@@ -32,8 +32,11 @@
 #### Parse BC/IR
 
 - https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
-- lbci, A Lua bytecode inspector library http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
-- ldumplib, A bytecode dumper for Lua 4.0 http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
+- lbci, A Lua bytecode inspector library
+	- http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
+	- https://github.com/LuaDist/lbci
+- ldumplib, A bytecode dumper for Lua 4.0
+	- http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
 - https://github.com/franko/luajit-lang-toolkit
 - C: https://github.com/sztupy/luadec51
 - https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
