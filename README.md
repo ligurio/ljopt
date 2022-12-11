@@ -6,7 +6,7 @@
 string.dump(f [,strip])
 luajit -jbc=- foo.lua
 luajit -bl -e "a = a + 1"
-luajit -jdump=-m -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"
+luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"
 ```
 
 ### Parsing BC/IR
