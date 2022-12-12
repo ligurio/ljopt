@@ -73,8 +73,8 @@ Execute Z3: `z3 example.z3`
 
 ### References
 
-- https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
-- https://luajit.org/running.html#opt_b
-- https://luajit.org/extensions.html#string_dump
-- http://web.archive.org/web/20220607041118/http://wiki.luajit.org/SSA-IR-2.0
-- https://web.archive.org/web/20220717120825/http://wiki.luajit.org/Bytecode-2.0
+- `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
+- "Running LuaJIT", https://luajit.org/running.html#opt_b
+- `string.dump` description, https://luajit.org/extensions.html#string_dump
+- "SSA-IR-2.0", http://web.archive.org/web/20220607041118/http://wiki.luajit.org/SSA-IR-2.0
+- "Bytecode-2.0", https://web.archive.org/web/20220717120825/http://wiki.luajit.org/Bytecode-2.0
