@@ -2,6 +2,8 @@
 
 ### Exporting BC/IR
 
+какой вид экспорта с учётом сделанных оптимизаций, а какой нет?
+
 ```
 string.dump(f [,strip])
 luajit -jbc=- foo.lua
@@ -11,19 +13,17 @@ luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"
 
 ### Parsing BC/IR
 
-- https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
-- lbci, A Lua bytecode inspector library
-	- http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
-	- https://github.com/LuaDist/lbci
+- lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
 - ldumplib, A bytecode dumper for Lua 4.0 http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
 - https://github.com/franko/luajit-lang-toolkit
-- C: https://github.com/sztupy/luadec51
-- https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
+- https://github.com/sztupy/luadec51, written in C
+- https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd, Lua VM written in Lua.
 - LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
-- IR decompiler https://gitlab.com/znixian/luajit-decompiler
+- https://gitlab.com/znixian/luajit-decompiler, written in Python
 
 ### References
 
+- https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - https://luajit.org/running.html#opt_b
 - https://luajit.org/extensions.html#string_dump
 - http://web.archive.org/web/20220607041118/http://wiki.luajit.org/SSA-IR-2.0
