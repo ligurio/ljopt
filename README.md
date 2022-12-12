@@ -28,30 +28,6 @@ Translate `example.luac` to `example.z3`: `luajit lj2smt.lua example.luac`
 
 Execute Z3: `z3 example.z3`
 
-### Optimizations
-
-#### PUC Rio Lua
-
-- "A no-frills introduction to Lua 5 VM instructions.",
-  http://underpop.free.fr/l/lua/docs/a-no-frills-introduction-to-lua-5.1-vm-instructions.pdf
-- "The Implementation of Lua 5.0", https://www.lua.org/doc/jucs05.pdf
-- "Optimizing Lua VM Bytecode using Global Dataflow Analysis" (Chapter 3 Optimizing),
-  https://nymphium.github.io/pdf/opeth_report.pdf
-
-#### LuaJIT
-
-- "Tecnical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
-  https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
-- IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
-- https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
-
 ### Exporting BC/IR
 
 1. `luajit -b -e "local function add(a, b) return a + b end; add(1, 2)" luac.out`
@@ -81,3 +57,19 @@ Execute Z3: `z3 example.z3`
 - `string.dump` description, https://luajit.org/extensions.html#string_dump
 - "SSA-IR-2.0", http://web.archive.org/web/20220607041118/http://wiki.luajit.org/SSA-IR-2.0
 - "Bytecode-2.0", https://web.archive.org/web/20220717120825/http://wiki.luajit.org/Bytecode-2.0
+- "A no-frills introduction to Lua 5 VM instructions.",
+  http://underpop.free.fr/l/lua/docs/a-no-frills-introduction-to-lua-5.1-vm-instructions.pdf
+- "The Implementation of Lua 5.0", https://www.lua.org/doc/jucs05.pdf
+- "Optimizing Lua VM Bytecode using Global Dataflow Analysis" (Chapter 3 Optimizing),
+  https://nymphium.github.io/pdf/opeth_report.pdf
+- "Tecnical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
+  https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
+- IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
+- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
+- LuaJIT tests, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
