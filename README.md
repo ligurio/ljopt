@@ -16,9 +16,9 @@ fd:write(bc)
 fd:close()
 ```
 
-Run: `lua example.lua`
+Run: `luajit example.lua`
 
-Translate `example.luac` to `example.z3`: `lua lj2smt.lua example.luac`
+Translate `example.luac` to `example.z3`: `luajit lj2smt.lua example.luac`
 
 Execute Z3: `z3 example.z3`
 
