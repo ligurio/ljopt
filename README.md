@@ -59,7 +59,8 @@ Execute Z3: `z3 example.z3`
 3. `luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"`
 4. `string.dump(f [,strip])`
 
-### Parsing BC/IR
+<details>
+  <summary>Parsing BC/IR</summary>
 
 - (!) Lua: https://github.com/franko/luajit-lang-toolkit/blob/master/lang/bcread.lua
 - (!) Lua: LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
@@ -70,6 +71,8 @@ Execute Z3: `z3 example.z3`
 - Lua: https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
 - Python: https://gitlab.com/znixian/luajit-decompiler
 - C: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_bcread.c
+
+</details>
 
 ### References
 
