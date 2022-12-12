@@ -65,11 +65,17 @@ Execute Z3: `z3 example.z3`
 - "Tecnical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
   https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
 - IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
+- "DCE: Dead Code Elimination",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
+- "LOOP: Loop Optimizations",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
+- "Memory access optimizations",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
+- "NARROW: Narrowing of numbers to integers",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
+- "SINK: Allocation Sinking and Store Sinking",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
+- "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 - LuaJIT tests, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
