@@ -1,5 +1,19 @@
 ## LuaJIT to SMT
 
+### Optimizations
+
+- "The Implementation of Lua 5.0", https://www.lua.org/doc/jucs05.pdf
+- "Optimizing Lua VM Bytecode using Global Dataflow Analysis", https://nymphium.github.io/pdf/opeth_report.pdf
+- LuaJIT
+	- IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
+	- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
+
 ### Exporting BC/IR
 
 какой вид экспорта с учётом сделанных оптимизаций, а какой нет?
@@ -13,13 +27,15 @@ luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"
 
 ### Parsing BC/IR
 
-- lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
+- (!) Lua: https://github.com/franko/luajit-lang-toolkit/blob/master/lang/bcread.lua
+- (!) Lua: LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
+- C: lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
 - ldumplib, A bytecode dumper for Lua 4.0 http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
 - https://github.com/franko/luajit-lang-toolkit
-- https://github.com/sztupy/luadec51, written in C
-- https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd, Lua VM written in Lua.
-- LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
-- https://gitlab.com/znixian/luajit-decompiler, written in Python
+- C: https://github.com/sztupy/luadec51/tree/master/luadec
+- Lua: https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
+- Python: https://gitlab.com/znixian/luajit-decompiler
+- C: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_bcread.c
 
 ### References
 
