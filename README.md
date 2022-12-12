@@ -4,13 +4,16 @@
 
 #### PUC Rio Lua
 
-- "A no-frills introduction to Lua 5 VM instructions.", http://underpop.free.fr/l/lua/docs/a-no-frills-introduction-to-lua-5.1-vm-instructions.pdf
+- "A no-frills introduction to Lua 5 VM instructions.",
+  http://underpop.free.fr/l/lua/docs/a-no-frills-introduction-to-lua-5.1-vm-instructions.pdf
 - "The Implementation of Lua 5.0", https://www.lua.org/doc/jucs05.pdf
-- "Optimizing Lua VM Bytecode using Global Dataflow Analysis", https://nymphium.github.io/pdf/opeth_report.pdf
+- "Optimizing Lua VM Bytecode using Global Dataflow Analysis" (Chapter 3 Optimizing),
+  https://nymphium.github.io/pdf/opeth_report.pdf
 
 #### LuaJIT
 
-- "Tecnical Documentation trace-based just-in-time compiler LuaJIT", https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
+- "Tecnical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
+  https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
 - IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
