@@ -1,5 +1,27 @@
 ## LuaJIT to SMT
 
+### How-to
+
+Create an `example.lua`:
+
+```lua
+local function add(a, b)
+	return a + b
+end
+
+local bc = string.dump(add)
+
+local fd = io.open("example.luac", "wb")
+fd:write(bc)
+fd:close()
+```
+
+Run: `lua example.lua`
+
+Translate `example.luac` to `example.z3`: `lua lj2smt.lua example.luac`
+
+Execute Z3: `z3 example.z3`
+
 ### Optimizations
 
 #### PUC Rio Lua
@@ -22,6 +44,7 @@
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
 - https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
+- https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
 
 ### Exporting BC/IR
 
