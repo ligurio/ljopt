@@ -2,6 +2,12 @@
 
 ### How-to
 
+Setup package dependencies:
+
+```sh
+$ apt install -y luajit z3
+```
+
 Create an `example.lua`:
 
 ```lua
@@ -48,14 +54,10 @@ Execute Z3: `z3 example.z3`
 
 ### Exporting BC/IR
 
-какой вид экспорта с учётом сделанных оптимизаций, а какой нет?
-
-```
-string.dump(f [,strip])
-luajit -jbc=- foo.lua
-luajit -bl -e "a = a + 1"
-luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"
-```
+1. `luajit -b -e "local function add(a, b) return a + b end; add(1, 2)" luac.out`
+2. `luajit -jdump=bi -O+loop -Ohotloop=1 -e "local function add(a, b) return a + b end; add(1, 4) add(1, 2) add(1, 54)"`
+3. `luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"`
+4. `string.dump(f [,strip])`
 
 ### Parsing BC/IR
 
