@@ -67,7 +67,8 @@ Execute Z3: `z3 example.z3`
 - IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
 - "DCE: Dead Code Elimination",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
-- https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+- "FOLD: Constant Folding, Algebraic Simplifications and Reassociation",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
 - "LOOP: Loop Optimizations",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
 - "Memory access optimizations",
