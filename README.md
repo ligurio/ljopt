@@ -53,7 +53,7 @@ Execute Z3: `z3 example.z3`
 ### References
 
 <details>
-  <summary>Parsing BC/IR</summary>
+  <summary>References</summary>
 
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - "Running LuaJIT", https://luajit.org/running.html#opt_b
