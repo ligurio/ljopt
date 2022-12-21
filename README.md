@@ -52,6 +52,9 @@ Execute Z3: `z3 example.z3`
 
 ### References
 
+<details>
+  <summary>Parsing BC/IR</summary>
+
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - "Running LuaJIT", https://luajit.org/running.html#opt_b
 - `string.dump` description, https://luajit.org/extensions.html#string_dump
@@ -80,3 +83,5 @@ Execute Z3: `z3 example.z3`
 - "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 - LuaJIT tests, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
+
+</details>

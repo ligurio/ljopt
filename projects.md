@@ -16,3 +16,4 @@
 > logic mistake.
 - Z3 и SQL https://cosette.cs.washington.edu/
 - https://github.com/SRI-CSL/llvm2smt#what-we-do
+- PyPy https://www.pypy.org/posts/2022/12/jit-bug-finding-smt-fuzzing.html
