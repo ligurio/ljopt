@@ -127,6 +127,38 @@ The callback can be called:
 Set a callback with `jit.attach(callback, "event")` and clear the same callback
 with `jit.attach(callback)`.
 
+**Arguments**
+
+1. function `callback`
+
+The callback function.
+The arguments passed to the callback depend on the event being reported:
+
+- "bc": function func - The function that's just been recorded
+- "trace": string what - description of the trace event: "flush", "start",
+  "stop", "abort". Available for all events.
+- number tr - The trace number. Not available for flush.
+- function func - The function being traced. Available for start and abort.
+- number pc - The program counter - the bytecode number of the function being
+  recorded (if this a Lua function). Available for start and abort.
+- number otr - start: the parent trace number if this is a side trace, abort: abort code
+- string oex - start: the exit number for the parent trace, abort: abort reason (string)
+  "record": number tr - The trace number. Not available for flush.
+- function func - The function being traced. Available for start and abort.
+- number pc - The program counter - the bytecode number of the function being
+  recorded (if this a Lua function). Available for start and abort.
+- number depth - The depth of the inlining of the current bytecode.
+  "texit": number tr - The trace number. Not available for flush.
+- number ex - The exit number
+- number ngpr - The number of general-purpose and floating point registers that
+  are active at the exit.
+- number nfpr - The number of general-purpose and floating point registers that
+  are active at the exit.
+
+2 string event
+
+The event to hook into.
+
 Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
 
 ### References
