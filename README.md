@@ -111,6 +111,8 @@ Tarantool documentation: https://www.tarantool.io/en/doc/latest/reference/refere
 
 3. `jit.attach()`
 
+https://wiki.facepunch.com/gmod/jit.attach
+
 Attach a handler to the compiler pipeline with the given priority. The handler
 is detached if no priority is given. The inner workings of the compiler
 pipeline and the API for handlers are still in flux. Please see the source code
