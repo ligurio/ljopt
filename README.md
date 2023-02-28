@@ -30,10 +30,29 @@ Execute Z3: `z3 example.z3`
 
 ### Exporting BC/IR
 
+<!--
 1. `luajit -b -e "local function add(a, b) return a + b end; add(1, 2)" luac.out`
 2. `luajit -jdump=bi -O+loop -Ohotloop=1 -e "local function add(a, b) return a + b end; add(1, 4) add(1, 2) add(1, 54)"`
 3. `luajit -jdump=bi -O+loop -Ohotloop=1 -e "local b; for i = 1, 3 do b = 20 end"`
 4. `string.dump(f [,strip])`
+-->
+
+1. `string.dump(f [, strip])`, Lua API, compatible with LuaJIT as well as PUC Rio Lua.
+
+> Returns a string containing a binary representation of the given function, so
+> that a later loadstring on this string returns a copy of the function. `function`
+> must be a Lua function without upvalues.
+
+Example:
+
+```lua
+tarantool> string.dump(function() print() end)
+---
+- "\eLJ\x02\0*return string.dump(function() print() end) \0\0\x01\0\x01\0\x03\x04\x01\06\0\0\0B\0\x01\x01K\0\x01\0\nprint\0\0\0\0\0"
+...
+
+tarantool>
+```
 
 <details>
   <summary>Parsing BC/IR</summary>
@@ -47,14 +66,73 @@ Execute Z3: `z3 example.z3`
 - Lua: https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
 - Python: https://gitlab.com/znixian/luajit-decompiler
 - C: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_bcread.c
+- Python: https://github.com/luavela/dumpanalyze
 
 </details>
 
+2. `require("jit.bc").dump(f)`, LuaJIT-specific.
+
+Example:
+
+```lua
+local bc = require("jit.bc")
+
+local function foo() print("hello") end
+
+bc.dump(foo)           --> -- BYTECODE -- [...]
+print(bc.line(foo, 2)) --> 0002    KSTR     1   1      ; "hello"
+```
+
+```
+tarantool> jit_bc = require('jit.bc')
+---
+...
+
+tarantool> function f()
+         > print("D")
+         > end
+---
+...
+
+tarantool> jit_bc.dump(f)
+-- BYTECODE -- 0x01113163c8:1-3
+0001    GGET     0   0      ; "print"
+0002    KSTR     2   1      ; "D"
+0003    CALL     0   1   2
+0004    RET0     0   1
+
+---
+...
+```
+
+Source code: [LuaJIT bytecode listing module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/bc.lua)
+
+Tarantool documentation: https://www.tarantool.io/en/doc/latest/reference/reference_lua/jit/#jit-bc-dump
+
+3. `jit.attach()`
+
+Attach a handler to the compiler pipeline with the given priority. The handler
+is detached if no priority is given. The inner workings of the compiler
+pipeline and the API for handlers are still in flux. Please see the source code
+for more details.
+
+You can attach callbacks to a number of compiler events with `jit.attach`.
+The callback can be called:
+
+- when a function has been compiled to bytecode ("bc");
+- when trace recording starts or stops ("trace");
+- as a trace is being recorded ("record");
+- or when a trace exits through a side exit ("texit").
+
+Set a callback with `jit.attach(callback, "event")` and clear the same callback
+with `jit.attach(callback)`.
+
+Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
+
 ### References
 
-<details>
-  <summary>References</summary>
-
+- "Tutorial: How Folding Engine Works"
+  https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - "Running LuaJIT", https://luajit.org/running.html#opt_b
 - `string.dump` description, https://luajit.org/extensions.html#string_dump
@@ -83,5 +161,3 @@ Execute Z3: `z3 example.z3`
 - "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 - LuaJIT tests, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
-
-</details>
