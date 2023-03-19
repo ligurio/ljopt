@@ -1,4 +1,4 @@
-## LuaJIT to SMT
+## LuaJIT IR to SMT
 
 ### How-to
 
@@ -111,7 +111,8 @@ Tarantool documentation: https://www.tarantool.io/en/doc/latest/reference/refere
 
 3. `jit.attach()`
 
-https://wiki.facepunch.com/gmod/jit.attach
+- https://wiki.facepunch.com/gmod/jit.attach
+- https://luajit.org/ext_jit.html
 
 Attach a handler to the compiler pipeline with the given priority. The handler
 is detached if no priority is given. The inner workings of the compiler
@@ -134,6 +135,7 @@ with `jit.attach(callback)`.
 1. function `callback`
 
 The callback function.
+
 The arguments passed to the callback depend on the event being reported:
 
 - "bc": function func - The function that's just been recorded
