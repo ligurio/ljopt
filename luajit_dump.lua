@@ -2,6 +2,7 @@
 -- LuaJIT compiler dump module.
 --
 -- Copyright (C) 2005-2017 Mike Pall. All rights reserved.
+-- Copyright (C) 2023 Sergey Bronnikov. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 --
