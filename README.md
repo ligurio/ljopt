@@ -23,17 +23,25 @@ an argument to LuaJIT in the form:
 If you want to report traces on just part of your code, it's better to use it
 explicitly.
 
-**`local loom = require 'jit.loom'`**
-
 As any module, you have to `require()` it first.
+
+`local loom = require('jit.loom')`
+
+**`loom.start(out)`**
+
+Implements the `-jloom[=out]` option. The `out` parameter is either a writeable
+open file, defaults to `io.stdout`.  When the Lua VM is terminated normally,
+`loom.off()` is called with the reporting function created by the given
+template.
 
 **`loom.on()`**
 
 Starts recording all JIT events and traces.
 
-**`traces, funcs = loom.off()`**
-
-**`report = loom.off([f [, ...]])`**
+```lua
+traces, funcs = loom.off()
+report = loom.off([f [, ...]])
+```
 
 Stops recording and performs any processing and cross references needed to
 actually generate a report.
@@ -54,13 +62,6 @@ end
 That is, both return values (the `traces` and `funcs` arrays) are passed to the
 given function `f`, together with any extra argument, and returns any return
 value(s) of `f`.
-
-**`loom.start(out)`**
-
-Implements the `-jloom[=out]` option. The `out` parameter is either a writeable
-open file, defaults to `io.stdout`.  When the Lua VM is terminated normally,
-`loom.off()` is called with the reporting function created by the given
-template.
 
 **`loom.annotated(funcs, traces)`**
 
