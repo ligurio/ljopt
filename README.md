@@ -38,13 +38,15 @@ template.
 
 Starts recording all JIT events and traces.
 
+**`loom.off()`**
+
+Stops recording and performs any processing and cross references needed to
+actually generate a report.
+
 ```lua
 traces, funcs = loom.off()
 report = loom.off([f [, ...]])
 ```
-
-Stops recording and performs any processing and cross references needed to
-actually generate a report.
 
 Called without any arguments, returns two Lua tables, one with the processed
 trace information and a second one with all the functions involved in those
