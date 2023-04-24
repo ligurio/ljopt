@@ -3,8 +3,8 @@
 ### Usage
 
 - Setup package dependencies: `$ apt install -y luajit z3`
-- Create a `sample.lua`: `for i in ipairs({1, 2, 3, 4, 5}) do print(i) end`
-- Translate `sample.lua` to `sample.z3`: `luajit ljir2smt.lua > sample.z3`
+- Create a `sample.lua`: `echo "for i in ipairs({1, 2, 3, 4, 5}) do print(i) end" > sample.lua`
+- Translate `sample.lua` to `sample.z3`: `luajit -lloom -e 'loom.on()' > sample.z3`
 - Run Z3: `z3 sample.z3`
 
 ### As a command line argument
