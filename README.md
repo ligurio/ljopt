@@ -2,25 +2,8 @@
 
 ### Usage
 
-Setup package dependencies:
-
-```sh
-$ apt install -y luajit z3
-```
-
-- Create an `sample.lua`:
-
-```lua
-local function add(a, b)
-	return a + b
-end
-
-add()
-add()
-add()
-add()
-```
-
+- Setup package dependencies: `$ apt install -y luajit z3`
+- Create a `sample.lua`: `for i in ipairs({1, 2, 3, 4, 5}) do print(i) end`
 - Translate `sample.lua` to `sample.z3`: `luajit ljir2smt.lua > sample.z3`
 - Run Z3: `z3 sample.z3`
 
