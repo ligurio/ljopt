@@ -1,11 +1,11 @@
-## LuaJIT IR to SMT
+## Translate LuaJIT IR to SMT
 
 ### Usage
 
-- Setup package dependencies: `$ apt install -y luajit z3`
+- Setup dependencies: `$ apt install -y luajit z3`
 - Create a `sample.lua`: `echo "for i in ipairs({1, 2, 3, 4, 5}) do print(i) end" > sample.lua`
-- Translate `sample.lua` to `sample.z3`: `luajit -lloom -e 'loom.on()' > sample.z3`
-- Run Z3: `z3 sample.z3`
+- Translate `sample.lua` to `sample.smt`: `luajit -lloom -e 'loom.on()' > sample.smt`
+- Run Z3: `z3 sample.smt`
 
 ### Examples
 
