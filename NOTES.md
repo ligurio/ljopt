@@ -167,6 +167,8 @@ Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob
 
 ### References
 
+- loom https://github.com/cloudflare/loom
+- annotate.lua https://github.com/geoffleyland/luatrace/blob/master/lua/jit/annotate.lua
 - "Tutorial: How Folding Engine Works"
   https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua

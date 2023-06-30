@@ -7,6 +7,17 @@
 - Translate `sample.lua` to `sample.z3`: `luajit -lloom -e 'loom.on()' > sample.z3`
 - Run Z3: `z3 sample.z3`
 
+### Examples
+
+```sh
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-fold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Ofold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-fwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
+LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Ofwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
+```
+
 ### As a command line argument
 
 Just put it in a `jit/` directory within `package.path` or `$LUA_PATH`,
