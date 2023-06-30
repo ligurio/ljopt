@@ -10,12 +10,14 @@
 ### Examples
 
 ```sh
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-fold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Ofold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -O-fwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
-LUA_PATH='src/?.lua;test/tarantool-tests/?.lua;;' ./src/luajit -Ofwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
+luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
+luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
+luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
+luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
+luajit -O-fold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
+luajit -Ofold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
+luajit -O-fwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
+luajit -Ofwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
 ```
 
 ### As a command line argument
