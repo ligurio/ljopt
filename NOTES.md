@@ -165,7 +165,7 @@ The event to hook into.
 
 Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
 
-o### Optimisations
+### Optimisations
 
 - `fold` - Constant Folding, Simplifications and Reassociation
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
@@ -209,8 +209,6 @@ o### Optimisations
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
 - "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
-
-### Bugs
 
 ### References
 
