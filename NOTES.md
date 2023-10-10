@@ -165,6 +165,42 @@ The event to hook into.
 
 Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
 
+### Optimisations
+
+- `fold` - Constant Folding, Simplifications and Reassociation
+- `cse` - Common-Subexpression Elimination
+- `dce` - Dead-Code Elimination
+- `narrow` - Narrowing of numbers to integers
+- `loop` - Loop Optimizations (code hoisting)
+- `fwd` - Load Forwarding (L2L) and Store Forwarding (S2L)
+- `dse` - Dead-Store Elimination
+- `abc` - Array Bounds Check Elimination
+- `sink` - Allocation/Store Sinking
+- `fuse` - Fusion of operands into instructions
+- `fma` - Fused multiply-add
+
+### Bugs
+
+- dce: https://github.com/LuaJIT/LuaJIT/issues/791
+- dce: https://github.com/LuaJIT/LuaJIT/issues/651
+- dce: https://github.com/LuaJIT/LuaJIT/issues/1094
+- fold: https://github.com/LuaJIT/LuaJIT/issues/299
+- fold: https://github.com/LuaJIT/LuaJIT/issues/1084
+- fold: https://github.com/LuaJIT/LuaJIT/issues/1079
+- fold?: https://github.com/LuaJIT/LuaJIT/issues/981
+- fold: https://github.com/LuaJIT/LuaJIT/issues/833
+- fold: https://github.com/LuaJIT/LuaJIT/issues/799
+- fold: https://github.com/LuaJIT/LuaJIT/issues/797
+- fold: https://github.com/LuaJIT/LuaJIT/issues/792
+- fold: https://github.com/LuaJIT/LuaJIT/issues/505
+- fold: https://github.com/LuaJIT/LuaJIT/issues/540
+- fold: https://github.com/LuaJIT/LuaJIT/issues/311
+- narrow: https://github.com/LuaJIT/LuaJIT/issues/858
+- abc/fold: https://github.com/LuaJIT/LuaJIT/issues/794
+- fold: https://github.com/LuaJIT/LuaJIT/issues/311
+- cse: https://github.com/LuaJIT/LuaJIT/issues/1086
+- cse: https://github.com/LuaJIT/LuaJIT/issues/1084
+
 ### References
 
 - loom https://github.com/cloudflare/loom
