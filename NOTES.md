@@ -203,6 +203,7 @@ Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob
 
 ### References
 
+- bytecode parser in python https://gist.github.com/MickaelWalter/4b130d36040844abcb71bf69fe8d6fd4?ref=mickaelwalter.fr
 - loom https://github.com/cloudflare/loom
 - annotate.lua https://github.com/geoffleyland/luatrace/blob/master/lua/jit/annotate.lua
 - "Tutorial: How Folding Engine Works"
