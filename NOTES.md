@@ -165,49 +165,57 @@ The event to hook into.
 
 Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
 
-### Optimisations
+o### Optimisations
 
 - `fold` - Constant Folding, Simplifications and Reassociation
+  - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/299
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/1084
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/1079
+  - fold?: https://github.com/LuaJIT/LuaJIT/issues/981
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/833
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/799
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/797
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/792
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/505
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/540
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/311
+  - fold: https://github.com/LuaJIT/LuaJIT/issues/311
+  - "Tutorial: How Folding Engine Works"
+    https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `cse` - Common-Subexpression Elimination
+  - cse: https://github.com/LuaJIT/LuaJIT/issues/1086
+  - cse: https://github.com/LuaJIT/LuaJIT/issues/1084
 - `dce` - Dead-Code Elimination
+  - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
+  - dce: https://github.com/LuaJIT/LuaJIT/issues/791
+  - dce: https://github.com/LuaJIT/LuaJIT/issues/651
+  - dce: https://github.com/LuaJIT/LuaJIT/issues/1094
 - `narrow` - Narrowing of numbers to integers
+  - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
+  - narrow: https://github.com/LuaJIT/LuaJIT/issues/858
 - `loop` - Loop Optimizations (code hoisting)
+  - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
 - `fwd` - Load Forwarding (L2L) and Store Forwarding (S2L)
 - `dse` - Dead-Store Elimination
 - `abc` - Array Bounds Check Elimination
+  - abc/fold: https://github.com/LuaJIT/LuaJIT/issues/794
 - `sink` - Allocation/Store Sinking
+  - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
 - `fuse` - Fusion of operands into instructions
 - `fma` - Fused multiply-add
 
-### Bugs
+- "Memory access optimizations",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
+- "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
+  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 
-- dce: https://github.com/LuaJIT/LuaJIT/issues/791
-- dce: https://github.com/LuaJIT/LuaJIT/issues/651
-- dce: https://github.com/LuaJIT/LuaJIT/issues/1094
-- fold: https://github.com/LuaJIT/LuaJIT/issues/299
-- fold: https://github.com/LuaJIT/LuaJIT/issues/1084
-- fold: https://github.com/LuaJIT/LuaJIT/issues/1079
-- fold?: https://github.com/LuaJIT/LuaJIT/issues/981
-- fold: https://github.com/LuaJIT/LuaJIT/issues/833
-- fold: https://github.com/LuaJIT/LuaJIT/issues/799
-- fold: https://github.com/LuaJIT/LuaJIT/issues/797
-- fold: https://github.com/LuaJIT/LuaJIT/issues/792
-- fold: https://github.com/LuaJIT/LuaJIT/issues/505
-- fold: https://github.com/LuaJIT/LuaJIT/issues/540
-- fold: https://github.com/LuaJIT/LuaJIT/issues/311
-- narrow: https://github.com/LuaJIT/LuaJIT/issues/858
-- abc/fold: https://github.com/LuaJIT/LuaJIT/issues/794
-- fold: https://github.com/LuaJIT/LuaJIT/issues/311
-- cse: https://github.com/LuaJIT/LuaJIT/issues/1086
-- cse: https://github.com/LuaJIT/LuaJIT/issues/1084
+### Bugs
 
 ### References
 
 - bytecode parser in python https://gist.github.com/MickaelWalter/4b130d36040844abcb71bf69fe8d6fd4?ref=mickaelwalter.fr
-- loom https://github.com/cloudflare/loom
 - annotate.lua https://github.com/geoffleyland/luatrace/blob/master/lua/jit/annotate.lua
-- "Tutorial: How Folding Engine Works"
-  https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - "Running LuaJIT", https://luajit.org/running.html#opt_b
 - `string.dump` description, https://luajit.org/extensions.html#string_dump
@@ -218,21 +226,27 @@ Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob
 - "The Implementation of Lua 5.0", https://www.lua.org/doc/jucs05.pdf
 - "Optimizing Lua VM Bytecode using Global Dataflow Analysis" (Chapter 3 Optimizing),
   https://nymphium.github.io/pdf/opeth_report.pdf
-- "Tecnical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
+- "Technical Documentation trace-based just-in-time compiler LuaJIT" (4.3 Optimisation),
   https://raw.githubusercontent.com/MethodicalAcceleratorDesign/MADdocs/master/luajit/luajit-doc.pdf
 - IR: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_iropt.h
-- "DCE: Dead Code Elimination",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
-- "FOLD: Constant Folding, Algebraic Simplifications and Reassociation",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
-- "LOOP: Loop Optimizations",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
-- "Memory access optimizations",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_mem.c
-- "NARROW: Narrowing of numbers to integers",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
-- "SINK: Allocation Sinking and Store Sinking",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
-- "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
-  https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 - LuaJIT tests, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
+
+### Проекты для проверки эквивалентности кода для тестирования оптимизаций
+
+- libfuzzer + solidity https://blog.soliditylang.org/2021/02/10/an-introduction-to-soliditys-fuzz-testing-approach/
+- Solidity https://github.com/ethereum/solidity/tree/develop/test/formal
+- https://github.com/kristerw/pysmtgcc/blob/main/smtgcc.py
+- https://github.com/boogie-org/boogie
+- https://github.com/p4gauntlet/gauntlet
+- https://www.usenix.org/conference/osdi20/presentation/ruffy
+- Alive2 для проверки оптимизаций https://web.ist.utl.pt/nuno.lopes/pubs.php?id=alive2-pldi21
+- https://foss.heptapod.net/pypy/pypy/-/issues/3832
+- https://github.com/MattPD/cpplinks/blob/master/compilers.correctness.md#verification
+> You can use Z3 to encode the source code before and after a compiler
+> optimization as a logic formula and then check whether the formulae are
+> equivalent. If they are not, there is likely a semantic bug in the
+> transformation pass of your compiler, meaning you have introduced a subtle
+> logic mistake.
+- Z3 и SQL https://cosette.cs.washington.edu/
+- https://github.com/SRI-CSL/llvm2smt#what-we-do
+- PyPy https://www.pypy.org/posts/2022/12/jit-bug-finding-smt-fuzzing.html
