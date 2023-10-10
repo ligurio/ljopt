@@ -169,37 +169,38 @@ Source code: [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob
 
 - `fold` - Constant Folding, Simplifications and Reassociation
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/299
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/1084
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/1079
-  - fold?: https://github.com/LuaJIT/LuaJIT/issues/981
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/833
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/799
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/797
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/792
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/505
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/540
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/311
-  - fold: https://github.com/LuaJIT/LuaJIT/issues/311
+  - https://github.com/LuaJIT/LuaJIT/issues/299
+  - https://github.com/LuaJIT/LuaJIT/issues/1084
+  - https://github.com/LuaJIT/LuaJIT/issues/1079
+  - https://github.com/LuaJIT/LuaJIT/issues/981
+  - https://github.com/LuaJIT/LuaJIT/issues/833
+  - https://github.com/LuaJIT/LuaJIT/issues/799
+  - https://github.com/LuaJIT/LuaJIT/issues/797
+  - https://github.com/LuaJIT/LuaJIT/issues/792
+  - https://github.com/LuaJIT/LuaJIT/issues/505
+  - https://github.com/LuaJIT/LuaJIT/issues/540
+  - https://github.com/LuaJIT/LuaJIT/issues/311
+  - https://github.com/LuaJIT/LuaJIT/issues/311
   - "Tutorial: How Folding Engine Works"
     https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `cse` - Common-Subexpression Elimination
-  - cse: https://github.com/LuaJIT/LuaJIT/issues/1086
-  - cse: https://github.com/LuaJIT/LuaJIT/issues/1084
+  - https://github.com/LuaJIT/LuaJIT/issues/1086
+  - https://github.com/LuaJIT/LuaJIT/issues/1084
 - `dce` - Dead-Code Elimination
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
-  - dce: https://github.com/LuaJIT/LuaJIT/issues/791
-  - dce: https://github.com/LuaJIT/LuaJIT/issues/651
-  - dce: https://github.com/LuaJIT/LuaJIT/issues/1094
+  - https://github.com/LuaJIT/LuaJIT/issues/791
+  - https://github.com/LuaJIT/LuaJIT/issues/651
+  - https://github.com/LuaJIT/LuaJIT/issues/1094
 - `narrow` - Narrowing of numbers to integers
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_narrow.c
-  - narrow: https://github.com/LuaJIT/LuaJIT/issues/858
+  - https://github.com/LuaJIT/LuaJIT/issues/858
 - `loop` - Loop Optimizations (code hoisting)
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_loop.c
 - `fwd` - Load Forwarding (L2L) and Store Forwarding (S2L)
+  - https://github.com/LuaJIT/LuaJIT/issues/606
 - `dse` - Dead-Store Elimination
 - `abc` - Array Bounds Check Elimination
-  - abc/fold: https://github.com/LuaJIT/LuaJIT/issues/794
+  - https://github.com/LuaJIT/LuaJIT/issues/794
 - `sink` - Allocation/Store Sinking
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
 - `fuse` - Fusion of operands into instructions
