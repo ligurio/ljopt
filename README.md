@@ -3,9 +3,10 @@
 ### Usage
 
 - Setup dependencies: `$ apt install -y luajit z3`.
-- Create a `sample.lua`: `echo "for i in ipairs({1, 2, 3, 4, 5}) do print(i) end" > sample.lua`
-- Record LJ IR output: `luajit -l ljir -e 'ljir.on()' > sample.txt`
-- Translate `sample.txt` to `sample.smt`: `luajit -e 'ljir.on()' > sample.smt`
+- Record LJ IR output without `dce`: `luajit -O-dce -Ohotloop=1 -Ohotexit=1 -jdump=i -e "require('jtbl').on()" -e "for i = 1, 4 do a = i + 1 end"`
+- Record LJ IR output with `dce`: `luajit -Odce -Ohotloop=1 -Ohotexit=1 -jdump=i -e "require('jtbl').on()" -e "for i = 1, 4 do a = i + 1 end"`
+- Translate `sample_with_dce.txt` to `sample_with_dce.smt`.
+- Translate `sample_wo_dce.txt` to `sample_wo_dce.smt`.
 - Run Z3: `z3 sample.smt`
 
 ### Examples
