@@ -397,13 +397,12 @@ end
 -- Open the output file and attach dump handlers.
 local function dumpon(outfile)
   if active then dumpoff() end
-  assert(outfile)
   dumpmode = { t=true, b=true, i=true, m=false }
   jit.attach(dump_trace, "trace")
   colorize = colorize_text
   irtype = irtype_text
   active = true
-  out = outfile
+  out = outfile or io.stdout
 end
 
 return {
