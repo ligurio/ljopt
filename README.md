@@ -10,6 +10,10 @@
 - Translate `sample_wo_dce.txt` to `sample_wo_dce.smt`.
 - Run Z3: `z3 sample.smt`
 
+```
+$ lj2smt sammple.lua > sample.smt
+```
+
 ### Examples
 
 ```sh
