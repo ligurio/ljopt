@@ -13,14 +13,14 @@
 ### Examples
 
 ```sh
-luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
-luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/array.lua
-luajit -O-dse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
-luajit -Odse -jdump=i test/LuaJIT-tests/opt/dse/field.lua
-luajit -O-fold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
-luajit -Ofold -jdump=i test/LuaJIT-tests/opt/fold/kfold.lua
-luajit -O-fwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
-luajit -Ofwd -jdump=i test/LuaJIT-tests/opt/fwd/tnew_tdup.lua
+luajit -O-dse -jdump=i opt-tests/dse/array.lua
+luajit -Odse -jdump=i opt-tests/dse/array.lua
+luajit -O-dse -jdump=i opt-tests/dse/field.lua
+luajit -Odse -jdump=i opt-tests/dse/field.lua
+luajit -O-fold -jdump=i opt-tests/fold/kfold.lua
+luajit -Ofold -jdump=i opt-tests/fold/kfold.lua
+luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua
+luajit -Ofwd -jdump=i opt-tests/fwd/tnew_tdup.lua
 ```
 
 ### Lua API
