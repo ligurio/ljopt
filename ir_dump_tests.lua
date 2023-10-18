@@ -14,7 +14,7 @@ for _ = 1, 3 do
 end
 ]]
 
-local dump = require("jit.dump")
+local dump = require("ir.dump")
 local name = "dump.txt"
 dump.on(name)
 loadstring(code)()

@@ -138,6 +138,20 @@ The event to hook into.
 
 ### References
 
+`git effort`:
+
+```
+  src/lj_asm.c.................. 248         165
+  src/lj_record.c............... 219         145
+  src/lj_crecord.c.............. 155         110
+  src/lj_opt_fold.c............. 147         98
+  src/lj_arch.h................. 132         103
+  src/lj_asm_x86.h.............. 109         77
+  src/lj_err.c.................. 106         89
+  src/lj_trace.c................ 101         78
+  ...
+```
+
 #### LuaJIT IR
 
 - LuaJIT Wiki: LuaJIT SSA IR, https://github.com/tarantool/tarantool/wiki/LuaJIT-SSA-IR
@@ -216,6 +230,7 @@ The event to hook into.
 
 ### Трансляция семантики в SMT-LIB
 
+- http://www.cprover.org/cprover-manual/cbmc/unwinding/
 - https://github.com/SRI-CSL/llvm2smt#what-we-do
 - https://www.pypy.org/posts/2022/12/jit-bug-finding-smt-fuzzing.html
 - https://kristerw.github.io/2022/09/13/translation-validation/
