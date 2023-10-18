@@ -144,7 +144,7 @@ The event to hook into.
   src/lj_asm.c.................. 248         165
   src/lj_record.c............... 219         145
   src/lj_crecord.c.............. 155         110
-  src/lj_opt_fold.c............. 147         98
+  src/lj_opt_fold.c............. 147         98    <-------- o_O
   src/lj_arch.h................. 132         103
   src/lj_asm_x86.h.............. 109         77
   src/lj_err.c.................. 106         89
