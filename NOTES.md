@@ -154,6 +154,13 @@ The event to hook into.
 
 #### LuaJIT IR
 
+```sh
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/array.lua) <(luajit -Odse -jdump=i opt-tests/dse/array.lua)
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/field.lua) <(luajit -Odse -jdump=i opt-tests/dse/field.lua)
+diff -u <(luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua) <(luajit -Ofwd -jdump=i opt-tests/fwd/tnew_tdup.lua)
+diff -u <(luajit -O-fold -jdump=i opt-tests/dse/kfold.lua) <(luajit -Ofold -jdump=i opt-tests/fold/kfold.lua)
+```
+
 - LuaJIT Wiki: LuaJIT SSA IR, https://github.com/tarantool/tarantool/wiki/LuaJIT-SSA-IR
 - LuaJIT Wiki: Not Yet Implemented, https://github.com/tarantool/tarantool/wiki/LuaJIT-Not-Yet-Implemented
 - Running LuaJIT, https://luajit.org/running.html#opt_b
