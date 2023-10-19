@@ -4,8 +4,8 @@
 
 - Setup dependencies: `$ apt install -y luajit z3`.
 - Lua code: `$C = "for i = 1, 4 do a = i + 1 end"`
+- Record LJ IR output with enabled `dce`: `luajit -O+dce -Ohotloop=1 -e "require('lj-opt').check()" -e "$C"`
 - Record LJ IR output without `dce`: `luajit -O-dce -Ohotloop=1 -e "require('lj-opt').check()" -e "$C"`
-- Record LJ IR output with `dce`: `luajit -Odce -Ohotloop=1 -e "require('lj-opt').check()" -e "$C"`
 - Translate `sample_with_dce.txt` to `sample_with_dce.smt`.
 - Translate `sample_wo_dce.txt` to `sample_wo_dce.smt`.
 - Run Z3: `z3 sample.smt`

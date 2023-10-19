@@ -2,10 +2,10 @@
 	Project: DisLua.
 	Author: imring <fishlake-scripts.ru>.
 	License: MIT License.
-	
+
 	Project "DisLua" is a parser of bytecode LuaJIT.
     Details: https://github.com/FishLake-Scripts/DisLua
-    
+
     This example displays opcodes of proto.
     USAGE: luajit bytecode-list.lua in.luac [out.lua]
 ]]
@@ -96,7 +96,7 @@ for i = 1, #parser.protos do
             jmps_addr[#jmps_addr + 1] = addr
         end
     end
-    
+
 	out:write(('-- BYTECODE -- %s\n'):format(proto))
 	out:write(('-- size: %08x args: %d opcodes: %d\n'):format(proto.len, proto.numparams, proto.sizebc))
 
@@ -106,7 +106,7 @@ for i = 1, #parser.protos do
         local comments
 
         local kgcmax = #proto.kgc
-        
+
         if bc.opcode == 51 then -- FNEW
             local field2 = bc.fields[2]
             local val = proto.kgc[kgcmax - field2]
