@@ -270,3 +270,6 @@ The event to hook into.
 - https://github.com/SRI-CSL/llvm2smt#what-we-do
 - https://www.pypy.org/posts/2022/12/jit-bug-finding-smt-fuzzing.html
 - https://kristerw.github.io/2022/09/13/translation-validation/
+- https://symflower.com/en/company/blog/2021/40-year-old-riddle-solved/
+- https://symflower.com/en/company/blog/2021/it-is-simply-math/
+- https://symflower.com/en/company/blog/2021/ssa/
