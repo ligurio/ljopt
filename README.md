@@ -17,14 +17,10 @@ $ lj-opt sample.lua > sample.smt
 ### Examples
 
 ```sh
-luajit -O-dse -jdump=i opt-tests/dse/array.lua
-luajit -Odse -jdump=i opt-tests/dse/array.lua
-luajit -O-dse -jdump=i opt-tests/dse/field.lua
-luajit -Odse -jdump=i opt-tests/dse/field.lua
-luajit -O-fold -jdump=i opt-tests/fold/kfold.lua
-luajit -Ofold -jdump=i opt-tests/fold/kfold.lua
-luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua
-luajit -Ofwd -jdump=i opt-tests/fwd/tnew_tdup.lua
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/array.lua) <(luajit -Odse -jdump=i opt-tests/dse/array.lua)
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/field.lua) <(luajit -Odse -jdump=i opt-tests/dse/field.lua)
+diff -u <(luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua) <(luajit -Ofwd -jdump=i opt-tests/fwd/tnew_tdup.lua)
+diff -u <(luajit -O-fold -jdump=i opt-tests/dse/kfold.lua) <(luajit -Ofold -jdump=i opt-tests/fold/kfold.lua)
 ```
 
 ### Lua API
