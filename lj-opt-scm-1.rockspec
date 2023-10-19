@@ -19,9 +19,8 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      luamut = "luamut/init.lua",
-      ["luamut.unicode"] = "luamut/unicode.lua",
-      ["luamut.unicode_printability_boundaries"] = "luamut/unicode_printability_boundaries.lua",
-      ["luamut.utils"] = "luamut/utils.lua",
+      ["lj-opt"] = "lj-opt/init.lua",
+      ["lj-opt.unicode"] = "lj-opt/unicode.lua",
+      ["lj-opt.utils"] = "lj-opt/utils.lua",
    },
 }

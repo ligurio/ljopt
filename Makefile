@@ -10,7 +10,7 @@ LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
 
-LUA_BIN ?= /usr/bin/lua
+LUA_BIN ?= /usr/bin/luajit
 
 all: check test
 
@@ -49,10 +49,7 @@ coverage: $(LUACOV_STATS)
 
 coveralls: coverage
 	@echo "Send code coverage data to the coveralls.io service"
-	@luacov-coveralls --include ^luamut --verbose --repo-token ${GITHUB_TOKEN}
-
-test-corpus: clean
-	@find corpus/static/ -name '*.lua' -print0 | xargs -0 -n1 -i ${LUA_BIN} {}
+	@luacov-coveralls --include ^lj-opt --verbose --repo-token ${GITHUB_TOKEN}
 
 clean:
 	@rm -rf ${CLEANUP_FILES}
