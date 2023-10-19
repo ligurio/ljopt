@@ -1,6 +1,36 @@
-## LuaJIT IR to SMT
+## LuaJIT BC to SMT
 
-### Parse LuaJIT and Lua bytecode
+### Example
+
+```
+$ luajit -jdump=-m -O+loop -Ohotloop=1 -e 'local b; for i = 1, 3 do b = 20 end'
+---- TRACE 1 start (command line):1
+0006  KSHORT   0  20
+0007  FORL     1 => 0006
+---- TRACE 1 IR
+0001    int SLOAD  #2    CI
+0002  + int ADD    0001  +1
+0003 >  int LE     0002  +3
+0004 ------ LOOP ------------
+0005  + int ADD    0002  +1
+0006 >  int LE     0005  +3
+0007    int PHI    0002  0005
+---- TRACE 1 stop -> loop
+
+$ luajit -bl -e "local a = 10; for i = 1, 20 do a = 30 end"
+-- BYTECODE -- 0x4034a150:0-1
+0001    KSHORT   0  10
+0002    KSHORT   1   1
+0003    KSHORT   2  20
+0004    KSHORT   3   1
+0005    FORI     1 => 0008
+0006 => KSHORT   0  30
+0007    FORL     1 => 0006
+0008 => RET0     0   1
+$
+```
+
+### Parse LuaJIT bytecode
 
 1. `string.dump(f [, strip])`, Lua API, compatible with LuaJIT as well as PUC Rio Lua.
 
@@ -82,6 +112,31 @@ tarantool> jit_bc.dump(f)
 ...
 ```
 
+## LuaJIT IR to SMT
+
+`git effort`:
+
+```
+  src/lj_asm.c.................. 248         165
+  src/lj_record.c............... 219         145
+  src/lj_crecord.c.............. 155         110
+  src/lj_opt_fold.c............. 147         98    <-------- o_O
+  src/lj_arch.h................. 132         103
+  src/lj_asm_x86.h.............. 109         77
+  src/lj_err.c.................. 106         89
+  src/lj_trace.c................ 101         78
+  ...
+```
+
+```sh
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/array.lua) <(luajit -O+dse -jdump=i opt-tests/dse/array.lua)
+diff -u <(luajit -O-dse -jdump=i opt-tests/dse/field.lua) <(luajit -O+dse -jdump=i opt-tests/dse/field.lua)
+diff -u <(luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua) <(luajit -O+fwd -jdump=i opt-tests/fwd/tnew_tdup.lua)
+diff -u <(luajit -O-fold -jdump=i opt-tests/fold/kfold.lua) <(luajit -O+fold -jdump=i opt-tests/fold/kfold.lua)
+```
+
+----
+
 3. `jit.attach()`
 
 - https://wiki.facepunch.com/gmod/jit.attach
@@ -136,38 +191,12 @@ The arguments passed to the callback depend on the event being reported:
 
 The event to hook into.
 
-### References
-
-`git effort`:
-
-```
-  src/lj_asm.c.................. 248         165
-  src/lj_record.c............... 219         145
-  src/lj_crecord.c.............. 155         110
-  src/lj_opt_fold.c............. 147         98    <-------- o_O
-  src/lj_arch.h................. 132         103
-  src/lj_asm_x86.h.............. 109         77
-  src/lj_err.c.................. 106         89
-  src/lj_trace.c................ 101         78
-  ...
-```
-
-#### LuaJIT IR
-
-```sh
-diff -u <(luajit -O-dse -jdump=i opt-tests/dse/array.lua) <(luajit -Odse -jdump=i opt-tests/dse/array.lua)
-diff -u <(luajit -O-dse -jdump=i opt-tests/dse/field.lua) <(luajit -Odse -jdump=i opt-tests/dse/field.lua)
-diff -u <(luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua) <(luajit -Ofwd -jdump=i opt-tests/fwd/tnew_tdup.lua)
-diff -u <(luajit -O-fold -jdump=i opt-tests/dse/kfold.lua) <(luajit -Ofold -jdump=i opt-tests/fold/kfold.lua)
-```
+#### References
 
 - LuaJIT Wiki: LuaJIT SSA IR, https://github.com/tarantool/tarantool/wiki/LuaJIT-SSA-IR
 - LuaJIT Wiki: Not Yet Implemented, https://github.com/tarantool/tarantool/wiki/LuaJIT-Not-Yet-Implemented
 - Running LuaJIT, https://luajit.org/running.html#opt_b
 - [LuaJIT compiler dump module](https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/jit/dump.lua)
-
-#### Optimisations
-
 - LuaJIT Wiki: LuaJIT Optimizations, https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations
 - LuaJIT Wiki: LuaJIT Allocation Sinking Optimization, https://github.com/tarantool/tarantool/wiki/LuaJIT-Allocation-Sinking-Optimization
 - LuaJIT tests on optimisations, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
@@ -214,7 +243,7 @@ diff -u <(luajit -O-fold -jdump=i opt-tests/dse/kfold.lua) <(luajit -Ofold -jdum
 - "SPLIT: Split 64 bit IR instructions into 32 bit IR instructions",
   https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_split.c
 
-### Проекты для проверки эквивалентности кода для тестирования оптимизаций
+## Проекты для проверки эквивалентности кода для тестирования оптимизаций
 
 - libfuzzer + solidity https://blog.soliditylang.org/2021/02/10/an-introduction-to-soliditys-fuzz-testing-approach/
 - Solidity https://github.com/ethereum/solidity/tree/develop/test/formal
@@ -235,7 +264,7 @@ diff -u <(luajit -O-fold -jdump=i opt-tests/dse/kfold.lua) <(luajit -Ofold -jdum
 - https://kristerw.github.io/2022/11/01/verifying-optimizations/
 - https://github.com/kristerw/pysmtgcc/blob/main/smtgcc.py
 
-### Трансляция семантики в SMT-LIB
+## Трансляция в SMT-LIB
 
 - http://www.cprover.org/cprover-manual/cbmc/unwinding/
 - https://github.com/SRI-CSL/llvm2smt#what-we-do
