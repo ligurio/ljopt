@@ -1,13 +1,13 @@
-package = 'lj-opt'
+package = 'ljopt'
 version = 'scm-1'
 source = {
-    url = 'git+https://github.com/ligurio/lj-opt',
+    url = 'git+https://github.com/ligurio/ljopt',
     branch = 'master',
 }
 
 description = {
     summary = 'Translate LuaJIT BC and IR to SMT',
-    homepage = 'https://github.com/ligurio/lj-opt',
+    homepage = 'https://github.com/ligurio/ljopt',
     maintainer = 'Sergey Bronnikov <estetus@gmail.com>',
     license = 'MIT',
 }
@@ -19,8 +19,8 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      ["lj-opt"] = "lj-opt/init.lua",
-      ["lj-opt.unicode"] = "lj-opt/unicode.lua",
-      ["lj-opt.utils"] = "lj-opt/utils.lua",
+      ["ljopt"] = "ljopt/init.lua",
+      ["ljopt.unicode"] = "ljopt/unicode.lua",
+      ["ljopt.utils"] = "ljopt/utils.lua",
    },
 }

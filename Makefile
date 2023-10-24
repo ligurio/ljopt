@@ -17,7 +17,7 @@ all: check test
 doc:
 	@ldoc -c $(PROJECT_DIR)/doc/config.ld -v \
               -d $(PROJECT_DIR)/doc/html/ \
-                 $(PROJECT_DIR)/luamut
+                 $(PROJECT_DIR)/ljopt
 
 deps:
 	@echo "Setup dependencies"
@@ -28,8 +28,8 @@ deps:
 	@luarocks install --local luacov-coveralls 0.2.3
 
 install:
-	@install -d -m 755 $(LUADIR)/luamut
-	@install -m 644 $(PROJECT_DIR)/luamut/*.lua $(LUADIR)/luamut
+	@install -d -m 755 $(LUADIR)/ljopt
+	@install -m 644 $(PROJECT_DIR)/ljopt/*.lua $(LUADIR)/ljopt
 
 check: luacheck
 
@@ -44,12 +44,12 @@ $(LUACOV_STATS): test
 
 coverage: $(LUACOV_STATS)
 	@sed -i -e 's@'"$$(realpath .)"'/@@' $(LUACOV_STATS)
-	@cd $(PROJECT_DIR) && luacov ^luamut
+	@cd $(PROJECT_DIR) && luacov ^ljopt
 	@grep -A999 '^Summary' $(LUACOV_REPORT)
 
 coveralls: coverage
 	@echo "Send code coverage data to the coveralls.io service"
-	@luacov-coveralls --include ^lj-opt --verbose --repo-token ${GITHUB_TOKEN}
+	@luacov-coveralls --include ^ljopt --verbose --repo-token ${GITHUB_TOKEN}
 
 clean:
 	@rm -rf ${CLEANUP_FILES}

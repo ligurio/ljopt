@@ -14,7 +14,7 @@ for _ = 1, 3 do
 end
 ]]
 
-local ljopt = require("lj-opt")
+local ljopt = require("ljopt")
 local name = "dump.txt"
 ljopt.dump.on(name)
 loadstring(code)()

@@ -129,10 +129,10 @@ tarantool> jit_bc.dump(f)
 ```
 
 ```sh
-diff -u <(luajit -O-dse -jdump=i opt-tests/dse/array.lua) <(luajit -O+dse -jdump=i opt-tests/dse/array.lua)
-diff -u <(luajit -O-dse -jdump=i opt-tests/dse/field.lua) <(luajit -O+dse -jdump=i opt-tests/dse/field.lua)
-diff -u <(luajit -O-fwd -jdump=i opt-tests/fwd/tnew_tdup.lua) <(luajit -O+fwd -jdump=i opt-tests/fwd/tnew_tdup.lua)
-diff -u <(luajit -O-fold -jdump=i opt-tests/fold/kfold.lua) <(luajit -O+fold -jdump=i opt-tests/fold/kfold.lua)
+diff -u <(luajit -O-dse -jdump=i trash/opt-tests/dse/array.lua) <(luajit -O+dse -jdump=i trash/opt-tests/dse/array.lua)
+diff -u <(luajit -O-dse -jdump=i trash/opt-tests/dse/field.lua) <(luajit -O+dse -jdump=i trash/opt-tests/dse/field.lua)
+diff -u <(luajit -O-fwd -jdump=i trash/opt-tests/fwd/tnew_tdup.lua) <(luajit -O+fwd -jdump=i trash/opt-tests/fwd/tnew_tdup.lua)
+diff -u <(luajit -O-fold -jdump=i trash/opt-tests/fold/kfold.lua) <(luajit -O+fold -jdump=i trash/opt-tests/fold/kfold.lua)
 ```
 
 ----
