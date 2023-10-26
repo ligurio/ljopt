@@ -1,5 +1,3 @@
 #!/bin/env luajit
 
---
--- $ lj2smt sammple.lua > sample.smt
---
+require "ljopt.main"
