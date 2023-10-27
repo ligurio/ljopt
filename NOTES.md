@@ -273,3 +273,5 @@ The event to hook into.
 - https://symflower.com/en/company/blog/2021/40-year-old-riddle-solved/
 - https://symflower.com/en/company/blog/2021/it-is-simply-math/
 - https://symflower.com/en/company/blog/2021/ssa/
+- An Abstract Interpretation-based Model of Tracing Just-In-Time
+Compilation, https://arxiv.org/pdf/1411.7839.pdf
