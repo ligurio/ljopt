@@ -6,7 +6,7 @@ source = {
 }
 
 description = {
-    summary = 'Translate LuaJIT BC and IR to SMT',
+    summary = 'Translate LuaJIT BC and IR to SMT-LIB',
     homepage = 'https://github.com/ligurio/ljopt',
     maintainer = 'Sergey Bronnikov <estetus@gmail.com>',
     license = 'MIT',
@@ -18,7 +18,6 @@ dependencies = {
 
 build = {
    type = "builtin",
-   -- TODO: setup bin executable.
    modules = {
       ["ljopt"] = "ljopt/init.lua",
       ["ljopt.main"] = "ljopt/main.lua",
@@ -29,4 +28,9 @@ build = {
       ["ljopt.smtlib_bc"] = "ljopt/smtlib_bc.lua",
       ["ljopt.smtlib_ir"] = "ljopt/smtlib_ir.lua",
    },
+   install = {
+      bin = {
+         ljopt = "bin/ljopt.lua"
+      }
+   }
 }
