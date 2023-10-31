@@ -12,15 +12,15 @@ description = {
     license = 'MIT',
 }
 
--- dependencies = {
---     "luajit >= 2.1.0"
--- }
+dependencies = {
+    "luajit >= 2.1.0"
+}
 
--- external_dependencies = {
---     LUAJIT = {
---         header = 'luajit-2.1/luajit.h',
---     },
--- }
+external_dependencies = {
+    LUAJIT = {
+        header = 'luajit-2.1/luajit.h',
+    },
+}
 
 build = {
    type = "builtin",
