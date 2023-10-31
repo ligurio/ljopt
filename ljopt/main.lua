@@ -1,3 +1,5 @@
+local ljopt = require("ljopt")
+
 -- TODO
 -- - bisect lj opt
 -- - bisect lj opt level

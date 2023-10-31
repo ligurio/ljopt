@@ -860,4 +860,6 @@ local function bcread(s, output, chunkname, hexdump)
     end
 end
 
-return { dump = bcread }
+return {
+    dump = bcread,
+}

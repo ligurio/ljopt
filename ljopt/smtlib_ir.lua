@@ -162,5 +162,13 @@ local ir_ins_bl = {
 	-- RENAME
 }
 
+local function is_supported_ir_ins(ins)
+
+end
+
+local function is_supported_ir_type(tp)
+
+end
+
 return {
 }
