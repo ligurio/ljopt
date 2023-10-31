@@ -18,9 +18,15 @@ dependencies = {
 
 build = {
    type = "builtin",
+   -- TODO: setup bin executable.
    modules = {
       ["ljopt"] = "ljopt/init.lua",
-      ["ljopt.unicode"] = "ljopt/unicode.lua",
-      ["ljopt.utils"] = "ljopt/utils.lua",
+      ["ljopt.main"] = "ljopt/main.lua",
+      ["ljopt.dump_bc"] = "ljopt/dump_bc.lua",
+      ["ljopt.dump_ir"] = "ljopt/dump_ir.lua",
+      ["ljopt.parse_bc"] = "ljopt/parse_bc.lua",
+      ["ljopt.parse_ir"] = "ljopt/parse_ir.lua",
+      ["ljopt.smtlib_bc"] = "ljopt/smtlib_bc.lua",
+      ["ljopt.smtlib_ir"] = "ljopt/smtlib_ir.lua",
    },
 }
