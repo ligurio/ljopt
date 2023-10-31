@@ -13,7 +13,7 @@ description = {
 }
 
 dependencies = {
-    "luajit >= 2.1.0"
+    "luajit >= 2.1"
 }
 
 external_dependencies = {
