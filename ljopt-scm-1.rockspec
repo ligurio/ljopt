@@ -12,14 +12,10 @@ description = {
     license = 'MIT',
 }
 
-dependencies = {
-    'luajit >= 2.1',
-}
-
 build = {
    type = "builtin",
    modules = {
-      ["ljopt"] = "ljopt/init.lua",
+      luacheck = "ljopt/init.lua",
       ["ljopt.main"] = "ljopt/main.lua",
       ["ljopt.dump_bc"] = "ljopt/dump_bc.lua",
       ["ljopt.dump_ir"] = "ljopt/dump_ir.lua",
@@ -30,7 +26,7 @@ build = {
    },
    install = {
       bin = {
-         ljopt = "bin/ljopt.lua"
+         ljopt = "bin/ljopt"
       }
    }
 }
