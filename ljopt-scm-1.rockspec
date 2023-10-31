@@ -16,6 +16,12 @@ dependencies = {
     "luajit >= 2.1.0"
 }
 
+external_dependencies = {
+    LUAJIT = {
+        header = 'luajit-2.1/luajit.h',
+    },
+}
+
 build = {
    type = "builtin",
    modules = {
