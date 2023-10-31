@@ -12,9 +12,9 @@ description = {
     license = 'MIT',
 }
 
-dependencies = {
-    "luajit >= 2.1"
-}
+-- dependencies = {
+--     "luajit >= 2.1"
+-- }
 
 external_dependencies = {
     LUAJIT = {
