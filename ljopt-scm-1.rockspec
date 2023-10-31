@@ -2,7 +2,7 @@ package = 'ljopt'
 version = 'scm-1'
 source = {
     url = 'git+https://github.com/ligurio/ljopt',
-    branch = 'master',
+    branch = 'devel',
 }
 
 description = {
