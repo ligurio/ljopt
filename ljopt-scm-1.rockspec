@@ -12,6 +12,10 @@ description = {
     license = 'MIT',
 }
 
+dependencies = {
+    "luajit >= 2.1"
+}
+
 build = {
    type = "builtin",
    modules = {
