@@ -1,12 +1,21 @@
-local dump_bc = require("ljopt.dump_bc")
-local dump_ir = require("ljopt.dump_ir")
-
-local parse_bc = require("ljopt.parse_bc")
-local parse_ir = require("ljopt.parse_ir")
+local dump_bc = require("ljopt.ir.dump")
+local dump_ir = require("ljopt.bc.dump")
+local parse_bc = require("ljopt.bc.parse")
+local parse_ir = require("ljopt.ir.parse")
+local smtlib_bc = require("ljopt.bc.parse")
+local smtlib_ir = require("ljopt.bc.parse")
 
 return {
-    translate_ir = dump_ir,
-    translate_bc = dump_bc,
+    ir = {
+	    dump = dump_ir,
+	    parse = parse_ir,
+	    smtlib = smtlib_ir,
+    },
+    bc = {
+	    dump = dump_bc,
+	    parse = parse_bc,
+	    smtlib = smtlib_bc,
+    },
 
    _VERSION = "0.0.1"
 }
