@@ -8,12 +8,11 @@ source = {
 description = {
     summary = 'Translate LuaJIT BC and IR to SMT-LIB',
     detailed = [[
-	  ljopt is a bounded translation validation tool for the LuaJIT bytecode
-      and intermediate representation (IR). It limits resource consumption by,
-	  for example, unrolling loops up to some bound, which means
-      there are circumstances in which it misses bugs. ljopt is
-      designed to avoid false alarms, is fully automatic through
-      the use of an SMT solver, and requires no changes to LuaJIT.
+ljopt is a bounded translation validation tool for the LuaJIT bytecode and
+intermediate representation (IR). It limits resource consumption by, for
+example, unrolling loops up to some bound, which means there are circumstances
+in which it misses bugs. ljopt is designed to avoid false alarms, is fully
+automatic through the use of an SMT solver, and requires no changes to LuaJIT.
     ]],
     homepage = 'https://github.com/ligurio/ljopt',
     maintainer = 'Sergey Bronnikov <estetus@gmail.com>',
