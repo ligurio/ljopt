@@ -30,16 +30,16 @@ external_dependencies = {
 }
 
 build = {
-   type = "builtin",
-   modules = {
-      ljopt = "ljopt/init.lua",
-      ["ljopt.main"] = "ljopt/main.lua",
-      ["ljopt.dump_bc"] = "ljopt/dump_bc.lua",
-      ["ljopt.dump_ir"] = "ljopt/dump_ir.lua",
-      ["ljopt.parse_bc"] = "ljopt/parse_bc.lua",
-      ["ljopt.parse_ir"] = "ljopt/parse_ir.lua",
-      ["ljopt.smtlib_bc"] = "ljopt/smtlib_bc.lua",
-      ["ljopt.smtlib_ir"] = "ljopt/smtlib_ir.lua",
+    type = "builtin",
+    modules = {
+        ljopt = "ljopt/init.lua",
+        ["ljopt.main"] = "ljopt/main.lua",
+        ["ljopt.bc.dump"] = "ljopt/bc/dump.lua",
+        ["ljopt.bc.smtlib"] = "ljopt/bc/smtlib.lua",
+        ["ljopt.bc.parse"] = "ljopt/bc/parse.lua",
+        ["ljopt.ir.dump"] = "ljopt/ir/dump.lua",
+        ["ljopt.ir.smtlib"] = "ljopt/ir/smtlib.lua",
+        ["ljopt.ir.parse"] = "ljopt/ir/parse.lua",
    },
    install = {
       bin = {
