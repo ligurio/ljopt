@@ -160,5 +160,11 @@ local function is_supported_ir_type(tp)
 
 end
 
+local function translate()
+    is_supported_ir_type()
+    is_supported_ir_ins()
+end
+
 return {
+    translate = translate,
 }
