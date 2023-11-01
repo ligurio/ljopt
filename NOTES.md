@@ -57,13 +57,14 @@ tarantool>
   - annotate.lua https://github.com/geoffleyland/luatrace/blob/master/lua/jit/annotate.lua
   - (!) Lua: https://github.com/franko/luajit-lang-toolkit/blob/master/lang/bcread.lua
   - (!) Lua: LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
-  - C: lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
   - ldumplib, A bytecode dumper for Lua 4.0 http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
   - https://github.com/franko/luajit-lang-toolkit
+  - C: lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
   - C: https://github.com/sztupy/luadec51/tree/master/luadec
-  - Lua: https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
-  - Python: https://gitlab.com/znixian/luajit-decompiler
   - C: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_bcread.c
+  - Lua: https://gist.github.com/meepen/807dd81a572ffb0f28a8c44c04922fdd
+  - Python: https://openpunk.com/pages/lua-bytecode-parser/
+  - Python: https://gitlab.com/znixian/luajit-decompiler
   - Python: https://github.com/luavela/dumpanalyze
 - `jit.dump` source code, https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua
 - `string.dump` description, https://luajit.org/extensions.html#string_dump
@@ -129,10 +130,10 @@ tarantool> jit_bc.dump(f)
 ```
 
 ```sh
-diff -u <(luajit -O-dse -jdump=i trash/opt-tests/dse/array.lua) <(luajit -O+dse -jdump=i trash/opt-tests/dse/array.lua)
-diff -u <(luajit -O-dse -jdump=i trash/opt-tests/dse/field.lua) <(luajit -O+dse -jdump=i trash/opt-tests/dse/field.lua)
-diff -u <(luajit -O-fwd -jdump=i trash/opt-tests/fwd/tnew_tdup.lua) <(luajit -O+fwd -jdump=i trash/opt-tests/fwd/tnew_tdup.lua)
-diff -u <(luajit -O-fold -jdump=i trash/opt-tests/fold/kfold.lua) <(luajit -O+fold -jdump=i trash/opt-tests/fold/kfold.lua)
+diff -u <(luajit -O-dse -jdump=i tests/opt/dse/array.lua) <(luajit -O+dse -jdump=i tests/opt/dse/array.lua)
+diff -u <(luajit -O-dse -jdump=i tests/opt/dse/field.lua) <(luajit -O+dse -jdump=i tests/opt/dse/field.lua)
+diff -u <(luajit -O-fwd -jdump=i tests/opt/fwd/tnew_tdup.lua) <(luajit -O+fwd -jdump=i tests/opt/fwd/tnew_tdup.lua)
+diff -u <(luajit -O-fold -jdump=i tests/opt/fold/kfold.lua) <(luajit -O+fold -jdump=i tests/opt/fold/kfold.lua)
 ```
 
 ----
