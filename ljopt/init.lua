@@ -5,6 +5,8 @@ local parse_ir = require("ljopt.ir.parse")
 local smtlib_bc = require("ljopt.bc.parse")
 local smtlib_ir = require("ljopt.bc.parse")
 
+local VERSION = "0.0.1"
+
 return {
     ir = {
 	    dump = dump_ir,
@@ -17,5 +19,5 @@ return {
 	    smtlib = smtlib_bc,
     },
 
-   _VERSION = "0.0.1"
+    VERSION = VERSION,
 }
