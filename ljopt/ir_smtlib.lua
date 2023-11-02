@@ -153,11 +153,11 @@ local ir_ins_bl = {
 }
 
 local function is_supported_ir_ins(ins)
-
+    return ir_ins_bl[ins] ~= nil
 end
 
 local function is_supported_ir_type(tp)
-
+    return ir_types_bl[tp] ~= nil
 end
 
 local function translate()

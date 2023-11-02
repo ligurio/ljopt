@@ -6,8 +6,8 @@ is an implementation of translation validation for LuaJIT.
 
 Create a file with Lua source code:
 
-```
-cat << EOF > example.lua
+```sh
+$ cat << EOF > example.lua
 for i = 1, 100 do local a, b = 23, 11; y = a + b end
 EOF
 ```
@@ -15,7 +15,7 @@ EOF
 Execute LuaJIT with disabled and enabled optimisation `fold`:
 
 ```diff
-diff -u <(luajit -O-fold -jdump=i example.lua) <(luajit -O+fold -jdump=i example.lua)
+$ diff -u <(luajit -O-fold -jdump=Ti example.lua) <(luajit -O+fold -jdump=Ti example.lua)
 
 --- /dev/fd/63	2023-11-02 19:40:58.479664213 +0300
 +++ /dev/fd/62	2023-11-02 19:40:58.479664213 +0300
@@ -71,13 +71,13 @@ diff -u <(luajit -O-fold -jdump=i example.lua) <(luajit -O+fold -jdump=i example
 
 Translate IR to SMT-LIB:
 
-```
-cat example.lua | LUA_PATH='./ljopt/init.lua;./ljopt/?.lua;;' ./bin/ljopt > example.smt2
+```sh
+$ tarantool bin/ljopt "$(example.lua)" > example.smt2
 ```
 
 Validate correctness of optimisation with Z3:
 
-```
+```sh
 $ z3 -smt2 example.smt2
 ```
 

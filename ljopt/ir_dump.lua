@@ -7,9 +7,6 @@
 --
 -- This module can be used to debug the JIT compiler itself. It dumps the
 -- code representations and structures used in various compiler stages.
---
--- Example usage:
--- TBD
 ------------------------------------------------------------------------------
 
 -- Cache some library functions and objects.
