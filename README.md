@@ -75,7 +75,8 @@ Translate IR to SMT-LIB:
 $ tarantool bin/ljopt "$(example.lua)" > example.smt2
 ```
 
-Validate correctness of optimisation with Z3:
+Validate correctness of the `fold` optimisation with SMT solver, for example
+Z3:
 
 ```sh
 $ z3 -smt2 example.smt2
