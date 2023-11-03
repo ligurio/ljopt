@@ -1,6 +1,14 @@
 local ljopt = require("ljopt")
 local test = require("tests.tap").test("ljopt")
 
+local function is_tarantool()
+    return _G['_TARANTOOL'] ~= nil
+end
+
+if is_tarantool() then
+    require('tests.coverage').enable()
+end
+
 test:plan(4)
 
 test:test("ir_dump", function(test)
@@ -21,5 +29,9 @@ end)
 test:test("bc_smtlib", function(_test)
     -- Empty.
 end)
+
+if is_tarantool() then
+    require('tests.coverage').shutdown()
+end
 
 os.exit(test:check() == true and 0 or 1)
