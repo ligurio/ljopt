@@ -14,6 +14,15 @@ ignore = {
     "213/_.*",
 }
 
+files["tests/tests.lua"] = {
+    ignore = {
+        -- Shadowing an upvalue.
+        "431",
+        -- Line is too long.
+        "631"
+    }
+}
+
 include_files = {
     '.luacheckrc',
     '*.rockspec',
@@ -24,5 +33,5 @@ include_files = {
 exclude_files = {
     '.rocks',
     'tests/opt/',
-    'trash/',
+    'tests/tap.lua',
 }

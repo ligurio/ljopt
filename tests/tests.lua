@@ -10,15 +10,15 @@ test:test("ir_dump", function(test)
     test:is(#traces, 1)
 end)
 
-test:test("bc_dump", function(test)
+test:test("bc_dump", function(_test)
     -- Empty.
 end)
 
-test:test("ir_smtlib", function(test)
+test:test("ir_smtlib", function(_test)
     -- Empty.
 end)
 
-test:test("bc_smtlib", function(test)
+test:test("bc_smtlib", function(_test)
     -- Empty.
 end)
 
