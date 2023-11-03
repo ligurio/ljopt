@@ -267,6 +267,7 @@ The event to hook into.
 
 ## Трансляция в SMT-LIB
 
+- popcount, https://avigad.github.io/lamr/using_smt_solvers.html
 - http://www.cprover.org/cprover-manual/cbmc/unwinding/
 - https://github.com/SRI-CSL/llvm2smt#what-we-do
 - https://www.pypy.org/posts/2022/12/jit-bug-finding-smt-fuzzing.html
