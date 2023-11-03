@@ -1,34 +1,5 @@
 local ljopt = require("ljopt")
 
--- TODO
--- - bisect lj opt
--- - bisect lj opt level
-
---tarantool> jit.version
------
---- LuaJIT 2.1.0-beta3
---...
-
---tarantool> jit.status()
------
---- true
---- SSE2
---- SSE3
---- SSE4.1
---- BMI2
---- fold
---- cse
---- dce
---- fwd
---- dse
---- narrow
---- loop
---- abc
---- sink
---- fuse
---...
-
-
 local exit_codes = {
   ok = 0,
   warnings = 1,
