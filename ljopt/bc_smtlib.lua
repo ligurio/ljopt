@@ -3,7 +3,7 @@
 
 -- BC ops blacklist.
 local bc_ops_bl = {
-    -- Comparison ops
+    -- Comparison ops.
     ["ISLT"] = false,
     ["ISGE"] = false,
     ["ISLE"] = false,
@@ -16,17 +16,17 @@ local bc_ops_bl = {
     ["ISNEN"] = false,
     ["ISEQP"] = false,
     ["ISNEP"] = false,
-    -- Unary Test and Copy ops
+    -- Unary Test and Copy ops.
     ["ISTC"] = false,
     ["ISFC"] = false,
     ["IST"] = false,
     ["ISF"] = false,
-    -- Unary ops
+    -- Unary ops.
     ["MOV"] = false,
     ["NOT"] = false,
     ["UNM"] = false,
     ["LEN"] = false,
-    -- Binary ops
+    -- Binary ops.
     ["ADDVN"] = false,
     ["SUBVN"] = false,
     ["MULVN"] = false,
@@ -44,14 +44,14 @@ local bc_ops_bl = {
     ["MODVV"] = false,
     ["POW"] = false,
     ["CAT"] = false,
-    -- Constant ops
+    -- Constant ops.
     ["KSTR"] = false,
     ["KCDATA"] = false,
     ["KSHORT"] = false,
     ["KNUM"] = false,
     ["KPRI"] = false,
     ["KNIL"] = false,
-    -- Upvalue and Function ops
+    -- Upvalue and Function ops.
     ["UGET"] = false,
     ["USETV"] = false,
     ["USETS"] = false,
@@ -59,7 +59,7 @@ local bc_ops_bl = {
     ["USETP"] = false,
     ["UCLO"] = false,
     ["FNEW"] = false,
-    -- Table ops
+    -- Table ops.
     ["TNEW"] = false,
     ["TDUP"] = false,
     ["GGET"] = false,
@@ -71,7 +71,7 @@ local bc_ops_bl = {
     ["TSETS"] = false,
     ["TSETB"] = false,
     ["TSETM"] = false,
-    -- Calls and Vararg Handling
+    -- Calls and Vararg Handling.
     ["CALLM"] = false,
     ["CALL"] = false,
     ["CALLMT"] = false,
@@ -80,12 +80,12 @@ local bc_ops_bl = {
     ["ITERN"] = false,
     ["VARG"] = false,
     ["ISNEXT"] = false,
-    -- Returns
+    -- Returns.
     ["RETM"] = false,
     ["RET"] = false,
     ["RET0"] = false,
     ["RET1"] = false,
-    -- Loops and branches
+    -- Loops and branches.
     ["FORI"] = false,
     ["JFORI"] = false,
     ["FORL"] = false,
@@ -98,7 +98,7 @@ local bc_ops_bl = {
     ["ILOOP"] = false,
     ["JLOOP"] = false,
     ["JMP"] = false,
-    -- Function headers
+    -- Function headers.
     ["FUNCF"] = false,
     ["IFUNCF"] = false,
     ["JFUNCF"] = false,
