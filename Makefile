@@ -7,6 +7,8 @@ PROJECT_DIR := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
 LUACOV_REPORT := $(PROJECT_DIR)/luacov.report.out
 LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 
+LUA_PATH="./?/init.lua;;"
+
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
 
@@ -38,7 +40,7 @@ luacheck:
 
 test:
 	@echo "Run regression tests"
-	$(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
+	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 
 $(LUACOV_STATS): test
 
