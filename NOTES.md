@@ -58,7 +58,6 @@ tarantool>
   - (!) Lua: https://github.com/franko/luajit-lang-toolkit/blob/master/lang/bcread.lua
   - (!) Lua: LuaJIT 2.1 Bytecode Parser https://github.com/imring/DisLua
   - ldumplib, A bytecode dumper for Lua 4.0 http://webserver2.tecgraf.puc-rio.br/~lhf/ftp/lua/
-  - https://github.com/franko/luajit-lang-toolkit
   - C: lbci, A Lua bytecode inspector library, https://github.com/LuaDist/lbci
   - C: https://github.com/sztupy/luadec51/tree/master/luadec
   - C: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_bcread.c
