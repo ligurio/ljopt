@@ -59,29 +59,17 @@ print("Lua code:", lua_code)
 -- instance, for the chunk "a = 1", loadstring returns the equivalent of
 -- `function () a = 1 end`.
 -- https://www.lua.org/pil/8.html
-
 local fn, err = loadstring(lua_code)
 if fn == nil then
   io.stderr:write(("cannot load Lua code: %s.\n"):format(err))
   os.exit(exit_codes.fatals)
 end
 
-local function bc_dump(f) -- luacheck: no unused
-  -- https://luajit.org/extensions.html#string_dump
-  local bc = string.dump(f)
-  assert(bc, "bytecode is nil")
-end
-
-local function ir_parse(f)
-  ljopt.ir.dump.on()
-  f()
-  ljopt.ir.dump.off()
-end
-
 -- Documentation: https://luajit.org/running.html
 local lj_opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+
 print("LuaJIT flags:", lj_opt .. "\n")
 
 loadstring(lj_opt)
-assert(fn)
-ir_parse(fn)
+ljopt.ir.record(lua_code)
+ljopt.bc.record(lua_code)

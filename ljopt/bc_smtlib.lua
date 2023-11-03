@@ -128,5 +128,9 @@
 -- FUNCCW
 -- FUNC*
 
+local function translate()
+end
+
 return {
+    translate = translate,
 }

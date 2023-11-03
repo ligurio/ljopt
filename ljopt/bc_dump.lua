@@ -860,6 +860,17 @@ local function bcread(s, output, chunkname, hexdump)
     end
 end
 
+local function record(lua_code)
+  local fn, err = loadstring(lua_code)
+  if fn == nil then
+    error(("cannot load Lua code: %s"):format(err))
+  end
+  -- https://luajit.org/extensions.html#string_dump
+  local bc = string.dump(fn)
+  assert(bc, "bytecode is nil")
+  pcall(bcread, bc) -- FIXME
+end
+
 return {
-    dump = bcread,
+    record = record,
 }

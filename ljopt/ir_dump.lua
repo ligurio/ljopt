@@ -402,7 +402,16 @@ local function dumpon(outfile)
   out = outfile or io.stdout
 end
 
+local function record(lua_code)
+  local fn, err = loadstring(lua_code)
+  if fn == nil then
+    error(("cannot load Lua code: %s"):format(err))
+  end
+  dumpon()
+  pcall(fn)
+  dumpoff()
+end
+
 return {
-  on = dumpon,
-  off = dumpoff,
+  record = record,
 }

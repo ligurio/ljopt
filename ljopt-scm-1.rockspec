@@ -36,10 +36,8 @@ build = {
         ["ljopt.main"] = "ljopt/main.lua",
         ["ljopt.bc_dump"] = "ljopt/bc_dump.lua",
         ["ljopt.bc_smtlib"] = "ljopt/bc_smtlib.lua",
-        ["ljopt.bc_parse"] = "ljopt/bc_parse.lua",
         ["ljopt.ir_dump"] = "ljopt/ir_dump.lua",
         ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib.lua",
-        ["ljopt.ir_parse"] = "ljopt/ir_parse.lua",
    },
    install = {
       bin = {
