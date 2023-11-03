@@ -110,7 +110,12 @@ local bc_ops_bl = {
     ["FUNC*"] = false,
 }
 
+local function is_supported_bc_op(op)
+    return bc_ops_bl[op] == true
+end
+
 local function translate()
+    is_supported_bc_op()
 end
 
 return {
