@@ -34,4 +34,5 @@ exclude_files = {
     '.rocks',
     'tests/opt/',
     'tests/tap.lua',
+    'ljopt/bc_dump.lua',
 }
