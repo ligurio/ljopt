@@ -861,14 +861,17 @@ local function bcread(s, output, chunkname, hexdump)
 end
 
 local function record(lua_code)
-  local fn, err = loadstring(lua_code)
-  if fn == nil then
-    error(("cannot load Lua code: %s"):format(err))
-  end
-  -- https://luajit.org/extensions.html#string_dump
-  local bc = string.dump(fn)
-  assert(bc, "bytecode is nil")
-  pcall(bcread, bc) -- FIXME
+    -- Lua treats any independent chunk as the body of an anonymous function.
+    -- For instance, for the chunk "a = 1", loadstring returns the equivalent
+    -- of `function () a = 1 end`, https://www.lua.org/pil/8.html
+    local fn, err = loadstring(lua_code)
+    if fn == nil then
+        error(("cannot load Lua code: %s"):format(err))
+    end
+    -- https://luajit.org/extensions.html#string_dump
+    local bc = string.dump(fn)
+    assert(bc, "bytecode is nil")
+    pcall(bcread, bc) -- FIXME
 end
 
 return {
