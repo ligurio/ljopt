@@ -50,7 +50,6 @@ else
 end
 
 local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
-local ops = #bc
 if #bc == 0 then
   io.stderr:write("no bytecode\n")
   -- os.exit(exit_codes.errors)
