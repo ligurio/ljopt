@@ -33,10 +33,13 @@ install:
 	@install -d -m 755 $(LUADIR)/ljopt
 	@install -m 644 $(PROJECT_DIR)/ljopt/*.lua $(LUADIR)/ljopt
 
-check: luacheck
+check: luacheck lint
 
 luacheck:
 	@luacheck --config $(PROJECT_DIR)/.luacheckrc --codes $(PROJECT_DIR)
+
+lint:
+	@luarocks lint ljopt-scm-1.rockspec
 
 test:
 	@echo "Run regression tests"
