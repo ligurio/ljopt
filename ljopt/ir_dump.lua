@@ -410,9 +410,15 @@ local function record(lua_code)
   if fn == nil then
     error(("cannot load Lua code: %s"):format(err))
   end
+
+  local traces = {}
   dumpon()
   pcall(fn)
   dumpoff()
+
+  table.insert(traces, {})
+
+  return traces
 end
 
 return {

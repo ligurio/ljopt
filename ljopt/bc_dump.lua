@@ -872,6 +872,8 @@ local function record(lua_code)
     local bc = string.dump(fn)
     assert(bc, "bytecode is nil")
     pcall(bcread, bc) -- FIXME
+
+    return {}
 end
 
 return {

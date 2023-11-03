@@ -159,9 +159,13 @@ local function is_supported_ir_type(tp)
     return ir_types_bl[tp] == true
 end
 
-local function translate()
-    is_supported_ir_type()
-    is_supported_ir_ins()
+local function translate(trace)
+    for _, ins in pairs(trace) do
+        is_supported_ir_type()
+        is_supported_ir_ins(ins)
+    end
+
+    return "" -- FIXME
 end
 
 return {
