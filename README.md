@@ -72,7 +72,7 @@ $ diff -u <(luajit -O-fold -jdump=Ti example.lua) <(luajit -O+fold -jdump=Ti exa
 Translate IR to SMT-LIB:
 
 ```sh
-$ tarantool bin/ljopt "$(example.lua)" > example.smt2
+$ LUA_PATH="./?/init.lua;;" bin/ljopt "$(example.lua)" > example.smt2
 ```
 
 Validate correctness of the `fold` optimisation with SMT solver, for example
