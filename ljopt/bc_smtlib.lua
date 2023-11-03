@@ -118,7 +118,7 @@ end
 
 local function translate(bc)
     for _, op in pairs(bc) do
-        is_supported_bc_op()
+        is_supported_bc_op(op)
     end
 
     return "" -- FIXME
