@@ -202,6 +202,7 @@ The event to hook into.
 - LuaJIT tests on optimisations, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
 - `fold` - Constant Folding, Simplifications and Reassociation
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+  - https://github.com/LuaJIT/LuaJIT/pull/783
   - https://github.com/LuaJIT/LuaJIT/issues/299
   - https://github.com/LuaJIT/LuaJIT/issues/1084
   - https://github.com/LuaJIT/LuaJIT/issues/1079
@@ -214,6 +215,7 @@ The event to hook into.
   - https://github.com/LuaJIT/LuaJIT/issues/540
   - https://github.com/LuaJIT/LuaJIT/issues/311
   - https://github.com/LuaJIT/LuaJIT/issues/311
+  - https://github.com/LuaJIT/LuaJIT/issues/1069
   - "Tutorial: How Folding Engine Works"
     https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `cse` - Common-Subexpression Elimination
@@ -235,6 +237,7 @@ The event to hook into.
 - `abc` - Array Bounds Check Elimination
   - https://github.com/LuaJIT/LuaJIT/issues/794
 - `sink` - Allocation/Store Sinking
+  - https://github.com/LuaJIT/LuaJIT/issues/584
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_sink.c
 - `fuse` - Fusion of operands into instructions
 - `fma` - Fused multiply-add
