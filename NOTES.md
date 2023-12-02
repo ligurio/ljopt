@@ -202,6 +202,7 @@ The event to hook into.
 - LuaJIT tests on optimisations, https://github.com/tarantool/luajit/tree/tarantool/test/LuaJIT-tests/opt
 - `fold` - Constant Folding, Simplifications and Reassociation
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_fold.c
+  - https://github.com/LuaJIT/LuaJIT/issues/784
   - https://github.com/LuaJIT/LuaJIT/pull/783
   - https://github.com/LuaJIT/LuaJIT/issues/299
   - https://github.com/LuaJIT/LuaJIT/issues/1084
@@ -216,6 +217,7 @@ The event to hook into.
   - https://github.com/LuaJIT/LuaJIT/issues/311
   - https://github.com/LuaJIT/LuaJIT/issues/311
   - https://github.com/LuaJIT/LuaJIT/issues/1069
+  - https://github.com/LuaJIT/LuaJIT/issues/791
   - "Tutorial: How Folding Engine Works"
     https://ujit.readthedocs.io/en/latest/public/tut-folding-engine.html
 - `cse` - Common-Subexpression Elimination
@@ -223,7 +225,6 @@ The event to hook into.
   - https://github.com/LuaJIT/LuaJIT/issues/1084
 - `dce` - Dead-Code Elimination
   - Source: https://github.com/LuaJIT/LuaJIT/blob/v2.1/src/lj_opt_dce.c
-  - https://github.com/LuaJIT/LuaJIT/issues/791
   - https://github.com/LuaJIT/LuaJIT/issues/651
   - https://github.com/LuaJIT/LuaJIT/issues/1094
 - `narrow` - Narrowing of numbers to integers
