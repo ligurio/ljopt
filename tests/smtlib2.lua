@@ -1,0 +1,81 @@
+-- Requires installed z3 package.
+-- Usage: `parse_smtlib2_string("(declare-const p0 Bool)")`.
+-- Z3 C API: https://z3prover.github.io/api/html/
+
+local is_ffi, ffi = pcall(require, "ffi")
+
+if is_ffi == false then
+    error("requires FFI")
+end
+
+ffi.cdef[[
+struct Z3_ast_vector;
+struct Z3_config;
+struct Z3_context;
+struct Z3_func_decl;
+struct Z3_sort;
+struct Z3_string;
+struct Z3_symbol;
+
+typedef struct Z3_ast_vector *Z3_ast_vector;
+typedef struct Z3_config *Z3_config;
+typedef struct Z3_context *Z3_context;
+typedef struct Z3_func_decl *Z3_func_decl;
+typedef struct Z3_sort *Z3_sort;
+typedef struct Z3_string *Z3_string;
+typedef struct Z3_symbol *Z3_symbol;
+
+Z3_config Z3_mk_config(void);
+void Z3_set_param_value(Z3_config c,
+                        Z3_string param_id,
+                        Z3_string param_value);
+Z3_context Z3_mk_context(Z3_config c);
+Z3_ast_vector Z3_parse_smtlib2_string(Z3_context c,
+                                      Z3_string str,
+                                      unsigned num_sorts,
+                                      Z3_symbol const sort_names[],
+                                      Z3_sort const sorts[],
+                                      unsigned num_decls,
+                                      Z3_symbol const decl_names[],
+                                      Z3_func_decl const decls[]);
+
+unsigned Z3_ast_vector_size(Z3_context c, Z3_ast_vector v);
+Z3_string Z3_ast_vector_to_string(Z3_context c, Z3_ast_vector v);
+
+void Z3_del_config(Z3_config c);
+void Z3_del_context(Z3_context c);
+
+void free(void *ptr);
+]]
+
+local z3 = ffi.load("z3")
+
+local M = {}
+
+-- Function parses a buffer with SMT-LIB.
+function M.parse_smtlib2_string(str)
+    local cfg = z3.Z3_mk_config()
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "proof"), ffi.cast("Z3_string", "true"))
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "trace"), ffi.cast("Z3_string", "true"))
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"), ffi.cast("Z3_string", "100"))
+
+    local ctx = z3.Z3_mk_context(cfg);
+    local smtlib2_buf = ffi.cast("Z3_string", str)
+    local num_sorts = ffi.cast("unsigned", 0)
+    local sort_names = ffi.cast("const Z3_symbol *", 0)
+    local sorts = ffi.cast("const Z3_sort *", 0)
+    local num_decls = ffi.cast("unsigned", 0)
+    local decl_names = ffi.cast("Z3_symbol *", 0)
+    local decls = ffi.cast("Z3_func_decl *", 0)
+    -- luacheck: no unused
+    local res = z3.Z3_parse_smtlib2_string(ctx, smtlib2_buf,
+                                           num_sorts, sort_names, sorts,
+                                           num_decls, decl_names, decls)
+
+    z3.Z3_del_context(ctx)
+    z3.Z3_del_config(cfg)
+
+    return true
+end
+
+return M
