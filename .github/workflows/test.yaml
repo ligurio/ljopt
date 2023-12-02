@@ -1,0 +1,25 @@
+name: Testing
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testing:
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup packages
+        run: sudo apt install -y luarocks luajit
+
+      - name: Setup rocks
+        run: make deps
+
+      - name: Testing
+        run: make test
