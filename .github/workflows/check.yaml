@@ -1,0 +1,20 @@
+name: Static analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-analysis:
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run luacheck
+        uses: lunarmodules/luacheck@v1

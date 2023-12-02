@@ -12,7 +12,7 @@ LUA_PATH="./?/init.lua;;"
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
 
-LUA_BIN ?= /usr/bin/luajit
+LUA_BIN ?= luajit
 
 all: check test
 
