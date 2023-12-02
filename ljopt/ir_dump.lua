@@ -29,8 +29,12 @@ local disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
+-- Debug mode.
+local debug = false
+
 local function write_out(...)
   assert(out)
+  if not debug then return end
   out:write(...)
 end
 
@@ -417,6 +421,7 @@ local function record(lua_code)
   end
 
   local traces = {}
+
   dumpon()
   pcall(fn)
   dumpoff()
