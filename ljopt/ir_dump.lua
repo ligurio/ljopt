@@ -29,6 +29,11 @@ local disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
+local function write_out(...)
+  assert(out)
+  out:write(...)
+end
+
 ------------------------------------------------------------------------------
 
 local irtype_text = {
@@ -165,28 +170,28 @@ local function printsnap(tr, snap)
       n = n + 1
       local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
       if ref < 0 then
-	out:write(formatk(tr, ref, sn))
+	write_out(formatk(tr, ref, sn))
       elseif band(sn, 0x80000) ~= 0 then -- SNAP_SOFTFPNUM
-	out:write(colorize(format("%04d/%04d", ref, ref+1), 14))
+	write_out(colorize(format("%04d/%04d", ref, ref+1), 14))
       else
 	local _, ot, _, _ = traceir(tr, ref)
-	out:write(colorize(format("%04d", ref), band(ot, 31)))
+	write_out(colorize(format("%04d", ref), band(ot, 31)))
       end
-      out:write(band(sn, 0x10000) == 0 and " " or "|") -- SNAP_FRAME
+      write_out(band(sn, 0x10000) == 0 and " " or "|") -- SNAP_FRAME
     else
-      out:write("---- ")
+      write_out("---- ")
     end
   end
-  out:write("]\n")
+  write_out("]\n")
 end
 
 -- Dump snapshots (not interleaved with IR).
 local function dump_snap(tr)
-  out:write("---- TRACE ", tr, " snapshots\n")
+  write_out("---- TRACE ", tr, " snapshots\n")
   for i=0,1000000000 do
     local snap = tracesnap(tr, i)
     if not snap then break end
-    out:write(format("#%-3d %04d [ ", i, snap[0]))
+    write_out(format("#%-3d %04d [ ", i, snap[0]))
     printsnap(tr, snap)
   end
 end
@@ -214,9 +219,9 @@ local function dumpcallfunc(tr, ins)
     end
   end
   if ins < 0 then
-    out:write(format("[0x%x](", tonumber((tracek(tr, ins)))))
+    write_out(format("[0x%x](", tonumber((tracek(tr, ins)))))
   else
-    out:write(format("%04d (", ins))
+    write_out(format("%04d (", ins))
   end
   return ctype
 end
@@ -224,7 +229,7 @@ end
 -- Recursively gather CALL* args and dump them.
 local function dumpcallargs(tr, ins)
   if ins < 0 then
-    out:write(formatk(tr, ins))
+    write_out(formatk(tr, ins))
   else
     local _, ot, op1, op2 = traceir(tr, ins)
     local oidx = 6*shr(ot, 8)
@@ -232,12 +237,12 @@ local function dumpcallargs(tr, ins)
     if op == "CARG  " then
       dumpcallargs(tr, op1)
       if op2 < 0 then
-	out:write(" ", formatk(tr, op2))
+	write_out(" ", formatk(tr, op2))
       else
-	out:write(" ", format("%04d", op2))
+	write_out(" ", format("%04d", op2))
       end
     else
-      out:write(format("%04d", ins))
+      write_out(format("%04d", ins))
     end
   end
 end
@@ -247,7 +252,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   local info = traceinfo(tr)
   if not info then return end
   local nins = info.nins
-  out:write("---- TRACE ", tr, " IR\n")
+  write_out("---- TRACE ", tr, " IR\n")
   local irnames = vmdef.irnames
   local snapref = 65536
   local snap, snapno
@@ -259,9 +264,9 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   for ins=1,nins do
     if ins >= snapref then
       if dumpreg then
-	out:write(format("....              SNAP   #%-3d [ ", snapno))
+	write_out(format("....              SNAP   #%-3d [ ", snapno))
       else
-	out:write(format("....        SNAP   #%-3d [ ", snapno))
+	write_out(format("....        SNAP   #%-3d [ ", snapno))
       end
       printsnap(tr, snap)
       snapno = snapno + 1
@@ -273,19 +278,19 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local op = sub(irnames, oidx+1, oidx+6)
     if op == "LOOP  " then
       if dumpreg then
-	out:write(format("%04d ------------ LOOP ------------\n", ins))
+	write_out(format("%04d ------------ LOOP ------------\n", ins))
       else
-	out:write(format("%04d ------ LOOP ------------\n", ins))
+	write_out(format("%04d ------ LOOP ------------\n", ins))
       end
     elseif op ~= "NOP   " and op ~= "CARG  " and
 	   (dumpreg or op ~= "RENAME") then
       local rid = band(ridsp, 255)
       if dumpreg then
-	out:write(format("%04d %-6s", ins, ridsp_name(ridsp, ins)))
+	write_out(format("%04d %-6s", ins, ridsp_name(ridsp, ins)))
       else
-	out:write(format("%04d ", ins))
+	write_out(format("%04d ", ins))
       end
-      out:write(format("%s%s %s %s ",
+      write_out(format("%s%s %s %s ",
 		       (rid == 254 or rid == 253) and "}" or
 		       (band(ot, 128) == 0 and " " or ">"),
 		       band(ot, 64) == 0 and " " or "+",
@@ -294,46 +299,46 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       if sub(op, 1, 4) == "CALL" then
 	local ctype
 	if m2 == 1*4 then -- op2 == IRMlit
-	  out:write(format("%-10s  (", vmdef.ircall[op2]))
+	  write_out(format("%-10s  (", vmdef.ircall[op2]))
 	else
 	  ctype = dumpcallfunc(tr, op2)
 	end
 	if op1 ~= -1 then dumpcallargs(tr, op1) end
-	out:write(")")
-	if ctype then out:write(" ctype ", ctype) end
+	write_out(")")
+	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	out:write(formatk(tr, op1))
+	write_out(formatk(tr, op1))
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  out:write(formatk(tr, op1))
+	  write_out(formatk(tr, op1))
 	else
-	  out:write(format(m1 == 0 and "%04d" or "#%-3d", op1))
+	  write_out(format(m1 == 0 and "%04d" or "#%-3d", op1))
 	end
 	if m2 ~= 3*4 then -- op2 != IRMnone
 	  if m2 == 1*4 then -- op2 == IRMlit
 	    local litn = litname[op]
 	    if litn and litn[op2] then
-	      out:write("  ", litn[op2])
+	      write_out("  ", litn[op2])
 	    elseif op == "UREFO " or op == "UREFC " then
-	      out:write(format("  #%-3d", shr(op2, 8)))
+	      write_out(format("  #%-3d", shr(op2, 8)))
 	    else
-	      out:write(format("  #%-3d", op2))
+	      write_out(format("  #%-3d", op2))
 	    end
 	  elseif op2 < 0 then
-	    out:write("  ", formatk(tr, op2))
+	    write_out("  ", formatk(tr, op2))
 	  else
-	    out:write(format("  %04d", op2))
+	    write_out(format("  %04d", op2))
 	  end
 	end
       end
-      out:write("\n")
+      write_out("\n")
     end
   end
   if snap then
     if dumpreg then
-      out:write(format("....              SNAP   #%-3d [ ", snapno))
+      write_out(format("....              SNAP   #%-3d [ ", snapno))
     else
-      out:write(format("....        SNAP   #%-3d [ ", snapno))
+      write_out(format("....        SNAP   #%-3d [ ", snapno))
     end
     printsnap(tr, snap)
   end
@@ -357,26 +362,26 @@ local function dump_trace(what, tr, func, pc, otr, oex)
     elseif dumpmode.s then dump_snap(tr) end
   end
   if what == "start" then
-    out:write("---- TRACE ", tr, " ", what)
-    if otr then out:write(" ", otr, "/", oex == -1 and "stitch" or oex) end
-    out:write(" ", fmtfunc(func, pc), "\n")
+    write_out("---- TRACE ", tr, " ", what)
+    if otr then write_out(" ", otr, "/", oex == -1 and "stitch" or oex) end
+    write_out(" ", fmtfunc(func, pc), "\n")
   elseif what == "stop" or what == "abort" then
-    out:write("---- TRACE ", tr, " ", what)
+    write_out("---- TRACE ", tr, " ", what)
     if what == "abort" then
-      out:write(" ", fmtfunc(func, pc), " -- ", fmterr(otr, oex), "\n")
+      write_out(" ", fmtfunc(func, pc), " -- ", fmterr(otr, oex), "\n")
     else
       local info = traceinfo(tr)
       local link, ltype = info.link, info.linktype
       if link == tr or link == 0 then
-	out:write(" -> ", ltype, "\n")
+	write_out(" -> ", ltype, "\n")
       elseif ltype == "root" then
-	out:write(" -> ", link, "\n")
+	write_out(" -> ", link, "\n")
       else
-	out:write(" -> ", link, " ", ltype, "\n")
+	write_out(" -> ", link, " ", ltype, "\n")
       end
     end
   else
-    out:write("---- TRACE ", what, "\n\n")
+    write_out("---- TRACE ", what, "\n\n")
   end
   out:flush()
 end
