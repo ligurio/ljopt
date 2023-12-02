@@ -29,8 +29,12 @@ local disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
+-- Debug mode.
+local debug = false
+
 local function write_out(...)
   assert(out)
+  if not debug then return end
   out:write(...)
 end
 
@@ -357,8 +361,6 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
-  print("dump_trace")
-  local trace = {}
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
@@ -419,6 +421,7 @@ local function record(lua_code)
   end
 
   local traces = {}
+
   dumpon()
   pcall(fn)
   dumpoff()
