@@ -279,4 +279,7 @@ The event to hook into.
 - https://symflower.com/en/company/blog/2021/it-is-simply-math/
 - https://symflower.com/en/company/blog/2021/ssa/
 - An Abstract Interpretation-based Model of Tracing Just-In-Time
-Compilation, https://arxiv.org/pdf/1411.7839.pdf
+  Compilation, https://arxiv.org/pdf/1411.7839.pdf
+- Aeneas: Translation from MIR to purely functional Coq/F* code
+- Hacspec v2: Translation from THIR to Coq/F* code
+- Creusot: Translation from MIR to Why3 (and then SMT solvers)
