@@ -37,7 +37,20 @@ build = {
         ["ljopt.bc_dump"] = "ljopt/bc_dump.lua",
         ["ljopt.bc_smtlib"] = "ljopt/bc_smtlib.lua",
         ["ljopt.ir_dump"] = "ljopt/ir_dump.lua",
-        ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib.lua",
+
+        -- Everything related to SMT-LIB translation.
+        ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib/ir_smtlib.lua",
+
+        --[[
+            TODO: After several itteration of review and implementation create
+            structure of modules based on class hierarchy.
+            Check whether it's possible to separate all modules below
+            to separate submodules with their own rockspec (to improve granularity of code and reduce conflicts).
+
+            ["ljopt.ir_internals_base"] = "ljopt/ir_smtlib/ir_internals_base.lua",
+            ["ljopt.ir_internals_node"] = "ljopt/ir_smtlib/ir_internals_node.lua",
+            ["ljopt.ir_internals_ADD"] = "ljopt/ir_smtlib/ir_internals_ADD.lua",
+        ]]
    },
    install = {
       bin = {
