@@ -42,15 +42,20 @@ build = {
         ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib/ir_smtlib.lua",
 
         --[[
-            TODO: After several itteration of review and implementation create
+            TODO: After several itterations of review and implementation create
             structure of modules based on class hierarchy.
             Check whether it's possible to separate all modules below
-            to separate submodules with their own rockspec (to improve granularity of code and reduce conflicts).
-
-            ["ljopt.ir_internals_base"] = "ljopt/ir_smtlib/ir_internals_base.lua",
-            ["ljopt.ir_internals_node"] = "ljopt/ir_smtlib/ir_internals_node.lua",
-            ["ljopt.ir_internals_ADD"] = "ljopt/ir_smtlib/ir_internals_ADD.lua",
+            to separate submodules with their own .rockspec (to improve granularity of code and reduce conflicts).
         ]]
+        ["ljopt.ir_node_base"] = "ljopt/ir_smtlib/nodes/ir_node_base.lua",
+        ["ljopt.ir_node"] = "ljopt/ir_smtlib/nodes/ir_node.lua",
+
+        ["ljopt.ir_ADD"]  = "ljopt/ir_smtlib/nodes/arithmetic_ops/ir_ADD.lua"
+        ["ljopt.ir_SUB"]  = "ljopt/ir_smtlib/nodes/arithmetic_ops/ir_SUB.lua"
+        ["ljopt.ir_MUL"]  = "ljopt/ir_smtlib/nodes/arithmetic_ops/ir_MUL.lua"
+
+        ["ljopt.smt_lib_context"] = "ljopt/ir_smtlib/smt_lib/smt_lib_context.lua",
+
    },
    install = {
       bin = {
