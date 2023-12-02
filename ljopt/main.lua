@@ -22,13 +22,18 @@ if jit.version_num ~= 20100 then
 end
 
 local lua_code = arg[1]
-if lua_code == nil or
-   lua_code == "-" then
+if lua_code == "-" then
   lua_code = io.stdin:read("*a") -- read the complete stdin
 end
 
-io.stdout:write("Lua code:", lua_code)
-io.stdout:write("LuaJIT flags:", lj_opt .. "\n")
+if not lua_code or
+   #lua_code == 0 then
+  io.stderr:write("Lua chunk is empty.\n")
+  os.exit(exit_codes.critical)
+end
+
+io.stdout:write(("Lua code: %s\n"):format(lua_code))
+io.stdout:write("LuaJIT flags: ", lj_opt .. "\n")
 
 loadstring(lj_opt)
 
