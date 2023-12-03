@@ -112,13 +112,13 @@ local function translate(trace)
     -- 3rd stage. Converting to SMT-LIB.
     local smt_lib_format = ''
     for i = 1, #nodes do
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_ssa_reference()
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_flags()
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_type()
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_opcode()
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_left_op()
-        smt_lib_format = smt_lib_format.." "..nodes[i]:get_right_op()
-        smt_lib_format = smt_lib_format.."\n"
+        print(nodes[i]:get_ssa_reference())
+        print(nodes[i]:get_flags())
+        print(nodes[i]:get_type())
+        print(nodes[i]:get_opcode())
+        print(nodes[i]:get_left_op())
+        print(nodes[i]:get_right_op())
+        print ("\n")
     end
     return smt_lib_format
 end

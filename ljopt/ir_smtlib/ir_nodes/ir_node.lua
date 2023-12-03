@@ -65,61 +65,62 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "FPM_COS",   -- TODO: Support.
         "FPM_TAN",   -- TODO: Support.
         -- Memory References.
-        "AREF",      -- TODO: Support.
-        "HREFK",     -- TODO: Support.
-        "HREF",      -- TODO: Support.
-        "NEWREF",    -- TODO: Support.
-        "UREFO",     -- TODO: Support.
-        "UREFC",     -- TODO: Support.
-        "FREF",      -- TODO: Support.
-        "STRREF",    -- TODO: Support.
+        ["AREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_AREF"),
+        "HREFK",  -- TODO: Support.
+        "HREF",   -- TODO: Support.
+        "NEWREF", -- TODO: Support.
+        "UREFO",  -- TODO: Support.
+        "UREFC",  -- TODO: Support.
+        "FREF",   -- TODO: Support.
+        "STRREF", -- TODO: Support.
         -- Loads and Stores.
-        "ALOAD",     -- TODO: Support.
-        "HLOAD",     -- TODO: Support.
-        "ULOAD",     -- TODO: Support.
-        "FLOAD",     -- TODO: Support.
-        "XLOAD",     -- TODO: Support.
-        "SLOAD",     -- TODO: Support.
-        "VLOAD",     -- TODO: Support.
-        "ASTORE",    -- TODO: Support.
-        "HSTORE",    -- TODO: Support.
-        "USTORE",    -- TODO: Support.
-        "FSTORE",    -- TODO: Support.
-        "XSTORE",    -- TODO: Support.
+        "ALOAD",  -- TODO: Support.
+        "HLOAD",  -- TODO: Support.
+        "ULOAD",  -- TODO: Support.
+        ["FLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_FLOAD"),
+        "XLOAD",  -- TODO: Support.
+        ["SLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_SLOAD"),
+        "VLOAD",  -- TODO: Support.
+        ["ASTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_ASTORE"),
+        "HSTORE", -- TODO: Support.
+        "USTORE", -- TODO: Support.
+        "FSTORE", -- TODO: Support.
+        "XSTORE", -- TODO: Support.
         -- Allocations.
-        "SNEW",      -- TODO: Support.
-        "XSNEW",     -- TODO: Support.
-        "TNEW",      -- TODO: Support.
-        "TDUP",      -- TODO: Support.
-        "CNEW",      -- TODO: Support.
-        "CNEWI",     -- TODO: Support.
+        "SNEW",   -- TODO: Support.
+        "XSNEW",  -- TODO: Support.
+        "TNEW",   -- TODO: Support.
+        "TDUP",   -- TODO: Support.
+        "CNEW",   -- TODO: Support.
+        "CNEWI",  -- TODO: Support.
         -- Barriers.
-        "TBAR",      -- TODO: Support.
-        "OBAR",      -- TODO: Support.
-        "XBAR",      -- TODO: Support.
+        "TBAR",   -- TODO: Support.
+        "OBAR",   -- TODO: Support.
+        "XBAR",   -- TODO: Support.
         -- Type Conversions.
-        "CONV",      -- TODO: Support.
-        "TOBIT",     -- TODO: Support.
-        "TOSTR",     -- TODO: Support.
-        "STRTO",     -- TODO: Support.
+        ["CONV"] = require("ljopt/ir_smtlib/ir_nodes/type_conversions/ir_CONV"),
+        "TOBIT",  -- TODO: Support.
+        "TOSTR",  -- TODO: Support.
+        "STRTO",  -- TODO: Support.
         -- Calls.
-        "CALLN",     -- TODO: Support.
-        "CALLL",     -- TODO: Support.
-        "CALLS",     -- TODO: Support.
-        "CALLXS",    -- TODO: Support.
-        "CARG",      -- TODO: Support.
+        "CALLN",  -- TODO: Support.
+        "CALLL",  -- TODO: Support.
+        "CALLS",  -- TODO: Support.
+        "CALLXS", -- TODO: Support.
+        "CARG",   -- TODO: Support.
         -- Miscellaneous Ops.
-        "NOP",       -- TODO: Support.
-        "BASE",      -- TODO: Support.
-        "PVAL",      -- TODO: Support.
-        "GCSTEP",    -- TODO: Support.
-        "HIOP",      -- TODO: Support.
-        "LOOP",      -- TODO: Support.
-        "USE",       -- TODO: Support.
-        "PHI",       -- TODO: Support.
-        "RENAME"     -- TODO: Support.
+        ["SNAP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_SNAP"),
+        "NOP",    -- TODO: Support.
+        "BASE",   -- TODO: Support.
+        "PVAL",   -- TODO: Support.
+        "GCSTEP", -- TODO: Support.
+        "HIOP",   -- TODO: Support.
+        ["LOOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_LOOP"),
+        "USE",    -- TODO: Support.
+        ["PHI"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_PHI"),
+        "RENAME", -- TODO: Support.
     }
-    assert(opcode_table[opcode] ~= nil, "Unsupported operation "..opcode, nil)
+    assert(opcode_table[opcode] ~= nil, "Unsupported operation " .. opcode, nil)
     return opcode_table[opcode].instance(ssa_ref, flags, type, left_op, right_op)
 end
 
