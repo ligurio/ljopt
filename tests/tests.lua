@@ -12,10 +12,13 @@ end
 test:plan(4)
 
 test:test("ir_dump", function(test)
-    test:plan(1)
+    test:plan(2)
 
     local traces = ljopt.ir.record("for i in 1, 100 do local a = 1 end")
-    test:is(#traces, 1)
+    test:is(next(traces), nil, "lua code without traces")
+
+    traces = ljopt.ir.record("for i = 1, 100 do local a, b = 23, 11; y = a + b end")
+    test:isnt(next(traces), nil, "lua code with traces")
 end)
 
 test:test("bc_dump", function(_test)
