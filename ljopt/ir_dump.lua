@@ -444,7 +444,7 @@ local function dumpon(outfile)
   out = outfile or io.stdout
 end
 
-local function record(lua_code)
+local function record(lua_code, debug_mode)
   -- Lua treats any independent chunk as the body of an anonymous function.
   -- For instance, for the chunk "a = 1", loadstring returns the equivalent
   -- of `function () a = 1 end`, https://www.lua.org/pil/8.html
@@ -453,6 +453,7 @@ local function record(lua_code)
     error(("cannot load Lua code: %s"):format(err))
   end
 
+  debug = debug_mode
   traces = {}
 
   dumpon()
