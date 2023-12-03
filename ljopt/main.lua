@@ -37,22 +37,20 @@ io.stdout:write("LuaJIT flags: ", lj_opt .. "\n")
 
 loadstring(lj_opt)
 
-local traces = ljopt.ir.record(lua_code) -- TODO: Wrap with pcall.
-local n_traces = #traces
-if n_traces == 0 then
-  io.stderr:write("there are no traces\n")
-  -- os.exit(exit_codes.errors)
-end
+local traces = ljopt.ir.record(lua_code)
+assert(type(traces) == "table")
 
-local trace = traces[1] -- FIXME
-local ir_smtlib = ljopt.ir.translate(trace) -- TODO: Wrap with pcall.
-if not ir_smtlib or #ir_smtlib == 0 then
-  io.stderr:write("translation IR to SMT-LIB has failed\n")
-  -- os.exit(exit_codes.errors)
-else
-  io.stdout:write("IR SMT-LIB:\n")
-  io.stdout:write(ir_smtlib)
+local traces_smtlib = ""
+for tr_n, tr_ir in pairs(traces) do
+  local tr_smtlib = ljopt.ir.translate(tr_ir)
+  if not tr_smtlib or #tr_smtlib == 0 then
+    local msg = ("translation of trace %d to SMT-LIB has failed\n"):format(tr_n)
+    io.stderr:write(msg)
+  else
+    traces_smtlib = traces_smtlib .. tr_smtlib
+  end
 end
+io.stdout:write(traces_smtlib .. "\n")
 
 local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
 if #bc == 0 then
