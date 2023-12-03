@@ -29,6 +29,9 @@ local disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
+-- A table with recorded traces.
+local traces
+
 -- Debug mode.
 local debug = false
 
@@ -36,6 +39,12 @@ local function write_out(...)
   assert(out)
   if not debug then return end
   out:write(...)
+end
+
+local function trim(s)
+  if s == nil then return end
+  local ss, _ = s:gsub('^%s*(.-)%s*$', '%1')
+  return ss
 end
 
 ------------------------------------------------------------------------------
@@ -280,6 +289,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local m, ot, op1, op2, ridsp = traceir(tr, ins)
     local oidx, t = 6*shr(ot, 8), band(ot, 31)
     local op = sub(irnames, oidx+1, oidx+6)
+    local op1_txt, op2_txt, irt_guard, irt_isphi
     if op == "LOOP  " then
       if dumpreg then
 	write_out(format("%04d ------------ LOOP ------------\n", ins))
@@ -294,6 +304,9 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       else
 	write_out(format("%04d ", ins))
       end
+      irt_guard = (rid == 254 or rid == 253) and "}" or
+                  (band(ot, 128) == 0 and false or true)
+      irt_isphi = band(ot, 64) == 0 and false or true
       write_out(format("%s%s %s %s ",
 		       (rid == 254 or rid == 253) and "}" or
 		       (band(ot, 128) == 0 and " " or ">"),
@@ -311,32 +324,51 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	write_out(formatk(tr, op1))
+	op1_txt = formatk(tr, op1)
+	write_out(op1_txt)
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  write_out(formatk(tr, op1))
+	  op1_txt = formatk(tr, op1)
+	  write_out(op1_txt)
 	else
-	  write_out(format(m1 == 0 and "%04d" or "#%-3d", op1))
+	  op1_txt = format(m1 == 0 and "%04d" or "#%-3d", op1)
+	  write_out(op1_txt)
 	end
 	if m2 ~= 3*4 then -- op2 != IRMnone
 	  if m2 == 1*4 then -- op2 == IRMlit
 	    local litn = litname[op]
 	    if litn and litn[op2] then
-	      write_out("  ", litn[op2])
+	      op2_txt = litn[op2]
+	      write_out("  ", op2_txt)
 	    elseif op == "UREFO " or op == "UREFC " then
-	      write_out(format("  #%-3d", shr(op2, 8)))
+	      op2_txt = format("  #%-3d", shr(op2, 8))
+	      write_out(op2_txt)
 	    else
-	      write_out(format("  #%-3d", op2))
+	      op2_txt = format("  #%-3d", op2)
+	      write_out(op2_txt)
 	    end
 	  elseif op2 < 0 then
-	    write_out("  ", formatk(tr, op2))
+	    op2_txt = formatk(tr, op2)
+	    write_out("  ", op2_txt)
 	  else
-	    write_out(format("  %04d", op2))
+	    op2_txt = format("  %04d", op2)
+	    write_out(op2_txt)
 	  end
 	end
       end
       write_out("\n")
     end
+
+    local irins = {
+        num = ins,
+        irt_guard = irt_guard,
+        irt_isphi = irt_isphi,
+        irtype = irtype[t],
+        irop = trim(op),
+        op1 = trim(op1_txt),
+        op2 = trim(op2_txt),
+    }
+    table.insert(traces[tr], irins)
   end
   if snap then
     if dumpreg then
@@ -367,6 +399,7 @@ local function dump_trace(what, tr, func, pc, otr, oex)
   end
   if what == "start" then
     write_out("---- TRACE ", tr, " ", what)
+    traces[tr] = {}
     if otr then write_out(" ", otr, "/", oex == -1 and "stitch" or oex) end
     write_out(" ", fmtfunc(func, pc), "\n")
   elseif what == "stop" or what == "abort" then
@@ -420,13 +453,11 @@ local function record(lua_code)
     error(("cannot load Lua code: %s"):format(err))
   end
 
-  local traces = {}
+  traces = {}
 
   dumpon()
   pcall(fn)
   dumpoff()
-
-  table.insert(traces, {})
 
   return traces
 end
