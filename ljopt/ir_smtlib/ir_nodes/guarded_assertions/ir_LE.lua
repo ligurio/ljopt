@@ -5,10 +5,10 @@ extended(ir_node_LE_base, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.ir_node_LE_num = {}
-extended(impls.ir_node_LE_num, ir_node_LE_base)
+impls.ir_node_LE_int = {}
+extended(impls.ir_node_LE_int, ir_node_LE_base)
 
-function impls.ir_node_LE_num:to_smt_lib ()
+function impls.ir_node_LE_int:to_smt_lib()
     --TODO: Implement
     return ''
 end
@@ -31,7 +31,7 @@ extended(impls.ir_node_LE_u16, ir_node_LE_base)
 impls.ir_node_LE_int = {}
 extended(impls.ir_node_LE_int, ir_node_LE_base)
 
-function impls.ir_node_LE_int:to_smt_lib ()
+function impls.ir_node_LE_int:to_smt_lib()
     --TODO: Implement
 end
 
@@ -50,22 +50,21 @@ extended(impls.ir_node_LE_sfp, ir_node_LE_base)
 
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ["num"] = {},
-        ["i8"] = {},
-        ["u8"] = {},
-        ["i16"] = {},
-        ["u16"] = {},
+        "num", -- TODO: Support.
+        "i8",  -- TODO: Support.
+        "u8",  -- TODO: Support.
+        "i16", -- TODO: Support.
+        "u16", -- TODO: Support.
         ["int"] = {},
-        ["u32"] = {},
-        ["i64"] = {},
-        ["u64"] = {},
-        ["sfp"] = {}
+        "u32", -- TODO: Support.
+        "i64", -- TODO: Support.
+        "u64", -- TODO: Support.
+        "sfp"  -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for LE operation", nil)
-    return impls["ir_node_LE_"..type].new(ssa_ref, flags, type, "LE", left_op, right_op)
+    return impls["ir_node_LE_" .. type]:new(ssa_ref, flags, type, "LE", left_op, right_op)
 end
 
-
-return{
+return {
     instance = instance
 }
