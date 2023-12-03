@@ -26,7 +26,15 @@ test:test("bc_dump", function(_test)
 end)
 
 test:test("ir_smtlib", function(_test)
-    -- Empty.
+    test:plan(8)
+
+    local ok, err = pcall(ljopt.ir.translate, "")
+    test:is(ok, false, "exit code is correct")
+    test:like(err, "not a table", "error message is correct")
+
+    local buf = ljopt.ir.translate({})
+    test:is(type(buf), "string", "type of result when no traces")
+    test:isnt(#buf, 0, "length of result when no traces")
 end)
 
 test:test("bc_smtlib", function(_test)
