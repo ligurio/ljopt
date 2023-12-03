@@ -1,4 +1,7 @@
 local ljopt = require("ljopt")
+local is_json, json = pcall(require, "json")
+
+local is_debug = os.getenv("DEBUG")
 
 -- Documentation: https://luajit.org/running.html
 local lj_opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
@@ -32,13 +35,20 @@ if not lua_code or
   os.exit(exit_codes.critical)
 end
 
-io.stdout:write(("Lua code: %s\n"):format(lua_code))
-io.stdout:write("LuaJIT flags: ", lj_opt .. "\n")
+if is_debug then
+  io.stdout:write(("Lua code: %s\n"):format(lua_code))
+  io.stdout:write(("LuaJIT flags: %s\n"):format(lj_opt))
+end
 
 loadstring(lj_opt)
 
-local traces = ljopt.ir.record(lua_code)
+local traces = ljopt.ir.record(lua_code, is_debug)
 assert(type(traces) == "table")
+
+if is_json and is_debug then
+  local traces_buf = json.encode(traces)
+  io.stdout:write(traces_buf .. "\n")
+end
 
 local traces_smtlib = ""
 for tr_n, tr_ir in pairs(traces) do
