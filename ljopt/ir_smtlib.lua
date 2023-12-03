@@ -161,12 +161,19 @@ local function is_supported_ir_type(tp)
 end
 
 local function translate(trace)
+    if (type(trace) ~= "table") then
+        error("not a table")
+    end
+    local smtlib_buf = [[
+(set-option :print-success false)
+(set-option :produce-models true)
+]]
     for _, ins in pairs(trace) do
         is_supported_ir_type()
         is_supported_ir_ins(ins)
     end
 
-    return "" -- FIXME
+    return smtlib_buf
 end
 
 return {
