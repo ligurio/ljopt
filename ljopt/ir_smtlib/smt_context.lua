@@ -71,7 +71,7 @@ function Op_stack_bv:init_smt(name)
     self.bv2type = {
         ["u64"] = "%s",
         ["i64"] = "%s",
-        ["num"] = "((_ to_fp 11 53) (select %s %d)))",
+        ["num"] = "((_ to_fp 11 53) (select %s %d))",
     }
     return string.format("(declare-fun %s () (Array Int (_ BitVec 64)))", name)
 end
@@ -83,7 +83,7 @@ end
 
 function Op_stack_bv:store(op_num, type, data)
     local conv = assert(self.type2bv[type], "Unsupported store op type "..type, nil)
-    return string.format("(assert (= (select %s %d) %s))", self.name, op_num, string.format(conv, data))
+    return string.format("(assert (let ((a!1 %s)) (= (select %s %d) a!1)))", string.format(conv, data), self.name, op_num)
 end
 
 
