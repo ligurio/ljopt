@@ -276,3 +276,55 @@ The event to hook into.
 - https://symflower.com/en/company/blog/2021/ssa/
 - An Abstract Interpretation-based Model of Tracing Just-In-Time
 Compilation, https://arxiv.org/pdf/1411.7839.pdf
+
+
+### Семантика LuaJIT IR
+#### Модель памяти и состояния JIT компилятора.
+  0. Стек с переменными из VM `(declare-fun vm_stack () (Array Int (_ BitVec 64)))`
+  1. Стек с переменными (IR references) `(declare-fun stack () (Array Int (_ BitVec 64)))`
+  2. Выходные типы операций `(declare-fun stack_types () (Array Int (_ BitVec 5)))`
+  3. Флаги выхода с трассы для guarded операций `(declare-fun stack_types () (Array Int (_ BitVec 1)))`
+  4. Snapshot `(declare-fun stack_types () (Array Int Int (_ BitVec 64)))`
+
+
+#### Типы в IR
+|# 	|Dump|IRT_      |Description                                        |SMT-LIB Representation|HEX code for SMT-LIB|
+|---|----|----------|---------------------------------------------------|----------------------|-|
+|0 	|nil |NIL       | 	nil value                                       |64-bit Vector (0x0)|0x0|
+|1 	|fal |FALSE     | 	false value                                     |64-bit Vector (0x0)|0x1|
+|2 	|tru |TRUE      | 	true value                                      |64-bit Vector (0x1)|0x2|
+|3 	|lud |LIGHTUD   |   Lightuserdata value                             |Unsupported|0x3|
+|4 	|str |STR       | 	Interned string object                          |Unsupported|0x4|
+|5 	|p32 |P32       | 	32 bit pointer                                  |64-bit Vector & 0x00000000ffffffff|0x5|
+|6 	|thr |THREAD    | 	Thread object                                   |Unsupported|0x6|
+|7 	|pro |PROTO     | 	Function prototype object                       |Unsupported|0x7|
+|8 	|fun |FUNC      | 	Function (closure) object                       |Unsupported|0x8|
+|9 	|p64 |P64       | 	64 bit pointer                                  |64-bit Vector|0x9|
+|10 |cdt |CDATA     | 	cdata object                                    |Unsupported|0xA|
+|11 |tab |TAB       | 	Table object                                    |Unsupported|0xB|
+|12 |udt |UDATA     | 	Userdata object                                 |Unsupported|0xC|
+|13 |flt |FLOAT     | 	32 bit FP number (float)                        |64-bit Vector & 0x00000000ffffffff -> Float32|0xD|
+|14 |num |NUM       | 	64 bit FP number (double)                       |64-bit Vector -> Float64|0xE|
+|15 |i8  |I8        | 	8 bit signed integer (int8_t)                   |64-bit Vector & 0x00000000000000ff|0xF|
+|16 |u8  |U8        | 	8 bit unsigned integer (uint8_t)                |64-bit Vector & 0x00000000000000ff|0x10|
+|17 |i16 |I16       | 	16 bit signed integer (int16_t)                 |64-bit Vector & 0x000000000000ffff|0x11|
+|18 |u16 |U16       | 	16 bit unsigned integer (uint16_t)              |64-bit Vector & 0x000000000000ffff|0x12|
+|19 |int |INT       | 	32 bit signed integer (int32_t)                 |64-bit Vector & 0x00000000ffffffff|0x13|
+|20 |u32 |U32       | 	32 bit unsigned integer (uint32_t)              |64-bit Vector & 0x00000000ffffffff|0x14|
+|21 |i64 |I64       | 	64 bit signed integer (int64_t)                 |64-bit Vector|0x15|
+|22 |u64 |U64       | 	64 bit unsigned integer (uint64_t)              |64-bit Vector|0x16|
+|23 |sfp |SOFTFP    | 	Hi-word of split soft-fp operations             |Unsupported|0x17|
+#### Инструкции IR
+1. `ADD`
+   Операнды:
+     Левый - IR-ref
+     Правый - IR-ref
+     
+   Операнды имеют одинаковый тип.
+   
+
+   Поддерживаемые типы:
+     
+   
+     
+   
