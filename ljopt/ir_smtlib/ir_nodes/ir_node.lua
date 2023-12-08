@@ -38,7 +38,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         -- Arithmetic Ops.
         ["ADD"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_ADD"),
         ["SUB"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_SUB"),
-        ["MUL"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_SUB"),
+        ["MUL"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_MUL"),
         "DIV",       -- TODO: Support.
         "MOD",       -- TODO: Support.
         "POW",       -- TODO: Support.
