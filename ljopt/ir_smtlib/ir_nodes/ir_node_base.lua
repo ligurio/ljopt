@@ -33,6 +33,31 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             return self.right_op
         end
 
+        function public:parse_op(operand, maxrecord)
+            -- TODO support for other types
+            maxrecord = maxrecord or 4000
+            -- TODO inf?
+            if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or operand == "NaN" then
+	            return "num"
+            elseif string.len(operand) == string.len(tostring(maxrecord)) then
+                return "op"
+            end
+        end
+
+        function public:retrieve_num_op(operand, ctx)
+            local op_type = self:parse_op(operand)
+            print(op_type)
+            if op_type == "op" then
+                operand = ctx.op_stack:load(tonumber(operand), "num")
+            elseif op_type == "num" then
+                -- TODO rewrite
+                local conv = "((_ to_fp 11 53) roundNearestTiesToEven %s)"
+                operand = operand:gsub("e", " "):gsub("+", "")
+                operand = string.format(conv, operand)
+            end
+            return operand
+        end
+
         function to_smt_lib()
             return assert(false, "Unimplemented", nil)
         end
