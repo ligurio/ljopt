@@ -69,8 +69,8 @@ function Op_stack_bv:init_smt(name)
         ["num"] = "(fp.to_ieee_bv %s)",
     }
     self.bv2type = {
-        ["u64"] = "%s",
-        ["i64"] = "%s",
+        ["u64"] = "(select %s %d)",
+        ["i64"] = "(select %s %d)",
         ["num"] = "((_ to_fp 11 53) (select %s %d))",
     }
     return string.format("(declare-fun %s () (Array Int (_ BitVec 64)))", name)
