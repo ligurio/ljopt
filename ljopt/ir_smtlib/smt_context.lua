@@ -1,3 +1,19 @@
+local type2bv = {
+    ["u32"] = "%s",
+    ["int"] = "%s",
+    ["u64"] = "%s",
+    ["i64"] = "%s",
+    ["num"] = "(fp.to_ieee_bv %s)",
+}
+local bv2type = {
+    ["u32"] = "(bvand %s #x00000000ffffffff)",
+    ["int"] = "(bvand %s #x00000000ffffffff)",
+    ["u64"] = "%s",
+    ["i64"] = "%s",
+    ["num"] = "((_ to_fp 11 53) %s)",
+}
+
+
 local Vm_stack = {}
 function Vm_stack:new()
     local public = {}
@@ -22,15 +38,25 @@ setmetatable(Vm_stack_bv, {__index = Vm_stack})
 
 function Vm_stack_bv:init_smt(name)
     self.name = name
-    return string.format("(declare-fun %s () (Array Int (_ BitVec 64)))", name)
+    self.cur_stack = 0
+    return string.format("(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))", name)
 end
 
 function Vm_stack_bv:load(slot_num, type)
-    -- TODO
+    local stack = string.format("(select %s %d)", self.name, self.cur_stack)
+    local slot = string.format("(select %s %d)", stack, slot_num)
+    local conv = assert(bv2type[type], "Unsupported load type "..type, nil)
+    return string.format(conv, slot)
 end
 
 function Vm_stack_bv:store(slot_num, type, data)
-    -- TODO
+    local conv = assert(type2bv[type], "Unsupported load op type "..type, nil)
+    local conv_data = string.format(conv, data)
+    local stack = string.format("(select %s %d)", self.name, self.cur_stack)
+    local new_stack = string.format("(store %s %d %s)", stack, slot_num, conv_data)
+    self.cur_stack = self.cur_stack + 1
+    local new_location = string.format("(select %s %d)", self.name, self.cur_stack)
+    return string.format("(assert (= %s %s))", new_location, new_stack)
 end
 
 
@@ -63,26 +89,17 @@ setmetatable(Op_stack_bv, {__index = Op_stack})
 
 function Op_stack_bv:init_smt(name)
     self.name = name
-    self.type2bv = {
-        ["u64"] = "%s",
-        ["i64"] = "%s",
-        ["num"] = "(fp.to_ieee_bv %s)",
-    }
-    self.bv2type = {
-        ["u64"] = "(select %s %d)",
-        ["i64"] = "(select %s %d)",
-        ["num"] = "((_ to_fp 11 53) (select %s %d))",
-    }
     return string.format("(declare-fun %s () (Array Int (_ BitVec 64)))", name)
 end
 
 function Op_stack_bv:load(op_num, type)
-    local conv = assert(self.bv2type[type], "Unsupported load op type "..type, nil)
-    return string.format(conv, self.name, op_num)
+    local conv = assert(bv2type[type], "Unsupported load op type "..type, nil)
+    local val = string.format("(select %s %d)", self.name, op_num)
+    return string.format(conv, val)
 end
 
 function Op_stack_bv:store(op_num, type, data)
-    local conv = assert(self.type2bv[type], "Unsupported store op type "..type, nil)
+    local conv = assert(type2bv[type], "Unsupported store op type "..type, nil)
     return string.format("(assert (let ((a!1 %s)) (= (select %s %d) a!1)))", string.format(conv, data), self.name, op_num)
 end
 
