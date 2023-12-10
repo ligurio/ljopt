@@ -113,8 +113,6 @@ local smt_context = require("ljopt/ir_smtlib/smt_context")
     -- 2nd stage. Transformations (loop unrooling, function inlining, ...).
     nodes = transform_nodes(nodes)
 
-    -- TODO: Create 'smt-context', and pass it to `:to_smt_lib()`
-
     -- 3rd stage. Converting to SMT-LIB.
     local smt_lib_format = ''
     for i = 1, #nodes do

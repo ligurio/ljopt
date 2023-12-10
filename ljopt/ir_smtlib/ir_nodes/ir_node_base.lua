@@ -58,6 +58,14 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
                 local conv = "((_ to_fp 11 53) roundNearestTiesToEven %s)"
                 operand = operand:gsub("e", " "):gsub("+", "")
                 operand = string.format(conv, operand)
+            end
+            return operand
+        end
+
+        function public:retrieve_int_op(operand, ctx)
+            local op_type = self:parse_op(operand)
+            if op_type == "op" then
+                operand = ctx.op_stack:load(tonumber(operand), self:get_type())
             elseif op_type == "int" then
                 local conv = string.format("#x%.16x", operand)
                 operand = string.format(conv, operand)
