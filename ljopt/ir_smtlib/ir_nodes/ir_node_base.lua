@@ -38,9 +38,8 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             maxrecord = maxrecord or 4000
             -- TODO inf?
             if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or operand == "NaN" then
-	            return "num"
-            elseif operand:sub(1, 1) == '#' then
-	            return "#int"
+                assert(self:get_type() == "num" or self:get_type() == "int") -- TODO support for arith other types
+                return self:get_type()
             elseif string.len(operand) == string.len(tostring(maxrecord)) then
                 return "op"
             end
@@ -52,13 +51,15 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
 
         function public:retrieve_num_op(operand, ctx)
             local op_type = self:parse_op(operand)
-            print(op_type)
             if op_type == "op" then
-                operand = ctx.op_stack:load(tonumber(operand), "num")
+                operand = ctx.op_stack:load(tonumber(operand), self:get_type())
             elseif op_type == "num" then
                 -- TODO rewrite
                 local conv = "((_ to_fp 11 53) roundNearestTiesToEven %s)"
                 operand = operand:gsub("e", " "):gsub("+", "")
+                operand = string.format(conv, operand)
+            elseif op_type == "int" then
+                local conv = string.format("#x%.16x", operand)
                 operand = string.format(conv, operand)
             end
             return operand

@@ -30,7 +30,7 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "u8",  -- TODO: Support.
         "i16", -- TODO: Support.
         "u16", -- TODO: Support.
-        ["int"] = {},
+        "int", -- TODO: Support.
         "u32", -- TODO: Support.
         "i64", -- TODO: Support.
         "u64", -- TODO: Support.

@@ -8,45 +8,12 @@ local impls = {}
 impls.ir_node_LE_int = {}
 extended(impls.ir_node_LE_int, ir_node_LE_base)
 
-function impls.ir_node_LE_int:to_smt_lib()
-    --TODO: Implement
-    return ''
+function impls.ir_node_LE_int:to_smt_lib(ctx)
+    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
+    local data = string.format("(bvsgt %s %s)", left_op, right_op)
+    return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
-
-impls.ir_node_LE_flt = {}
-extended(impls.ir_node_LE_flt, ir_node_LE_base)
-
-impls.ir_node_LE_i8 = {}
-extended(impls.ir_node_LE_i8, ir_node_LE_base)
-
-impls.ir_node_LE_u8 = {}
-extended(impls.ir_node_LE_u8, ir_node_LE_base)
-
-impls.ir_node_LE_i16 = {}
-extended(impls.ir_node_LE_i16, ir_node_LE_base)
-
-impls.ir_node_LE_u16 = {}
-extended(impls.ir_node_LE_u16, ir_node_LE_base)
-
-impls.ir_node_LE_int = {}
-extended(impls.ir_node_LE_int, ir_node_LE_base)
-
-function impls.ir_node_LE_int:to_smt_lib()
-    --TODO: Implement
-end
-
-impls.ir_node_LE_u32 = {}
-extended(impls.ir_node_LE_u32, ir_node_LE_base)
-
-impls.ir_node_LE_i64 = {}
-extended(impls.ir_node_LE_i64, ir_node_LE_base)
-
-impls.ir_node_LE_u64 = {}
-extended(impls.ir_node_LE_u64, ir_node_LE_base)
-
-impls.ir_node_LE_sfp = {}
-extended(impls.ir_node_LE_sfp, ir_node_LE_base)
-
 
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {

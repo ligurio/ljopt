@@ -118,15 +118,19 @@ local smt_context = require("ljopt/ir_smtlib/smt_context")
     -- 3rd stage. Converting to SMT-LIB.
     local smt_lib_format = ''
     for i = 1, #nodes do
-        print(nodes[i]:get_ssa_reference())
-        print(nodes[i]:get_flags())
-        print(nodes[i]:get_type())
-        print(nodes[i]:get_opcode())
-        print(nodes[i]:get_left_op())
-        print(nodes[i]:get_right_op())
+        local parsed_ir = (nodes[i]:get_ssa_reference() or '').." "
+        ..(nodes[i]:get_flags() or '').." "
+        ..(nodes[i]:get_type() or '').." "
+        ..(nodes[i]:get_opcode() or '').." "
+        ..(nodes[i]:get_left_op() or '').." "
+        ..(nodes[i]:get_right_op() or '').." "
+        print("; "..parsed_ir)
+
         print(nodes[i]:to_smt_lib(ctx_src))
         print("\n")
     end
+
+    smt_lib_format = smt_lib_format.."(check-sat)".."\n(get-model)"
     return smt_lib_format
 end
 
