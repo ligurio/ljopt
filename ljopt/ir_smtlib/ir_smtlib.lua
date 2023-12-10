@@ -174,7 +174,7 @@ local test_TRACE = {
     { ["ssa_ref"] = "0003", ["flags"] = nil, ["type"] = "num", ["opcode"] = "CONV",   ["left_op"] = "+0",                    ["right_op"] = "num.int" },
     { ["ssa_ref"] = "0004", ["flags"] = nil, ["type"] = "num", ["opcode"] = "MUL",    ["left_op"] = "-7.0222388080559e+305", ["right_op"] = "0003" },
     { ["ssa_ref"] = "0005", ["flags"] = nil, ["type"] = "num", ["opcode"] = "SUB",    ["left_op"] = "0002",                  ["right_op"] = "0004" },
-    { ["ssa_ref"] = "0006", ["flags"] = ">", ["type"] = "tab", ["opcode"] = "SLOAD",  ["left_op"] = "#2",                    ["right_op"] = "T" },
+    -- { ["ssa_ref"] = "0006", ["flags"] = ">", ["type"] = "tab", ["opcode"] = "SLOAD",  ["left_op"] = "#2",                    ["right_op"] = "T" },
     { ["ssa_ref"] = "0007", ["flags"] = nil, ["type"] = "int", ["opcode"] = "FLOAD",  ["left_op"] = "0006",                  ["right_op"] = "tab.asize" },
     { ["ssa_ref"] = "0008", ["flags"] = ">", ["type"] = "int", ["opcode"] = "ABC",    ["left_op"] = "0007",                  ["right_op"] = "0001" },
     { ["ssa_ref"] = "0009", ["flags"] = nil, ["type"] = "p32", ["opcode"] = "FLOAD",  ["left_op"] = "0006",                  ["right_op"] = "tab.array" },

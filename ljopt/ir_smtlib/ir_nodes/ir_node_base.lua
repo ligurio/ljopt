@@ -39,9 +39,15 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             -- TODO inf?
             if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or operand == "NaN" then
 	            return "num"
+            elseif operand:sub(1, 1) == '#' then
+	            return "#int"
             elseif string.len(operand) == string.len(tostring(maxrecord)) then
                 return "op"
             end
+        end
+
+        function public:retrieve_slot_op(operand)
+            return tonumber(operand:sub(2))
         end
 
         function public:retrieve_num_op(operand, ctx)
