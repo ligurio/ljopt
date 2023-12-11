@@ -8,15 +8,27 @@ local impls = {}
 impls.ir_node_EQ_num = {}
 extended(impls.ir_node_EQ_num, ir_node_EQ_base)
 
-function impls.ir_node_EQ_num:to_smt_lib()
-    --TODO: Implement
-    return ''
+function impls.ir_node_EQ_num:to_smt_lib(ctx)
+    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
+    local data = string.format("(== %s %s)", left_op, right_op)
+    return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
+end
+
+impls.ir_node_EQ_int = {}
+extended(impls.ir_node_EQ_int, ir_node_EQ_base)
+
+function impls.ir_node_EQ_int:to_smt_lib(ctx)
+    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
+    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
+    local data = string.format("(== %s %s)", left_op, right_op)
+    return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 impls.ir_node_EQ_tab = {}
 extended(impls.ir_node_EQ_tab, ir_node_EQ_base)
 
-function impls.ir_node_EQ_tab:to_smt_lib()
+function impls.ir_node_EQ_tab:to_smt_lib(ctx)
     --TODO: Implement
     return ''
 end
@@ -29,13 +41,13 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "u8",  -- TODO: Support.
         "i16", -- TODO: Support.
         "u16", -- TODO: Support.
-        "int", -- TODO: Support.
+        ["int"] = {},
         "u32", -- TODO: Support.
         "i64", -- TODO: Support.
         "u64", -- TODO: Support.
         "sfp"  -- TODO: Support.
     }
-    assert(type_table[type] ~= nil, "Unsupported type for EQ operation", nil)
+    assert(type_table[type] ~= nil, "Unsupported type for EQ operation "..type, nil)
     return impls["ir_node_EQ_" .. type]:new(ssa_ref, flags, type, "EQ", left_op, right_op)
 end
 

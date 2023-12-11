@@ -1,4 +1,5 @@
 local type2bv = {
+    ["tab"] = "%s",
     ["flt"] = "(fp.to_ieee_bv (bvand %s #x00000000ffffffff))",
     ["i8"]  = "(bvand %s #x00000000000000ff)",
     ["u8"]  = "(bvand %s #x00000000000000ff)",
@@ -12,6 +13,7 @@ local type2bv = {
 }
 
 local bv2type = {
+    ["tab"] = "%s",
     ["flt"] = "((_ to_fp 9 24) (bvand %s #x00000000ffffffff))",
     ["i8"]  = "(bvand %s #x00000000000000ff)",
     ["u8"]  = "(bvand %s #x00000000000000ff)",
@@ -166,6 +168,27 @@ function Ctx:new(vm_stack_type, op_stack_type)
 
     setmetatable(public, self)
     self.__index = self
+    return public
+end
+
+local snap_stack = {}
+function snap_stack:new()
+    local public = {}
+
+    function snap_stack:init_smt(name)
+        self.name = name
+        self.cur_stack = 0
+        return string.format("(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))", name)
+    end
+
+    function snap_stack:load(slot_num, type)
+    end
+
+    function snap_stack:store(slot_num, type, data)
+    end
+
+    setmetatable(public, self)
+    self.__index = self;
     return public
 end
 

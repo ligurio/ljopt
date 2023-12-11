@@ -14,6 +14,11 @@ function ir_node_CONV:to_smt_lib(ctx)
         left_op = left_op:gsub("+", "")
 
         data = string.format("((_ to_fp 11 53) roundNearestTiesToEven %s 0.)", left_op)
+    elseif right_op == "int.num" then
+        left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+        left_op = left_op:gsub("+", "")
+
+        data = string.format("((_ to_fp 11 53) roundNearestTiesToEven %s 0.)", left_op)
     else
         assert(false, "Unsupported type conversion")
     end

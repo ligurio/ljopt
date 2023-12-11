@@ -18,7 +18,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "GT",     -- TODO: Support.
         "ULT",    -- TODO: Support.
         "UGE",    -- TODO: Support.
-        "ULE",    -- TODO: Support.
+        ["ULE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_ULE"),
         "UGT",    -- TODO: Support.
         ["EQ"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_EQ"),
         "NE",     -- TODO: Support.
@@ -68,7 +68,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ["AREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_AREF"),
         "HREFK",  -- TODO: Support.
         "HREF",   -- TODO: Support.
-        "NEWREF", -- TODO: Support.
+        ["NEWREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_NEWREF"),
         "UREFO",  -- TODO: Support.
         "UREFC",  -- TODO: Support.
         "FREF",   -- TODO: Support.
@@ -82,7 +82,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ["SLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_SLOAD"),
         "VLOAD",  -- TODO: Support.
         ["ASTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_ASTORE"),
-        "HSTORE", -- TODO: Support.
+        ["HSTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_HSTORE"),
         "USTORE", -- TODO: Support.
         "FSTORE", -- TODO: Support.
         "XSTORE", -- TODO: Support.
@@ -110,7 +110,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "CARG",   -- TODO: Support.
         -- Miscellaneous Ops.
         ["SNAP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_SNAP"),
-        "NOP",    -- TODO: Support.
+        ["NOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_NOP"),
         "BASE",   -- TODO: Support.
         "PVAL",   -- TODO: Support.
         "GCSTEP", -- TODO: Support.

@@ -91,27 +91,25 @@ function dump(o)
    end
 end
 
-
-local smt_context = require("ljopt/ir_smtlib/smt_context")
-
-local function translate(trace, smt_suffix)
+<<<<<<< HEAD
+local function translate(trace)
     if (type(trace) ~= "table") then
         error("not a table")
-    end
-
-    -- print(dump(trace))
- 
+    end    
+    print(dump(trace))
     local smtlib_buf = [[
 (set-option :print-success false)
 (set-option :produce-models true)
 ]]
-
-    smt_suffix = "src"
+local smt_context = require("ljopt/ir_smtlib/smt_context")
+=======
+local function translate(trace, smt_suffix)
+>>>>>>> 04f0a9e (a)
     -- 0 stage. Create 'smt-context'.
     local ctx_src = smt_context:new("BV", "BV")
-    smtlib_buf = smtlib_buf .. ctx_src.vm_stack:init_smt("vm_" .. smt_suffix) .. "\n"
-    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt("op_" .. smt_suffix) .. "\n"
-    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt("te_" .. smt_suffix) .. "\n"
+    print(ctx_src.vm_stack:init_smt("vm_" .. smt_suffix))
+    print(ctx_src.op_stack:init_smt("op_" .. smt_suffix))
+    print(ctx_src.te_stack:init_smt("te_" .. smt_suffix))
     -- print(ctx_src.te_stack:init_smt("snap_" .. smt_suffix))
 
     -- 1st stage. Constructing list of `ir_nodes` from raw string data.
@@ -121,6 +119,7 @@ local function translate(trace, smt_suffix)
     nodes = transform_nodes(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
+    local smt_lib_format = ''
     for i = 1, #nodes do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. " "
             .. (nodes[i]:get_flags() or '') .. " "
@@ -128,13 +127,12 @@ local function translate(trace, smt_suffix)
             .. (nodes[i]:get_opcode() or '') .. " "
             .. (nodes[i]:get_left_op() or '') .. " "
             .. (nodes[i]:get_right_op() or '') .. " "
+        print("; " .. parsed_ir)
 
-        print (parsed_ir)
-        -- print (nodes[i]:to_smt_lib(ctx_src))
-        smtlib_buf = smtlib_buf .. "; " .. parsed_ir .. "\n" .. nodes[i]:to_smt_lib(ctx_src) .. "\n"
-
+        print(nodes[i]:to_smt_lib(ctx_src))
+        print("\n")
     end
-    return smtlib_buf
+    return smt_lib_format
 end
 
 
@@ -205,9 +203,9 @@ local dst_test_TRACE = {
     { ["ssa_ref"] = "0019", ["flags"] = nil, ["type"] = "int", ["opcode"] = "PHI",    ["left_op"] = "0011", ["right_op"] = "0017" },
 }
 
--- print(translate(src_test_TRACE, "src"))
--- print(translate(dst_test_TRACE, "dst"))
--- print(compare_smt("src", "dst"))
+print(translate(src_test_TRACE, "src"))
+print(translate(dst_test_TRACE, "dst"))
+print(compare_smt("src", "dst"))
 
 return {
     translate = translate,
