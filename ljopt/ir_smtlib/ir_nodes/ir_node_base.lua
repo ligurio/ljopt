@@ -38,7 +38,9 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             maxrecord = maxrecord or 4000
             -- TODO inf?
             if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or operand == "NaN" then
-                assert(self:get_type() == "num" or self:get_type() == "int") -- TODO support for arith other types
+                -- TODO support for arith other types
+                assert(self:get_type() == "num" or self:get_type() == "int" or
+                       self:get_type() == "i64" or self:get_type() == "u64")
                 return self:get_type()
             elseif string.len(operand) == string.len(tostring(maxrecord)) then
                 return "op"
@@ -68,6 +70,17 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
                 operand = ctx.op_stack:load(tonumber(operand), self:get_type())
             elseif op_type == "int" then
                 local conv = string.format("#x%.16x", operand)
+                operand = string.format(conv, operand)
+            end
+            return operand
+        end
+
+        function public:retrieve_i64_op(operand, ctx)
+            local op_type = self:parse_op(operand)
+            if op_type == "op" then
+                operand = ctx.op_stack:load(tonumber(operand), self:get_type())
+            elseif op_type == "i64" then
+                local conv = string.format("#x%.32x", operand)
                 operand = string.format(conv, operand)
             end
             return operand
