@@ -4,7 +4,10 @@ local is_json, json = pcall(require, "json")
 local is_debug = os.getenv("DEBUG")
 
 -- Documentation: https://luajit.org/running.html
-local lj_opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+local lj_opt_default = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+local lj_opt_src_test2 = "jit.opt.start(0, '-fold', '+cse', '+fwd', 'hotloop=1', 'hotexit=1')"
+local lj_opt_tgt_test2 = "jit.opt.start(0, '+fold', '+cse', '+fwd', 'hotloop=1', 'hotexit=1')"
+local lj_opt = lj_opt_default
 
 local exit_codes = {
   ok = 0,
