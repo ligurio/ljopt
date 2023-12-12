@@ -21,19 +21,19 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ["ULE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_ULE"),
         "UGT",    -- TODO: Support.
         ["EQ"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_EQ"),
-        "NE",     -- TODO: Support.
+        ["NE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_NE"),
         ["ABC"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_ABC"),
         "RETF",   -- TODO: Support.
         -- Bit Ops.
         "BNOT",   -- TODO: Support.
         "BSWAP",  -- TODO: Support.
-        "BAND",   -- TODO: Support.
+        ["BAND"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/ir_BAND"),
         "BOR",    -- TODO: Support.
         "BXOR",   -- TODO: Support.
         "BSHL",   -- TODO: Support.
         "BSHR",   -- TODO: Support.
         "BSAR",   -- TODO: Support.
-        "BROL",   -- TODO: Support.
+        ["BROL"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/ir_BROL"),
         "BROR",   -- TODO: Support.
         -- Arithmetic Ops.
         ["ADD"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_ADD"),

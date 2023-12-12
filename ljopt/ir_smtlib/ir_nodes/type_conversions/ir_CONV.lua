@@ -13,6 +13,10 @@ function ir_node_CONV:to_smt_lib(ctx)
         left_op = self:retrieve_int_op(self:get_left_op(), ctx)
         left_op = left_op:gsub("+", "")
         data = string.format("((_ to_fp 11 53) roundNearestTiesToEven %s 0.)", left_op)
+    elseif right_op == "int.num" then
+        left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+        -- TODO handle inputs that are out of range 
+        data = string.format("((_ fp.to_sbv 32) roundNearestTiesToEven %s)", left_op)
     elseif right_op == "num.i64" then
         left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
         -- TODO recheck rounding behaviour
