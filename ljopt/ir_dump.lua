@@ -298,7 +298,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       end
     elseif op ~= "NOP   " and op ~= "CARG  " and
 	   (dumpreg or op ~= "RENAME") then
-      local rid = band(ridsp, 255)
+      rid = band(ridsp, 255)
       if dumpreg then
 	write_out(format("%04d %-6s", ins, ridsp_name(ridsp, ins)))
       else
@@ -360,13 +360,17 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     end
 
     local irins = {
-        num = ins,
-        irt_guard = irt_guard,
-        irt_isphi = irt_isphi,
-        irtype = irtype[t],
-        irop = trim(op),
-        op1 = trim(op1_txt),
-        op2 = trim(op2_txt),
+        ssa_ref = format("%04d", ins),
+        flags = format("%s%s",
+		       (rid == 254 or rid == 253) and "}" or
+		       (band(ot, 128) == 0 and " " or ">"),
+		       band(ot, 64) == 0 and " " or "+"),
+--         irt_guard = irt_guard,
+--         irt_isphi = irt_isphi,
+        type = irtype[t],
+        opcode = trim(op),
+        left_op = trim(op1_txt),
+        right_op = trim(op2_txt),
     }
     table.insert(traces[tr], irins)
   end

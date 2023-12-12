@@ -160,10 +160,24 @@ local function is_supported_ir_type(tp)
     return ir_types_bl[tp] == false
 end
 
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ',\n'
+      end
+      return s .. '} '
+   else
+      return '"' .. tostring(o) .. '"'
+   end
+end
+
 local function translate(trace)
     if (type(trace) ~= "table") then
         error("not a table")
     end
+    print(dump(trace))
     local smtlib_buf = [[
 (set-option :print-success false)
 (set-option :produce-models true)
