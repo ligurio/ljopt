@@ -100,6 +100,12 @@ local function translate(trace)
 (set-option :print-success false)
 (set-option :produce-models true)
 ]]
+local smt_context = require("ljopt/ir_smtlib/smt_context")
+    -- 0 stage. Create 'smt-context'.
+    local ctx_src = smt_context:new("BV", "BV")
+    print(ctx_src.vm_stack:init_smt("vm_src"))
+    print(ctx_src.op_stack:init_smt("op_src"))
+    print(ctx_src.te_stack:init_smt("te_src"))
 
     -- 1st stage. Constructing list of `ir_nodes` from raw string data.
     local nodes = construct_nodes(trace)
@@ -118,7 +124,8 @@ local function translate(trace)
         print(nodes[i]:get_opcode())
         print(nodes[i]:get_left_op())
         print(nodes[i]:get_right_op())
-        print ("\n")
+        print(nodes[i]:to_smt_lib(ctx_src))
+        print("\n")
     end
     return smt_lib_format
 end
