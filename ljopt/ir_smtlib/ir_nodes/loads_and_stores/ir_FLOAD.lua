@@ -3,9 +3,20 @@ local ir_node = require("ljopt/ir_smtlib/ir_nodes/ir_node_base")
 ir_node_FLOAD = {}
 ir_node.extended(ir_node_FLOAD, ir_node.ir_node_base)
 
-function ir_node_FLOAD:to_smt_lib()
-    --TODO: Implement
-    return ''
+function ir_node_FLOAD:to_smt_lib(ctx)
+    local left_op = ''
+    local right_op = self:get_right_op()
+    local data = ''
+
+    -- TODO: Support other fields
+    -- TODO: cdata.type can have different IR type?
+    if right_op == "cdata.int64" then
+        left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
+        data = left_op
+    else
+        assert(false, "Unsupported field type for FLOAD")
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 function instance(ssa_ref, flags, type, left_op, right_op)

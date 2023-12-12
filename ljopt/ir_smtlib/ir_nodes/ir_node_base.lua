@@ -37,7 +37,9 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             -- TODO support for other types
             maxrecord = maxrecord or 4000
             -- TODO inf?
-            if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or operand == "NaN" then
+            -- TODO other modifiers
+            if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or
+               operand:sub(-1, -1) == 'L' or operand == "NaN" then
                 -- TODO support for arith other types
                 assert(self:get_type() == "num" or self:get_type() == "int" or
                        self:get_type() == "i64" or self:get_type() == "u64")
