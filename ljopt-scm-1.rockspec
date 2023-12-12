@@ -28,6 +28,11 @@ build = {
         ["ljopt.bc_smtlib"] = "ljopt/bc_smtlib.lua",
         ["ljopt.ir_dump"] = "ljopt/ir_dump.lua",
         ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib.lua",
+
+        ["ljopt.ir.ir_node_base"] = "ljopt/ir/ir_node_base.lua",
+        ["ljopt.ir.ir_node_dummy"] = "ljopt/ir/ir_node_dummy.lua",
+        ["ljopt.ir.ir_nodes"] = "ljopt/ir/ir_nodes.lua",
+        ["ljopt.ir.smt_context"] = "ljopt/ir/smt_context.lua",
    },
    install = {
       bin = {

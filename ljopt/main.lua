@@ -1,5 +1,6 @@
 local ljopt = require("ljopt")
 local is_json, json = pcall(require, "json")
+local jit = require("jit")
 
 local is_debug = os.getenv("DEBUG")
 
@@ -35,7 +36,7 @@ if is_debug then
   io.stdout:write(("LuaJIT flags: %s\n"):format(lj_opt))
 end
 
-loadstring(lj_opt)
+assert(load(lj_opt))()
 
 local traces = ljopt.ir.record(lua_code, is_debug)
 assert(type(traces) == "table")
