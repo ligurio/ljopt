@@ -82,6 +82,12 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
             if op_type == "op" then
                 operand = ctx.op_stack:load(tonumber(operand), self:get_type())
             elseif op_type == "i64" then
+                if operand:sub(-1, -1) == 'L' then
+                    operand = operand:sub(1,-2)
+                end
+                if operand:sub(-1, -1) == 'L' then
+                    operand = operand:sub(1,-2)
+                end
                 local conv = string.format("#x%.32x", operand)
                 operand = string.format(conv, operand)
             end

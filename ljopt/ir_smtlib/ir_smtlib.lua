@@ -319,7 +319,7 @@ local test2_traces = {
     },
 }
 
--- print(translate(test2_traces, "src"))
+print(translate(test2_traces, "src"))
 
 return {
     translate = translate,

@@ -56,7 +56,12 @@ end
 function Vm_stack_bv:load(slot_num, type)
     local stack = string.format("(select %s %d)", self.name, self.cur_stack)
     local slot = string.format("(select %s %d)", stack, slot_num)
-    local conv = assert(bv2type[type], "Unsupported load type " .. type, nil)
+    local conv = ''
+    if bv2type[type] == nil then
+        return ''
+    else
+        conv = assert(bv2type[type], "Unsupported load type " .. type, nil)
+    end
     return string.format(conv, slot)
 end
 
@@ -108,6 +113,9 @@ function Op_stack_bv:load(op_num, type)
 end
 
 function Op_stack_bv:store(op_num, type, data)
+    if data == '' then
+        return ''
+    end
     local conv = assert(type2bv[type], "Unsupported store op type " .. type, nil)
     return string.format("(assert (let ((a!1 %s)) (= (select %s %d) a!1)))", string.format(conv, data), self.name, op_num)
 end

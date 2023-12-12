@@ -33,9 +33,18 @@ function impls.ir_node_EQ_tab:to_smt_lib(ctx)
     return ''
 end
 
+impls.ir_node_EQ_fun = {}
+extended(impls.ir_node_EQ_fun, ir_node_EQ_base)
+
+function impls.ir_node_EQ_fun:to_smt_lib()
+    --TODO: Implement
+    return ''
+end
+
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
         ["tab"] = {},
+        ["fun"] = {}, -- TODO: Support.
         "num", -- TODO: Support.
         "i8",  -- TODO: Support.
         "u8",  -- TODO: Support.

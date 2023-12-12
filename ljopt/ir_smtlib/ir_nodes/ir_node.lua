@@ -66,16 +66,16 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "FPM_TAN",   -- TODO: Support.
         -- Memory References.
         ["AREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_AREF"),
-        "HREFK",  -- TODO: Support.
+        ["HREFK"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_HREFK"),
         "HREF",   -- TODO: Support.
         ["NEWREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_NEWREF"),
         "UREFO",  -- TODO: Support.
-        "UREFC",  -- TODO: Support.
+        ["UREFC"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_UREFC"),
         "FREF",   -- TODO: Support.
         "STRREF", -- TODO: Support.
         -- Loads and Stores.
         "ALOAD",  -- TODO: Support.
-        "HLOAD",  -- TODO: Support.
+        ["HLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_HLOAD"),
         "ULOAD",  -- TODO: Support.
         ["FLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_FLOAD"),
         "XLOAD",  -- TODO: Support.
@@ -92,7 +92,7 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "TNEW",   -- TODO: Support.
         "TDUP",   -- TODO: Support.
         "CNEW",   -- TODO: Support.
-        "CNEWI",  -- TODO: Support.
+        ["CNEWI"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_CNEWI"),
         -- Barriers.
         "TBAR",   -- TODO: Support.
         "OBAR",   -- TODO: Support.
