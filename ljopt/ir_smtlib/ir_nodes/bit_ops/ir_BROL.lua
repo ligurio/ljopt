@@ -1,14 +1,14 @@
 local ir_node = require("ljopt/ir_smtlib/ir_nodes/ir_node_base")
 
-ir_node_BROL_base = {}
-extended(ir_node_BROL_base, ir_node.ir_node_base)
+IRNodeBANDBase = {}
+extended(IRNodeBANDBase, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.ir_node_BROL_i64 = {}
-extended(impls.ir_node_BROL_i64, ir_node_BROL_base)
+impls.IRNodeBANDI64 = {}
+extended(impls.IRNodeBANDI64, IRNodeBANDBase)
 
-function impls.ir_node_BROL_i64:to_smt_lib(ctx)
+function impls.IRNodeBANDI64:to_smt_lib(ctx)
     local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
     local right_op = self:retrieve_i64_op(self:get_right_op(), ctx)
     local data = string.format("(ext_rotate_left %s %s)", left_op, right_op)
@@ -27,7 +27,7 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "u64", -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for BROL operation", nil)
-    return impls["ir_node_BROL_" .. type]:new(ssa_ref, flags, type, "BROL", left_op, right_op)
+    return impls["IRNodeBAND" .. type]:new(ssa_ref, flags, type, "BROL", left_op, right_op)
 end
 
 return {

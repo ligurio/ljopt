@@ -1,42 +1,42 @@
 local ir_node = require("ljopt/ir_smtlib/ir_nodes/ir_node_base")
 
-ir_node_EQ_base = {}
-extended(ir_node_EQ_base, ir_node.ir_node_base)
+IRNodeEQBase = {}
+extended(IRNodeEQBase, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.ir_node_EQ_num = {}
-extended(impls.ir_node_EQ_num, ir_node_EQ_base)
+impls.IRNodeEQNum = {}
+extended(impls.IRNodeEQNum, IRNodeEQBase)
 
-function impls.ir_node_EQ_num:to_smt_lib(ctx)
+function impls.IRNodeEQNum:to_smt_lib(ctx)
     local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
     local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
     local data = string.format("(== %s %s)", left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-impls.ir_node_EQ_int = {}
-extended(impls.ir_node_EQ_int, ir_node_EQ_base)
+impls.IRNodeEQInt = {}
+extended(impls.IRNodeEQInt, IRNodeEQBase)
 
-function impls.ir_node_EQ_int:to_smt_lib(ctx)
+function impls.IRNodeEQInt:to_smt_lib(ctx)
     local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
     local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
     local data = string.format("(== %s %s)", left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-impls.ir_node_EQ_tab = {}
-extended(impls.ir_node_EQ_tab, ir_node_EQ_base)
+impls.IRNodeEQTab = {}
+extended(impls.IRNodeEQTab, IRNodeEQBase)
 
-function impls.ir_node_EQ_tab:to_smt_lib(ctx)
+function impls.IRNodeEQTab:to_smt_lib(ctx)
     --TODO: Implement
     return ''
 end
 
-impls.ir_node_EQ_fun = {}
-extended(impls.ir_node_EQ_fun, ir_node_EQ_base)
+impls.IRNodeEQFun = {}
+extended(impls.IRNodeEQFun, IRNodeEQBase)
 
-function impls.ir_node_EQ_fun:to_smt_lib()
+function impls.IRNodeEQFun:to_smt_lib()
     --TODO: Implement
     return ''
 end
@@ -57,7 +57,7 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "sfp"  -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for EQ operation "..type, nil)
-    return impls["ir_node_EQ_" .. type]:new(ssa_ref, flags, type, "EQ", left_op, right_op)
+    return impls["IRNodeEQ" .. type]:new(ssa_ref, flags, type, "EQ", left_op, right_op)
 end
 
 return {
