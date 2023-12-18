@@ -27,19 +27,19 @@ end
 
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ["num"] = {},
+        ["num"] = "Num",
         "i8",  -- TODO: Support.
         "u8",  -- TODO: Support.
         "i16", -- TODO: Support.
         "u16", -- TODO: Support.
-        ["int"] = {},
+        ["int"] = "Int",
         "u32", -- TODO: Support.
         "i64", -- TODO: Support.
         "u64", -- TODO: Support.
         "sfp"  -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for LE operation", nil)
-    return impls["IRNodeLE" .. type]:new(ssa_ref, flags, type, "LE", left_op, right_op)
+    return impls["IRNodeLE" .. type_table[type]]:new(ssa_ref, flags, type, "LE", left_op, right_op)
 end
 
 return {

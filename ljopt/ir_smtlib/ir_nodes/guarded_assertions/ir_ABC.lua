@@ -15,10 +15,10 @@ end
 
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ["int"] = {},
+        ["int"] = "Int",
     }
     assert(type_table[type] ~= nil, "Unsupported type for ABC operation", nil)
-    return impls["IRNodeABC" .. type]:new(ssa_ref, flags, type, "ABC", left_op, right_op)
+    return impls["IRNodeABC" .. type_table[type]]:new(ssa_ref, flags, type, "ABC", left_op, right_op)
 end
 
 return {

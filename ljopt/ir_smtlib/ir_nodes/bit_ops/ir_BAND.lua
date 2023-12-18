@@ -31,13 +31,13 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "u8",  -- TODO: Support.
         "i16", -- TODO: Support.
         "u16", -- TODO: Support.
-        ["int"] = {},
+        ["int"] = "Int",
         "u32", -- TODO: Support.
-        ["i64"] = {},
+        ["i64"] = "I64",
         "u64", -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for BAND operation", nil)
-    return impls["IRNodeBAND" .. type]:new(ssa_ref, flags, type, "BAND", left_op, right_op)
+    return impls["IRNodeBAND" .. type_table[type]]:new(ssa_ref, flags, type, "BAND", left_op, right_op)
 end
 
 return {

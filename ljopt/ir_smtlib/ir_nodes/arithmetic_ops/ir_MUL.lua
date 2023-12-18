@@ -25,7 +25,7 @@ end
 
 function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ["num"] = {},
+        ["num"] = "Num",
         "i8",  -- TODO: Support.
         "u8",  -- TODO: Support.
         "i16", -- TODO: Support.
@@ -37,7 +37,7 @@ function instance(ssa_ref, flags, type, left_op, right_op)
         "sfp"  -- TODO: Support.
     }
     assert(type_table[type] ~= nil, "Unsupported type for MUL operation", nil)
-    return impls["IRNodeMUL" .. type]:new(ssa_ref, flags, type, "MUL", left_op, right_op)
+    return impls["IRNodeMUL" .. type_table[type]]:new(ssa_ref, flags, type, "MUL", left_op, right_op)
 end
 
 return {
