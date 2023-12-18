@@ -14,31 +14,31 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "OP",     -- TODO: Support.
         "LT",     -- TODO: Support.
         "GE",     -- TODO: Support.
-        ["LE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_LE"),
+        ["LE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/LE"),
         "GT",     -- TODO: Support.
         "ULT",    -- TODO: Support.
         "UGE",    -- TODO: Support.
-        ["ULE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_ULE"),
+        ["ULE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ULE"),
         "UGT",    -- TODO: Support.
-        ["EQ"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_EQ"),
-        ["NE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_NE"),
-        ["ABC"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ir_ABC"),
+        ["EQ"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/EQ"),
+        ["NE"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/NE"),
+        ["ABC"] = require("ljopt/ir_smtlib/ir_nodes/guarded_assertions/ABC"),
         "RETF",   -- TODO: Support.
         -- Bit Ops.
         "BNOT",   -- TODO: Support.
         "BSWAP",  -- TODO: Support.
-        ["BAND"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/ir_BAND"),
+        ["BAND"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/BAND"),
         "BOR",    -- TODO: Support.
         "BXOR",   -- TODO: Support.
         "BSHL",   -- TODO: Support.
         "BSHR",   -- TODO: Support.
         "BSAR",   -- TODO: Support.
-        ["BROL"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/ir_BROL"),
+        ["BROL"] = require("ljopt/ir_smtlib/ir_nodes/bit_ops/BROL"),
         "BROR",   -- TODO: Support.
         -- Arithmetic Ops.
-        ["ADD"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_ADD"),
-        ["SUB"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_SUB"),
-        ["MUL"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ir_MUL"),
+        ["ADD"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/ADD"),
+        ["SUB"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/SUB"),
+        ["MUL"] = require("ljopt/ir_smtlib/ir_nodes/arithmetic_ops/MUL"),
         "DIV",       -- TODO: Support.
         "MOD",       -- TODO: Support.
         "POW",       -- TODO: Support.
@@ -65,24 +65,24 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "FPM_COS",   -- TODO: Support.
         "FPM_TAN",   -- TODO: Support.
         -- Memory References.
-        ["AREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_AREF"),
-        ["HREFK"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_HREFK"),
+        ["AREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/AREF"),
+        ["HREFK"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/HREFK"),
         "HREF",   -- TODO: Support.
-        ["NEWREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_NEWREF"),
+        ["NEWREF"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/NEWREF"),
         "UREFO",  -- TODO: Support.
-        ["UREFC"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_UREFC"),
+        ["UREFC"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/UREFC"),
         "FREF",   -- TODO: Support.
         "STRREF", -- TODO: Support.
         -- Loads and Stores.
         "ALOAD",  -- TODO: Support.
-        ["HLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_HLOAD"),
+        ["HLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/HLOAD"),
         "ULOAD",  -- TODO: Support.
-        ["FLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_FLOAD"),
+        ["FLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/FLOAD"),
         "XLOAD",  -- TODO: Support.
-        ["SLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_SLOAD"),
+        ["SLOAD"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/SLOAD"),
         "VLOAD",  -- TODO: Support.
-        ["ASTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_ASTORE"),
-        ["HSTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ir_HSTORE"),
+        ["ASTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/ASTORE"),
+        ["HSTORE"] = require("ljopt/ir_smtlib/ir_nodes/loads_and_stores/HSTORE"),
         "USTORE", -- TODO: Support.
         "FSTORE", -- TODO: Support.
         "XSTORE", -- TODO: Support.
@@ -92,13 +92,13 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "TNEW",   -- TODO: Support.
         "TDUP",   -- TODO: Support.
         "CNEW",   -- TODO: Support.
-        ["CNEWI"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/ir_CNEWI"),
+        ["CNEWI"] = require("ljopt/ir_smtlib/ir_nodes/memory_references/CNEWI"),
         -- Barriers.
         "TBAR",   -- TODO: Support.
         "OBAR",   -- TODO: Support.
         "XBAR",   -- TODO: Support.
         -- Type Conversions.
-        ["CONV"] = require("ljopt/ir_smtlib/ir_nodes/type_conversions/ir_CONV"),
+        ["CONV"] = require("ljopt/ir_smtlib/ir_nodes/type_conversions/CONV"),
         "TOBIT",  -- TODO: Support.
         "TOSTR",  -- TODO: Support.
         "STRTO",  -- TODO: Support.
@@ -109,15 +109,15 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         "CALLXS", -- TODO: Support.
         "CARG",   -- TODO: Support.
         -- Miscellaneous Ops.
-        ["SNAP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_SNAP"),
-        ["NOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_NOP"),
+        ["SNAP"] = require("ljopt/ir_smtlib/ir_nodes/misc/SNAP"),
+        ["NOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/NOP"),
         "BASE",   -- TODO: Support.
         "PVAL",   -- TODO: Support.
         "GCSTEP", -- TODO: Support.
         "HIOP",   -- TODO: Support.
-        ["LOOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_LOOP"),
+        ["LOOP"] = require("ljopt/ir_smtlib/ir_nodes/misc/LOOP"),
         "USE",    -- TODO: Support.
-        ["PHI"] = require("ljopt/ir_smtlib/ir_nodes/misc/ir_PHI"),
+        ["PHI"] = require("ljopt/ir_smtlib/ir_nodes/misc/PHI"),
         "RENAME", -- TODO: Support.
     }
     assert(opcode_table[opcode] ~= nil, "Unsupported operation " .. opcode, nil)
