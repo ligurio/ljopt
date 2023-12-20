@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 -- LuaJIT compiler dump module.
 --
--- Copyright (C) 2005-2017 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2023 Mike Pall. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 --
@@ -11,7 +11,6 @@
 
 -- Cache some library functions and objects.
 local jit = require("jit")
-assert(jit.version_num == 20100, "LuaJIT core/library version mismatch")
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
 local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
@@ -92,6 +91,7 @@ local litname = {
     if band(mode, 8) ~= 0 then s = s.."C" end
     if band(mode, 16) ~= 0 then s = s.."R" end
     if band(mode, 32) ~= 0 then s = s.."I" end
+    if band(mode, 64) ~= 0 then s = s.."K" end
     t[mode] = s
     return s
   end}),
@@ -100,15 +100,18 @@ local litname = {
     local s = irtype[band(mode, 31)]
     s = irtype[band(shr(mode, 5), 31)].."."..s
     if band(mode, 0x800) ~= 0 then s = s.." sext" end
-    local c = shr(mode, 14)
-    if c == 2 then s = s.." index" elseif c == 3 then s = s.." check" end
+    local c = shr(mode, 12)
+    if c == 1 then s = s.." none"
+    elseif c == 2 then s = s.." index"
+    elseif c == 3 then s = s.." check" end
     t[mode] = s
     return s
   end}),
   ["FLOAD "] = vmdef.irfield,
   ["FREF  "] = vmdef.irfield,
   ["FPMATH"] = vmdef.irfpm,
-  ["BUFHDR"] = { [0] = "RESET", "APPEND" },
+  ["TMPREF"] = { [0] = "", "IN", "OUT", "INOUT", "", "", "OUT2", "INOUT2" },
+  ["BUFHDR"] = { [0] = "RESET", "APPEND", "WRITE" },
   ["TOSTR "] = { [0] = "INT", "NUM", "CHAR" },
 }
 
@@ -168,7 +171,7 @@ local function formatk(tr, idx, sn)
   else
     s = tostring(k) -- For primitives.
   end
-  s = colorize(format("%-4s", s), t)
+  s = colorize(format("%-4s", s), t, band(sn or 0, 0x100000) ~= 0)
   if slot then
     s = format("%s @%d", s, slot)
   end
