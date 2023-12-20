@@ -2,10 +2,10 @@ local dump_ir = require("ljopt.ir_dump")
 local dump_bc = require("ljopt.bc_dump")
 local smtlib_bc = require("ljopt.bc_smtlib")
 local smtlib_ir = require("ljopt.ir_smtlib")
-local jit = require("jit")
+local is_jit = (tostring(getmetatable):match("builtin") ~= nil)
 
-if (not jit or jit.version_num ~= 20100) then
-    error("Unsupported LuaJIT library version")
+if (not is_jit) then
+    error("requires LuaJIT")
 end
 
 local VERSION = "0.0.1"
