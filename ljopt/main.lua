@@ -19,11 +19,6 @@ if jit == nil then
   os.exit(exit_codes.critical)
 end
 
-if jit.version_num ~= 20100 then
-  io.stderr:write("Unsupported LuaJIT version.\n")
-  os.exit(exit_codes.critical)
-end
-
 local lua_code = arg[1]
 if lua_code == "-" then
   lua_code = io.stdin:read("*a") -- read the complete stdin
