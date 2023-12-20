@@ -14,17 +14,17 @@ local jit = require("jit")
 assert(jit.version_num == 20100, "LuaJIT core/library version mismatch")
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
-local funcinfo = jutil.funcinfo
+local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
 local traceinfo, traceir, tracek = jutil.traceinfo, jutil.traceir, jutil.tracek
 local tracesnap = jutil.tracesnap
 local bit = require("bit")
-local band, shr = bit.band, bit.rshift
+local band, shr, tohex = bit.band, bit.rshift, bit.tohex
 local sub, gsub, format = string.sub, string.gsub, string.format
-local byte = string.byte
+local byte, rep = string.byte, string.rep
 local type, tostring = type, tostring
 
 -- Load other modules on-demand.
-local disass
+local bcline, disass
 
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
@@ -382,6 +382,8 @@ end
 
 ------------------------------------------------------------------------------
 
+local recprefix = ""
+local recdepth = 0
 -- Format trace error message.
 local function fmterr(err, info)
   if type(err) == "number" then
@@ -423,6 +425,64 @@ local function dump_trace(what, tr, func, pc, otr, oex)
   out:flush()
 end
 
+-- Dump recorded bytecode.
+local function dump_record(tr, func, pc, depth) -- luacheck: no unused
+  if depth ~= recdepth then
+    recdepth = depth
+    recprefix = rep(" .", depth)
+  end
+  local line
+  if pc >= 0 then
+    line = bcline(func, pc, recprefix)
+  else
+    line = "0000 "..recprefix.." FUNCC      \n"
+  end
+  if pc <= 0 then
+    out:write(sub(line, 1, -2), "         ; ", fmtfunc(func), "\n")
+  else
+    out:write(line)
+  end
+  if pc >= 0 and band(funcbc(func, pc), 0xff) < 16 then -- ORDER BC
+    out:write(bcline(func, pc+1, recprefix)) -- Write JMP for cond.
+  end
+end
+
+------------------------------------------------------------------------------
+
+local gpr64 = jit.arch:match("64")
+local fprmips32 = jit.arch == "mips" or jit.arch == "mipsel"
+
+-- Dump taken trace exits.
+local function dump_texit(tr, ex, ngpr, nfpr, ...) -- luacheck: no unused
+  out:write("---- TRACE ", tr, " exit ", ex, "\n")
+  if dumpmode.X then
+    local regs = {...}
+    if gpr64 then
+      for i=1,ngpr do
+	out:write(format(" %016x", regs[i]))
+	if i % 4 == 0 then out:write("\n") end
+      end
+    else
+      for i=1,ngpr do
+	out:write(" ", tohex(regs[i]))
+	if i % 8 == 0 then out:write("\n") end
+      end
+    end
+    if fprmips32 then
+      for i=1,nfpr,2 do
+	out:write(format(" %+17.14g", regs[ngpr+i]))
+	if i % 8 == 7 then out:write("\n") end
+      end
+    else
+      for i=1,nfpr do
+	out:write(format(" %+17.14g", regs[ngpr+i]))
+	if i % 4 == 0 then out:write("\n") end
+      end
+    end
+  end
+end
+
+------------------------------------------------------------------------------
 -- Detach dump handlers.
 local function dumpoff()
   if active then
@@ -438,6 +498,7 @@ local function dumpon(outfile)
   if active then dumpoff() end
   dumpmode = { t=true, b=true, i=true, m=false }
   jit.attach(dump_trace, "trace")
+  if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
   irtype = irtype_text
   active = true
