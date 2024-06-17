@@ -10,6 +10,10 @@ if is_tarantool() then
     require('tests.coverage').enable()
 end
 
+if os.getenv('LJOPT_ENABLE_INTERNAL_CHECKS') == nil then
+    os.execute('export LJOPT_ENABLE_INTERNAL_CHECKS=ON')
+end
+
 test:plan(5)
 
 test:test("smt_module", function(test)

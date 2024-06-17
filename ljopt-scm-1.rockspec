@@ -30,6 +30,7 @@ build = {
     modules = {
         ljopt = 'ljopt/init.lua',
         ['ljopt.main'] = 'ljopt/main.lua',
+        ['ljopt.dev_checks'] = 'ljopt/dev_checks.lua',
         ['ljopt.bc_dump'] = 'ljopt/bc_dump.lua',
         ['ljopt.bc_smtlib'] = 'ljopt/bc_smtlib.lua',
         ['ljopt.ir_dump'] = 'ljopt/ir_dump.lua',
