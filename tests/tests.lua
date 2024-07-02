@@ -13,9 +13,10 @@ end
 test:plan(5)
 
 test:test("smt_module", function(test)
-    test:plan(1)
+    test:plan(2)
 
     test:is(smt:parse("(declare-const p0 Bool)"), true, "SMT-LIB parsing")
+    test:is(smt:check("(declare-const p0 Bool)"), 1, "SMT-LIB checking")
 end)
 
 test:test("ir_dump", function(test)
