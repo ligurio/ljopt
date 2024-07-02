@@ -1,4 +1,5 @@
 local ljopt = require("ljopt")
+local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 local function is_tarantool()
@@ -9,7 +10,13 @@ if is_tarantool() then
     require('tests.coverage').enable()
 end
 
-test:plan(4)
+test:plan(5)
+
+test:test("smt_module", function(test)
+    test:plan(1)
+
+    test:is(smt:parse("(declare-const p0 Bool)"), true, "SMT-LIB parsing")
+end)
 
 test:test("ir_dump", function(test)
     test:plan(2)

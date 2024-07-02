@@ -1,5 +1,8 @@
 -- Requires installed z3 package.
--- Usage: `parse_smtlib2_string("(declare-const p0 Bool)")`.
+-- Usage:
+-- local smt = require("smtlib2").new()
+-- assert(smt:parse("(declare-const p0 Bool)") == true)
+--
 -- Z3 C API: https://z3prover.github.io/api/html/
 
 local is_ffi, ffi = pcall(require, "ffi")
@@ -50,16 +53,11 @@ void free(void *ptr);
 
 local z3 = ffi.load("z3")
 
-local M = {}
-
 -- Function parses a buffer with SMT-LIB.
-function M.parse_smtlib2_string(str)
-    local cfg = z3.Z3_mk_config()
-    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "proof"), ffi.cast("Z3_string", "true"))
-    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "trace"), ffi.cast("Z3_string", "true"))
-    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"), ffi.cast("Z3_string", "100"))
-
-    local ctx = z3.Z3_mk_context(cfg);
+local function parse_smtlib2_string(self, str)
+    if type(str) ~= "string" then
+        error("'str' is not a string")
+    end
     local smtlib2_buf = ffi.cast("Z3_string", str)
     local num_sorts = ffi.cast("unsigned", 0)
     local sort_names = ffi.cast("const Z3_symbol *", 0)
@@ -68,14 +66,39 @@ function M.parse_smtlib2_string(str)
     local decl_names = ffi.cast("Z3_symbol *", 0)
     local decls = ffi.cast("Z3_func_decl *", 0)
     -- luacheck: no unused
-    local res = z3.Z3_parse_smtlib2_string(ctx, smtlib2_buf,
+    local res = z3.Z3_parse_smtlib2_string(self.ctx, smtlib2_buf,
                                            num_sorts, sort_names, sorts,
                                            num_decls, decl_names, decls)
-
-    z3.Z3_del_context(ctx)
-    z3.Z3_del_config(cfg)
 
     return true
 end
 
-return M
+local function free(self)
+    z3.Z3_del_context(self.ctx)
+end
+
+local mt = {
+    __gc = free,
+    __index = {
+        parse = parse_smtlib2_string,
+    },
+}
+
+local function new()
+    local self = {}
+    local cfg = z3.Z3_mk_config()
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "proof"),
+                          ffi.cast("Z3_string", "true"))
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "trace"),
+                          ffi.cast("Z3_string", "true"))
+    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"),
+                          ffi.cast("Z3_string", "100"))
+    self.ctx = z3.Z3_mk_context(cfg)
+    z3.Z3_del_config(cfg)
+
+    return setmetatable(self, mt)
+end
+
+return {
+    new = new,
+}
