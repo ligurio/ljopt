@@ -293,6 +293,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local oidx, t = 6*shr(ot, 8), band(ot, 31)
     local op = sub(irnames, oidx+1, oidx+6)
     local op1_txt, op2_txt, irt_guard, irt_isphi
+    local rid
     if op == "LOOP  " then
       if dumpreg then
 	write_out(format("%04d ------------ LOOP ------------\n", ins))
@@ -301,7 +302,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       end
     elseif op ~= "NOP   " and op ~= "CARG  " and
 	   (dumpreg or op ~= "RENAME") then
-      local rid = band(ridsp, 255)
+      rid = band(ridsp, 255)
       if dumpreg then
 	write_out(format("%04d %-6s", ins, ridsp_name(ridsp, ins)))
       else
@@ -364,6 +365,10 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 
     local irins = {
         num = ins,
+        flags = format("%s%s",
+		       (rid == 254 or rid == 253) and "}" or
+		       (band(ot, 128) == 0 and " " or ">"),
+		       band(ot, 64) == 0 and " " or "+"),
         irt_guard = irt_guard,
         irt_isphi = irt_isphi,
         irtype = irtype[t],
