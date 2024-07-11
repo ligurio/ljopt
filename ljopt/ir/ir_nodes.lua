@@ -5,6 +5,20 @@
 local dev_checks = require('ljopt.dev_checks')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
+local ir_node_ADD = require('ljopt.ir.ADD')
+local ir_node_BAND = require('ljopt.ir.BAND')
+local ir_node_BROL = require('ljopt.ir.BROL')
+local ir_node_CONV = require('ljopt.ir.CONV')
+local ir_node_EQ = require('ljopt.ir.EQ')
+local ir_node_FLOAD = require('ljopt.ir.FLOAD')
+local ir_node_LE = require('ljopt.ir.LE')
+local ir_node_MUL = require('ljopt.ir.MUL')
+local ir_node_NE = require('ljopt.ir.NE')
+local ir_node_NOP = require('ljopt.ir.NOP')
+local ir_node_SLOAD = require('ljopt.ir.SLOAD')
+local ir_node_SUB = require('ljopt.ir.SUB')
+local ir_node_ULE = require('ljopt.ir.ULE')
+
 local opcodes_table = {
     -- Constants.
     ['KPRI'] = false,
@@ -20,31 +34,31 @@ local opcodes_table = {
     ['OP'] = false,
     ['LT'] = false,
     ['GE'] = false,
-    ['LE'] = false,
+    ['LE'] = ir_node_LE,
     ['GT'] = false,
     ['ULT'] = false,
     ['UGE'] = false,
-    ['ULE'] = false,
+    ['ULE'] = ir_node_ULE,
     ['UGT'] = false,
-    ['EQ'] = false,
-    ['NE'] = false,
-    ['ABC'] = false,
+    ['EQ'] = ir_node_EQ,
+    ['NE'] = ir_node_NE,
+    ['ABC'] = ir_node_dummy,
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = false,
     ['BSWAP'] = false,
-    ['BAND'] = false,
+    ['BAND'] = ir_node_BAND,
     ['BOR'] = false,
     ['BXOR'] = false,
     ['BSHL'] = false,
     ['BSHR'] = false,
     ['BSAR'] = false,
-    ['BROL'] = false,
+    ['BROL'] = ir_node_BROL,
     ['BROR'] = false,
     -- Arithmetic Ops.
-    ['ADD'] = false,
-    ['SUB'] = false,
-    ['MUL'] = false,
+    ['ADD'] = ir_node_ADD,
+    ['SUB'] = ir_node_SUB,
+    ['MUL'] = ir_node_MUL,
     ['DIV'] = false,
     ['MOD'] = false,
     ['POW'] = false,
@@ -71,24 +85,24 @@ local opcodes_table = {
     ['FPM_COS'] = false,
     ['FPM_TAN'] = false,
     -- Memory References.
-    ['AREF'] = false,
-    ['HREFK'] = false,
+    ['AREF'] = ir_node_dummy,
+    ['HREFK'] = ir_node_dummy,
     ['HREF'] = false,
-    ['NEWREF'] = false,
+    ['NEWREF'] = ir_node_dummy,
     ['UREFO'] = false,
-    ['UREFC'] = false,
+    ['UREFC'] = ir_node_dummy,
     ['FREF'] = false,
     ['STRREF'] = false,
     -- Loads and Stores.
     ['ALOAD'] = false,
-    ['HLOAD'] = false,
+    ['HLOAD'] = ir_node_dummy,
     ['ULOAD'] = false,
-    ['FLOAD'] = false,
+    ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = false,
-    ['SLOAD'] = false,
+    ['SLOAD'] = ir_node_SLOAD,
     ['VLOAD'] = false,
-    ['ASTORE'] = false,
-    ['HSTORE'] = false,
+    ['ASTORE'] = ir_node_dummy,
+    ['HSTORE'] = ir_node_dummy,
     ['USTORE'] = false,
     ['FSTORE'] = false,
     ['XSTORE'] = false,
@@ -98,13 +112,13 @@ local opcodes_table = {
     ['TNEW'] = false,
     ['TDUP'] = false,
     ['CNEW'] = false,
-    ['CNEWI'] = false,
+    ['CNEWI'] = ir_node_dummy,
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,
     ['XBAR'] = false,
     -- Type Conversions.
-    ['CONV'] = false,
+    ['CONV'] = ir_node_CONV,
     ['TOBIT'] = false,
     ['TOSTR'] = false,
     ['STRTO'] = false,
@@ -115,15 +129,15 @@ local opcodes_table = {
     ['CALLXS'] = false,
     ['CARG'] = false,
     -- Miscellaneous Ops.
-    ['SNAP'] = false,
-    ['NOP'] = false,
+    ['SNAP'] = ir_node_dummy,
+    ['NOP'] = ir_node_NOP,
     ['BASE'] = false,
     ['PVAL'] = false,
     ['GCSTEP'] = false,
     ['HIOP'] = false,
-    ['LOOP'] = false,
+    ['LOOP'] = ir_node_dummy,
     ['USE'] = false,
-    ['PHI'] = false,
+    ['PHI'] = ir_node_dummy,
     ['RENAME'] = false,
 }
 
