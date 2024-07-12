@@ -25,8 +25,8 @@ test:test("bc_dump", function(_test)
     -- Empty.
 end)
 
-test:test("ir_smtlib", function(_test)
-    test:plan(8)
+test:test("ir_smtlib", function(test)
+    test:plan(4)
 
     local ok, err = pcall(ljopt.ir.translate, "")
     test:is(ok, false, "exit code is correct")
