@@ -19,16 +19,6 @@ automatic through the use of an SMT solver, and requires no changes to LuaJIT.
     license = 'MIT',
 }
 
--- dependencies = {
---     "luajit >= 2.1"
--- }
-
-external_dependencies = {
-    LUAJIT = {
-        header = 'luajit-2.1/luajit.h',
-    },
-}
-
 build = {
     type = "builtin",
     modules = {
