@@ -26,8 +26,8 @@ files["tests/tests.lua"] = {
 include_files = {
     '.luacheckrc',
     '*.rockspec',
-    'ljopt/**.lua',
-    'tests/**.lua',
+    'ljopt/**/*.lua',
+    'tests/**/*.lua',
 }
 
 exclude_files = {

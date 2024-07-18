@@ -19,16 +19,6 @@ automatic through the use of an SMT solver, and requires no changes to LuaJIT.
     license = 'MIT',
 }
 
--- dependencies = {
---     "luajit >= 2.1"
--- }
-
-external_dependencies = {
-    LUAJIT = {
-        header = 'luajit-2.1/luajit.h',
-    },
-}
-
 build = {
     type = "builtin",
     modules = {
@@ -38,6 +28,25 @@ build = {
         ["ljopt.bc_smtlib"] = "ljopt/bc_smtlib.lua",
         ["ljopt.ir_dump"] = "ljopt/ir_dump.lua",
         ["ljopt.ir_smtlib"] = "ljopt/ir_smtlib.lua",
+
+        ["ljopt.ir.ir_node_base"] = "ljopt/ir/ir_node_base.lua",
+        ["ljopt.ir.ir_node_dummy"] = "ljopt/ir/ir_node_dummy.lua",
+        ["ljopt.ir.ir_nodes"] = "ljopt/ir/ir_nodes.lua",
+        ["ljopt.ir.smt_context"] = "ljopt/ir/smt_context.lua",
+
+        ["ljopt.ir.ADD"] = "ljopt/ir/ADD.lua",
+        ["ljopt.ir.BAND"] = "ljopt/ir/BAND.lua",
+        ["ljopt.ir.BROL"] = "ljopt/ir/BROL.lua",
+        ["ljopt.ir.CONV"] = "ljopt/ir/CONV.lua",
+        ["ljopt.ir.EQ"] = "ljopt/ir/EQ.lua",
+        ["ljopt.ir.FLOAD"] = "ljopt/ir/FLOAD.lua",
+        ["ljopt.ir.LE"] = "ljopt/ir/LE.lua",
+        ["ljopt.ir.MUL"] = "ljopt/ir/MUL.lua",
+        ["ljopt.ir.NE"] = "ljopt/ir/NE.lua",
+        ["ljopt.ir.NOP"] = "ljopt/ir/NOP.lua",
+        ["ljopt.ir.SLOAD"] = "ljopt/ir/SLOAD.lua",
+        ["ljopt.ir.SUB"] = "ljopt/ir/SUB.lua",
+        ["ljopt.ir.ULE"] = "ljopt/ir/ULE.lua",
    },
    install = {
       bin = {

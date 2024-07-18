@@ -8,6 +8,7 @@ LUACOV_REPORT := $(PROJECT_DIR)/luacov.report.out
 LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 
 LUA_PATH="./?/init.lua;;"
+LUA_CPATH=$(shell luarocks path --lr-cpath)
 
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
@@ -23,6 +24,7 @@ doc:
 
 deps:
 	@echo "Setup dependencies"
+	@luarocks install --local checks 1.0-1
 	@luarocks install --local cluacov 0.1.1
 	@luarocks install --local ldoc 1.5.0
 	@luarocks install --local luacheck 0.25.0
@@ -43,7 +45,7 @@ lint:
 
 test:
 	@echo "Run regression tests"
-	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
+	LUA_PATH=$(LUA_PATH) LUA_CPATH="$(LUA_CPATH)" $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 
 $(LUACOV_STATS): test
 

@@ -2,177 +2,125 @@
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-SSA-IR
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations#ssa-ir-optimizations
 
--- IR Types blacklist.
-local ir_types_bl = {
-    ["nil"] = true,
-    ["fal"] = true,
-    ["tru"] = true,
-    ["lud"] = true,
-    ["str"] = true,
-    ["p32"] = true,
-    ["thr"] = true,
-    ["pro"] = true,
-    ["fun"] = true,
-    ["p64"] = true,
-    ["cdt"] = true,
-    ["tab"] = true,
-    ["udt"] = true,
-    ["flt"] = true,
-    ["num"] = true,
-    ["i8"] = true,
-    ["u8"] = true,
-    ["i16"] = true,
-    ["u16"] = true,
-    ["int"] = true,
-    ["u32"] = true,
-    ["i64"] = true,
-    ["u64"] = true,
-    ["sfp"] = true,
-}
+local ir_node = require('ljopt.ir.ir_nodes')
+local smt_context = require('ljopt.ir.smt_context')
+local dev_checks = require('ljopt.dev_checks')
 
--- IR instructions blacklist.
-local ir_ins_bl = {
-    -- Constants.
-    ["KPRI"] = true,
-    ["KINT"] = true,
-    ["KGC"] = true,
-    ["KPTR"] = true,
-    ["KKPTR"] = true,
-    ["KNULL"] = true,
-    ["KNUM"] = true,
-    ["KINT64"] = true,
-    ["KSLOT"] = true,
-    -- Guarded Assertions.
-    ["OP"] = true,
-    ["LT"] = true,
-    ["GE"] = true,
-    ["LE"] = true,
-    ["GT"] = true,
-    ["ULT"] = true,
-    ["UGE"] = true,
-    ["ULE"] = true,
-    ["UGT"] = true,
-    ["EQ"] = true,
-    ["NE"] = true,
-    ["ABC"] = true,
-    ["RETF"] = true,
-    -- Bit Ops.
-    ["BNOT"] = true,
-    ["BSWAP"] = true,
-    ["BAND"] = true,
-    ["BOR"] = true,
-    ["BXOR"] = true,
-    ["BSHL"] = true,
-    ["BSHR"] = true,
-    ["BSAR"] = true,
-    ["BROL"] = true,
-    ["BROR"] = true,
-    -- Arithmetic Ops.
-    ["ADD"] = true,
-    ["SUB"] = true,
-    ["MUL"] = true,
-    ["DIV"] = true,
-    ["MOD"] = true,
-    ["POW"] = true,
-    ["NEG"] = true,
-    ["ABS"] = true,
-    ["ATAN2"] = true,
-    ["LDEXP"] = true,
-    ["MIN"] = true,
-    ["MAX"] = true,
-    ["FPMATH"] = true,
-    ["ADDOV"] = true,
-    ["SUBOV"] = true,
-    ["MULOV"] = true,
-    ["FPM_FLOOR"] = true,
-    ["FPM_CEIL"] = true,
-    ["FPM_TRUNC"] = true,
-    ["FPM_SQRT"] = true,
-    ["FPM_EXP"] = true,
-    ["FPM_EXP2"] = true,
-    ["FPM_LOG"] = true,
-    ["FPM_LOG2"] = true,
-    ["FPM_LOG10"] = true,
-    ["FPM_SIN"] = true,
-    ["FPM_COS"] = true,
-    ["FPM_TAN"] = true,
-    -- Memory References.
-    ["AREF"] = true,
-    ["HREFK"] = true,
-    ["HREF"] = true,
-    ["NEWREF"] = true,
-    ["UREFO"] = true,
-    ["UREFC"] = true,
-    ["FREF"] = true,
-    ["STRREF"] = true,
-    -- Loads and Stores.
-    ["ALOAD"] = true,
-    ["HLOAD"] = true,
-    ["ULOAD"] = true,
-    ["FLOAD"] = true,
-    ["XLOAD"] = true,
-    ["SLOAD"] = true,
-    ["VLOAD"] = true,
-    ["ASTORE"] = true,
-    ["HSTORE"] = true,
-    ["USTORE"] = true,
-    ["FSTORE"] = true,
-    ["XSTORE"] = true,
-    -- Allocations.
-    ["SNEW"] = true,
-    ["XSNEW"] = true,
-    ["TNEW"] = true,
-    ["TDUP"] = true,
-    ["CNEW"] = true,
-    ["CNEWI"] = true,
-    -- Barriers.
-    ["TBAR"] = true,
-    ["OBAR"] = true,
-    ["XBAR"] = true,
-    -- Type Conversions.
-    ["CONV"] = true,
-    ["TOBIT"] = true,
-    ["TOSTR"] = true,
-    ["STRTO"] = true,
-    -- Calls.
-    ["CALLN"] = true,
-    ["CALLL"] = true,
-    ["CALLS"] = true,
-    ["CALLXS"] = true,
-    ["CARG"] = true,
-    -- Miscellaneous Ops.
-    ["NOP"] = true,
-    ["BASE"] = true,
-    ["PVAL"] = true,
-    ["GCSTEP"] = true,
-    ["HIOP"] = true,
-    ["LOOP"] = true,
-    ["USE"] = true,
-    ["PHI"] = true,
-    ["RENAME"] = true,
-}
+local dev_trace_dump = function() end
 
-local function is_supported_ir_ins(ins)
-    return ir_ins_bl[ins] == false
-end
-
-local function is_supported_ir_type(tp)
-    return ir_types_bl[tp] == false
-end
-
-local function translate(trace)
-    if (type(trace) ~= "table") then
-        error("not a table")
+local function dump(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then k = '"' .. k .. '"' end
+            s = s .. '[' .. k .. '] = ' .. dump(v) .. ',\n'
+        end
+        return s .. '} '
+    else
+        return '"' .. tostring(o) .. '"'
     end
+end
+
+if os.getenv('LJOPT_ENABLE_DEBUG_LOGGING') then
+    dev_trace_dump = dump
+end
+
+local function construct_nodes(trace)
+    dev_checks('table')
+
+    local nodes_table = {}
+    for i = 1, table.getn(trace) do
+        nodes_table[i] = ir_node.instance(
+            string.format("%04d", trace[i].num),
+            trace[i].flags,
+            trace[i].irtype,
+            trace[i].irop,
+            trace[i].op1,
+            trace[i].op2
+        )
+    end
+    return nodes_table
+end
+
+-- Nodes transformers.
+local function identity_transform(nodes)
+    dev_checks('table')
+
+    return nodes
+end
+
+local function loop_unrooling_transform(nodes)
+    dev_checks('table')
+
+    return nodes -- TODO: Implement.
+end
+
+local function function_inlining_transform(nodes)
+    dev_checks('table')
+
+    return nodes -- TODO: Implement.
+end
+
+local all_node_transforms = {
+    identity_transform = identity_transform,
+    function_inlining_transform = function_inlining_transform,
+    loop_unrooling_transform = loop_unrooling_transform
+}
+
+local function transform_nodes(nodes)
+    dev_checks('table')
+
+    for i = 1, table.getn(all_node_transforms) do
+        nodes = all_node_transforms[i](nodes)
+    end
+
+    return nodes
+end
+
+local vm_stack_prefix = 'vm_'
+local op_stack_prefix = 'op_'
+local te_stack_prefix = 'te_'
+local snap_stack_prefix = 'snap_'
+
+local function translate(trace, smt_suffix)
+    dev_checks('table', '?string')
+
+    if (type(trace) ~= 'table') then
+        error('IR-dump is not a table')
+    end
+
+    dev_trace_dump(trace)
+
     local smtlib_buf = [[
 (set-option :print-success false)
 (set-option :produce-models true)
 ]]
-    for _, ins in pairs(trace) do
-        is_supported_ir_type()
-        is_supported_ir_ins(ins)
-    end
 
+    smt_suffix = smt_suffix or 'src'
+    -- 0 stage. Create 'smt-context'.
+    local ctx_src = smt_context.SMTContext:new('BV', 'BV')
+    smtlib_buf = smtlib_buf .. ctx_src.vm_stack:init_smt(vm_stack_prefix .. smt_suffix) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix) .. '\n'
+
+    -- 1st stage. Constructing list of `ir_nodes` from raw string data.
+    local nodes = construct_nodes(trace)
+
+    -- 2nd stage. Transformations (loop unrooling, function inlining, ...).
+    nodes = transform_nodes(nodes)
+
+    -- 3rd stage. Converting to SMT-LIB.
+    for i = 1, table.getn(nodes) do
+        local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
+            .. (nodes[i]:get_flags() or '') .. ' '
+            .. (nodes[i]:get_type() or '') .. ' '
+            .. (nodes[i]:get_opcode() or '') .. ' '
+            .. (nodes[i]:get_left_op() or '') .. ' '
+            .. (nodes[i]:get_right_op() or '') .. ' '
+
+        smtlib_buf = smtlib_buf .. '; ' .. parsed_ir .. '\n' .. nodes[i]:to_smt_lib(ctx_src) .. '\n'
+    end
     return smtlib_buf
 end
 
