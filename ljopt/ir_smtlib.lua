@@ -5,6 +5,7 @@
 local ir_node = require('ljopt.ir.ir_nodes')
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
+local smt_snapshot = require('ljopt.ir.SNAP')
 
 local dev_trace_dump = function() end
 
@@ -29,7 +30,7 @@ local function construct_nodes(trace)
     dev_checks('table')
 
     local nodes_table = {}
-    for i = 1, table.getn(trace) do
+    for i = 1, #trace do
         nodes_table[i] = ir_node.instance(
             string.format("%04d", trace[i].num),
             trace[i].flags,
@@ -82,8 +83,8 @@ local op_stack_prefix = 'op_'
 local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
 
-local function translate(trace, smt_suffix)
-    dev_checks('table', '?string')
+local function translate(trace, snapshot, smt_suffix, tr_id, ctx_src)
+    dev_checks('table', 'table', '?string')
 
     if (type(trace) ~= 'table') then
         error('IR-dump is not a table')
@@ -91,18 +92,13 @@ local function translate(trace, smt_suffix)
 
     dev_trace_dump(trace)
 
-    local smtlib_buf = [[
-(set-option :print-success false)
-(set-option :produce-models true)
-]]
+    local smtlib_buf = ""
 
     smt_suffix = smt_suffix or 'src'
     -- 0 stage. Create 'smt-context'.
-    local ctx_src = smt_context.SMTContext:new('BV', 'BV')
-    smtlib_buf = smtlib_buf .. ctx_src.vm_stack:init_smt(vm_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix .. tr_id) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix .. tr_id) .. '\n'
 
     -- 1st stage. Constructing list of `ir_nodes` from raw string data.
     local nodes = construct_nodes(trace)
@@ -111,7 +107,7 @@ local function translate(trace, smt_suffix)
     nodes = transform_nodes(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
-    for i = 1, table.getn(nodes) do
+    for i = 1, #nodes do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
             .. (nodes[i]:get_flags() or '') .. ' '
             .. (nodes[i]:get_type() or '') .. ' '
@@ -119,9 +115,19 @@ local function translate(trace, smt_suffix)
             .. (nodes[i]:get_left_op() or '') .. ' '
             .. (nodes[i]:get_right_op() or '') .. ' '
 
-        smtlib_buf = smtlib_buf .. '; ' .. parsed_ir .. '\n' .. nodes[i]:to_smt_lib(ctx_src) .. '\n'
+        smtlib_buf = smtlib_buf .. nodes[i]:to_smt_lib(ctx_src) .. ' ; ' .. i .. '   ' .. parsed_ir .. '\n'
     end
-    return smtlib_buf
+    -- 4th stage. Construct SNAPSHOTs
+    local snap_nums = {}
+    if snapshot ~= nil then
+        for i, snap in pairs(snapshot) do
+            local cur_sn, slot_values = smt_snapshot.snap_to_smt_lib(ctx_src, snap)
+            smtlib_buf = smtlib_buf .. cur_sn .. "\n"
+            snap_nums[i] = slot_values
+        end
+    end
+
+    return smtlib_buf, snap_nums
 end
 
 return {

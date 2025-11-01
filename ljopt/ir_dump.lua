@@ -28,9 +28,6 @@ local bcline, disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
--- A table with recorded traces.
-local traces
-
 -- Debug mode.
 local debug = false
 
@@ -178,6 +175,128 @@ local function formatk(tr, idx, sn)
   return s
 end
 
+
+-- IR dump helpers for smt verification
+-----------------------------------------------------
+
+-- A table with recorded traces.
+local traces
+local snapshots -- table<LastInst, array<pair<SlotId, StackId>>>
+local traces_num -- table<id, line_number>
+
+
+local ffi = require("ffi")
+-- Get float in SMT format
+local function float_to_smt_bv(x)
+    local u = ffi.new("union { double d; uint64_t i; }")
+    u.d = x
+    local bits = u.i
+    local hi = tonumber(bit.rshift(bits, 32))
+    local lo = tonumber(bit.band(bits, 0xFFFFFFFF))
+    local decimal = hi * 0x100000000 + lo
+    return string.format("bv%u", decimal)
+end
+
+local function init_smt_arrays()
+  traces = {}
+  snapshots = {}
+  traces_num = {}
+end
+
+-- Returns persistent unique id across traces
+-- @tr - trace
+local function get_trace_uid(tr)
+  return traces_num[tr]
+end
+
+-- Remember line where trace starts
+local function init_trace_uid(tr, func, pc, what)
+  if what == "start" then
+    traces_num[tr] = tonumber(string.match(fmtfunc(func, pc), ":(%d+)"))
+  end
+end
+
+-- @tr - trace
+-- @snapno - snapshot number within the trace
+-- Returns uid for the snapshot based on BC PC
+-- Note: returned ID is persistent across executions
+local function get_snap_uid(tr, snapno)
+  return jutil.snappc(tr, snapno)
+end
+
+-- Everything same as formatk except float conversion. Should we modify floatk?
+local function formatsmt(tr, idx, sn)
+  local k, t, slot = tracek(tr, idx)
+  local tn = type(k)
+  local s
+  if tn == "number" then
+    if t < 12 then
+      s = k == 0 and "NULL" or format("[0x%08x]", k)
+    elseif band(sn or 0, 0x30000) ~= 0 then
+      s = band(sn, 0x20000) ~= 0 and "contpc" or "ftsz"
+    elseif k == 2^52+2^51 then
+      s = "bias"
+    else
+      s = float_to_smt_bv(k)
+    end
+  elseif tn == "string" then
+    s = format(#k > 20 and '"%.20s"~' or '"%s"', gsub(k, "%c", ctlsub))
+  elseif tn == "function" then
+    s = fmtfunc(k)
+  elseif tn == "table" then
+    s = format("{%p}", k)
+  elseif tn == "userdata" then
+    if t == 12 then
+      s = format("userdata:%p", k)
+    else
+      s = format("[%p]", k)
+      if s == "[NULL]" then s = "NULL" end
+    end
+  elseif t == 21 then -- int64_t
+    s = sub(tostring(k), 1, -3)
+    if sub(s, 1, 1) ~= "-" then s = "+"..s end
+  elseif sn == 0x1057fff then -- SNAP(1, SNAP_FRAME | SNAP_NORESTORE, REF_NIL)
+    return "----" -- Special case for LJ_FR2 slot 1.
+  else
+    s = tostring(k) -- For primitives.
+  end
+  s = colorize(format("%-4s", s), t, band(sn or 0, 0x100000) ~= 0)
+  if slot then
+    s = format("%s @%d", s, slot)
+  end
+  return s
+end
+
+-- Returns array<tuple<snap_num, type, slot, Option(slot)>>>
+local function savesnap(tr, snap, snapno)
+  local snapshot = {}
+  local n = 2
+  for s=0,snap[1]-1 do
+    local sn = snap[n]
+    if shr(sn, 24) == s then
+      n = n + 1
+      local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
+      if ref < 0 then
+        -- Type 1: Constant
+        local k, t, slot = tracek(tr, ref)
+        local tn = type(k)
+        table.insert(snapshot, {s, "const", formatsmt(tr, ref, sn)})
+        
+      elseif band(sn, 0x80000) ~= 0 then
+        -- Type 2: Soft-float number (needs two SSA slots)
+        table.insert(snapshot, {s, "softfp", ref, ref+1})
+      else
+        -- Type 3: Regular SSA reference
+        table.insert(snapshot, {s, "ssa", ref})
+      end
+    end
+  end
+  return snapshot
+end
+
+-----------------------------------------------------
+
+
 local function printsnap(tr, snap)
   local n = 2
   for s=0,snap[1]-1 do
@@ -199,6 +318,16 @@ local function printsnap(tr, snap)
     end
   end
   write_out("]\n")
+end
+
+function debugg(t)
+    print("debug")
+    if type(t) == "table" then
+        for k,v in pairs(t) do print(k,v) end
+    else
+        print(t)
+    end
+    print("end debug")
 end
 
 -- Dump snapshots (not interleaved with IR).
@@ -269,6 +398,13 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   if not info then return end
   local nins = info.nins
   write_out("---- TRACE ", tr, " IR\n")
+
+  local tr_id = get_trace_uid(tr)
+  assert(snapshots[tr_id] == nil)
+  assert(traces[tr_id] == nil)
+  snapshots[tr_id] = {}
+  traces[tr_id] = {}
+  traces_num[tr_id] = {}
   local irnames = vmdef.irnames
   local snapref = 65536
   local snap, snapno
@@ -278,6 +414,12 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     snapno = 0
   end
   for ins=1,nins do
+    if ins >= snapref then
+      -- todo: support stitches and all other types of snapshots
+      if (info.linktype ~= "stitch") then
+        snapshots[tr_id][get_snap_uid(tr, snapno)] = savesnap(tr, snap, snapno)
+      end
+    end
     if ins >= snapref then
       if dumpreg then
 	write_out(format("....              SNAP   #%-3d [ ", snapno))
@@ -328,11 +470,11 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	op1_txt = formatk(tr, op1)
+	op1_txt = formatsmt(tr, op1)
 	write_out(op1_txt)
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  op1_txt = formatk(tr, op1)
+	  op1_txt = formatsmt(tr, op1)
 	  write_out(op1_txt)
 	else
 	  op1_txt = format(m1 == 0 and "%04d" or "#%-3d", op1)
@@ -352,7 +494,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	      write_out(op2_txt)
 	    end
 	  elseif op2 < 0 then
-	    op2_txt = formatk(tr, op2)
+	    op2_txt = formatsmt(tr, op2)
 	    write_out("  ", op2_txt)
 	  else
 	    op2_txt = format("  %04d", op2)
@@ -376,9 +518,12 @@ local function dump_ir(tr, dumpsnap, dumpreg)
         op1 = trim(op1_txt),
         op2 = trim(op2_txt),
     }
-    table.insert(traces[tr], irins)
+    table.insert(traces[tr_id], irins)
   end
   if snap then
+    if (info.linktype ~= "stitch") then
+      snapshots[tr_id][get_snap_uid(tr, snapno)] = savesnap(tr, snap, snapno)
+    end
     if dumpreg then
       write_out(format("....              SNAP   #%-3d [ ", snapno))
     else
@@ -403,13 +548,13 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
+  init_trace_uid(tr, func, pc, what)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
   end
   if what == "start" then
     write_out("---- TRACE ", tr, " ", what)
-    traces[tr] = {}
     if otr then write_out(" ", otr, "/", oex == -1 and "stitch" or oex) end
     write_out(" ", fmtfunc(func, pc), "\n")
   elseif what == "stop" or what == "abort" then
@@ -504,7 +649,7 @@ end
 -- Open the output file and attach dump handlers.
 local function dumpon(outfile)
   if active then dumpoff() end
-  dumpmode = { t=true, b=true, i=true, m=false }
+  dumpmode = { t=true, b=true, i=true, m=false, s=true, r=true }
   jit.attach(dump_trace, "trace")
   if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
@@ -523,13 +668,13 @@ local function record(lua_code, debug_mode)
   end
 
   debug = debug_mode
-  traces = {}
+  init_smt_arrays()
 
   dumpon()
   pcall(fn)
   dumpoff()
 
-  return traces
+  return traces, snapshots
 end
 
 return {

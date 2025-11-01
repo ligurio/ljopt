@@ -48,17 +48,15 @@ local function parse_op(self, operand, maxrecord)
     maxrecord = maxrecord or JIT_P_maxrecord
 
     -- TODO support for other types
-    -- TODO inf?
     -- TODO other modifiers
-    if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or
-        operand:sub(-1, -1) == 'L' or operand == 'NaN' then
-        -- TODO support for arith other types
+    if operand:sub(1, 2) == 'bv' then
         assert(self:get_type() == 'num' or self:get_type() == 'int' or
             self:get_type() == 'i64' or self:get_type() == 'u64')
         return self:get_type()
     elseif string.len(operand) == string.len(tostring(maxrecord)) then
         return 'op'
     end
+    return self:get_type()
 end
 
 local function retrieve_slot_op(self, operand)
@@ -74,9 +72,7 @@ local function retrieve_num_op(self, operand, ctx)
     if op_type == 'op' then
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
     elseif op_type == 'num' then
-        -- TODO rewrite
-        local conv = '((_ to_fp 11 53) roundNearestTiesToEven %s)'
-        operand = operand:gsub('e', ' '):gsub('+', '')
+        local conv = '((_ to_fp 11 53) RNE (_ %s 64))'
         operand = string.format(conv, operand)
     end
     return operand
@@ -84,7 +80,6 @@ end
 
 local function retrieve_int_op(self, operand, ctx)
     dev_checks('table', 'string', 'table')
-
     local op_type = self:parse_op(operand)
     if op_type == 'op' then
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
@@ -118,14 +113,13 @@ local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('table', 'string', 'string', '?string', 'string', '?string', '?string')
 
-    self._ssa_ref = tonumber(ssa_ref)
-    self._flags = flags
-    self._type = type
-    self._opcode = opcode
-    self._left_op = left_op
-    self._right_op = right_op
-
     local public = {
+        _ssa_ref = tonumber(ssa_ref),
+        _flags = flags,
+        _type = type,
+        _opcode = opcode,
+        _left_op = left_op,
+        _right_op = right_op,
         get_ssa_reference = get_ssa_reference,
         get_flags = get_flags,
         get_type = get_type,
