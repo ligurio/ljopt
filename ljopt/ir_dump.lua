@@ -320,16 +320,6 @@ local function printsnap(tr, snap)
   write_out("]\n")
 end
 
-function debugg(t)
-    print("debug")
-    if type(t) == "table" then
-        for k,v in pairs(t) do print(k,v) end
-    else
-        print(t)
-    end
-    print("end debug")
-end
-
 -- Dump snapshots (not interleaved with IR).
 local function dump_snap(tr)
   write_out("---- TRACE ", tr, " snapshots\n")

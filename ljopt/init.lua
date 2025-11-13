@@ -14,6 +14,7 @@ return {
     ir = {
 	    record = dump_ir.record,
 	    translate = smtlib_ir.translate,
+	    generate_smt_formula = smtlib_ir.generate_smt_formula,
     },
     bc = {
 	    record = dump_bc.record,

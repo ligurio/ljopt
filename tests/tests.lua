@@ -14,7 +14,7 @@ if os.getenv('LJOPT_ENABLE_INTERNAL_CHECKS') == nil then
     os.execute('export LJOPT_ENABLE_INTERNAL_CHECKS=ON')
 end
 
-test:plan(7)
+test:plan(8)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -123,6 +123,18 @@ end
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB output with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
+end)
+
+-- Main tests for traces equivalence.
+test:test("ir_smtlib", function(test)
+    -- Extract to directory
+    local srcs = {"local function f(y) return y - y end\nf(0)\nf(1)\n"} 
+    test:plan(#srcs)
+
+    for i, f in ipairs(srcs) do
+        local formula = ljopt.ir.generate_smt_formula(f, false, false)
+        test:is(smt:check(formula), -1, "test_" .. i)
+    end
 end)
 
 test:test("bc_smtlib", function(_test)
