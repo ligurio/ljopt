@@ -36,7 +36,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['i64'] = 'I64',
         ['u64'] = false,
     }
-    assert(type_table[type], 'Unsupported type for BAND operation', nil)
+    assert(type_table[type], 'Unsupported type for BAND operation')
     return impls['IRNodeBAND' .. type_table[type]]:new(ssa_ref, flags, type, 'BAND', left_op, right_op)
 end
 

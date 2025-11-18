@@ -26,7 +26,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['i64'] = 'I64',
         ['u64'] = false,
     }
-    assert(type_table[type], 'Unsupported type for BROL operation', nil)
+    assert(type_table[type], 'Unsupported type for BROL operation')
     return impls['IRNodeBAND' .. type_table[type]]:new(ssa_ref, flags, type, 'BROL', left_op, right_op)
 end
 

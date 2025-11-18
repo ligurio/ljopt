@@ -56,7 +56,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
-    assert(type_table[type], 'Unsupported type for EQ operation ' .. type, nil)
+    assert(type_table[type], 'Unsupported type for EQ operation ' .. type)
     return impls['IRNodeEQ' .. type_table[type]]:new(ssa_ref, flags, type, 'EQ', left_op, right_op)
 end
 
