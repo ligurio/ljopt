@@ -38,7 +38,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
-    assert(type_table[type], 'Unsupported type for SUB operation', nil)
+    assert(type_table[type], 'Unsupported type for SUB operation')
     return impls['IRNodeSUB' .. type_table[type]]:new(ssa_ref, flags, type, 'SUB', left_op, right_op)
 end
 

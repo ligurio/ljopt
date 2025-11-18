@@ -38,7 +38,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
-    assert(type_table[type], 'Unsupported type for NE operation', nil)
+    assert(type_table[type], 'Unsupported type for NE operation')
     return impls['IRNodeNE' .. type_table[type]]:new(ssa_ref, flags, type, 'NE', left_op, right_op)
 end
 

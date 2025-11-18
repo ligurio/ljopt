@@ -79,7 +79,7 @@ function VMStackBV.load(self, slot_num, type)
     if bv2type[type] == nil then
         return ''
     else
-        conv = assert(bv2type[type], 'Unsupported load type ' .. type, nil)
+        conv = assert(bv2type[type], 'Unsupported load type ' .. type)
     end
     return string.format(conv, slot)
 end
@@ -87,7 +87,7 @@ end
 function VMStackBV.store(self, slot_num, type, data)
     dev_checks('table', 'number', 'string', 'string')
 
-    local conv = assert(type2bv[type], 'Unsupported load op type ' .. type, nil)
+    local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     local conv_data = string.format(conv, data)
     local stack = string.format('(select %s %d)', self._name, self._cur_stack)
     local new_stack = string.format('(store %s %d %s)', stack, slot_num, conv_data)
@@ -109,7 +109,7 @@ end
 function OpStackBV.load(self, op_num, type)
     dev_checks('table', 'number', 'string')
 
-    local conv = assert(bv2type[type], 'Unsupported load op type ' .. type, nil)
+    local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     local val = string.format('(select %s %d)', self._name, op_num)
     return string.format(conv, val)
 end
@@ -120,7 +120,7 @@ function OpStackBV.store(self, op_num, type, data)
     if data == '' then
         return ''
     end
-    local conv = assert(type2bv[type], 'Unsupported store op type ' .. type, nil)
+    local conv = assert(type2bv[type], 'Unsupported store op type ' .. type)
     return string.format(
         '(assert (let ((a!1 %s)) (= (select %s %d) a!1)))',
         string.format(conv, data),
