@@ -15,6 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache LuaJIT
+        uses: actions/cache@v3
+        id: luajit-cache
+        with:
+          path: luajit
+          key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}
+
       - name: Setup packages
         run: sudo apt install -y luarocks
 
