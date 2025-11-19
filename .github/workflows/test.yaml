@@ -16,10 +16,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup packages
-        run: sudo apt install -y luarocks luajit
+        run: sudo apt install -y luarocks
 
       - name: Setup rocks
         run: make deps
+
+      - name: Building
+        run: make build
 
       - name: Testing
         run: make test
