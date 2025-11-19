@@ -15,11 +15,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache LuaJIT
+        uses: actions/cache@v3
+        id: luajit-cache
+        with:
+          # This path should be same as the path in Makefile,
+          # where tarantool's LuaJIT repo stored.
+          path: luajit
+          key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}
+
       - name: Setup packages
-        run: sudo apt install -y luarocks luajit
+        run: sudo apt install -y luarocks
 
       - name: Setup rocks
         run: make deps
+
+      - name: Building
+        run: make build
 
       - name: Testing
         run: make test

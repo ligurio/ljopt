@@ -9,10 +9,13 @@ LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 
 LUA_PATH="./?/init.lua;;"
 
+LUAJIT_DIR := $(PROJECT_DIR)/luajit
+LUA_BIN ?= $(LUAJIT_DIR)/tarantool_luajit/bin/luajit
+LUAJIT_TAG ?= af5d38f109b6a7f714b41f92a57e2bd67d14955a
+
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
-
-LUA_BIN ?= luajit
+CLEANUP_FILES += ${LUAJIT_DIR}
 
 all: check test
 
@@ -20,6 +23,23 @@ doc:
 	@ldoc -c $(PROJECT_DIR)/doc/config.ld -v \
               -d $(PROJECT_DIR)/doc/html/ \
                  $(PROJECT_DIR)/ljopt
+
+$(LUA_BIN):
+	@echo "Building LuaJIT..."
+	@if [ ! -d "$(LUAJIT_DIR)" ]; then \
+		git clone https://github.com/tarantool/luajit $(LUAJIT_DIR); \
+	fi
+	# Install 2.1.0-beta3 tarantool's LuaJIT.
+	@cd $(LUAJIT_DIR) && \
+		echo "Reset to $(LUAJIT_TAG)..." && \
+		git reset --hard $(LUAJIT_TAG) && \
+		echo "Applying patches..." && \
+		git apply ../lua_patches/*.patch && \
+		cmake -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=tarantool_luajit && \
+		echo "Building luajit..." && \
+		cmake --build build --target install
+
+build: $(LUA_BIN)
 
 deps:
 	@echo "Setup dependencies"
@@ -41,7 +61,7 @@ luacheck:
 lint:
 	@luarocks lint ljopt-scm-1.rockspec
 
-test:
+test: $(LUA_BIN)
 	@echo "Run regression tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 

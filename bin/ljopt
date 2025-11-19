@@ -1,3 +1,3 @@
-#!/bin/env luajit
+#!/bin/env luajit/tarantool_luajit/bin/luajit
 
 require "ljopt.main"
