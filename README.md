@@ -2,6 +2,11 @@
 
 is an implementation of translation validation for LuaJIT.
 
+### Building
+```sh
+make build
+```
+
 ### Usage
 
 Create a file with Lua source code:
