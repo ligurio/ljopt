@@ -55,6 +55,7 @@ local function parse_op(self, operand, maxrecord)
     elseif string.len(operand) == string.len(tostring(maxrecord)) then
         return 'op'
     end
+    return self:get_type()
 end
 
 local function retrieve_slot_op(self, operand)

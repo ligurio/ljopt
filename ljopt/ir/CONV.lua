@@ -17,15 +17,15 @@ function IRNodeCONV:to_smt_lib(ctx)
     if parsed_right_op[1] == 'num.int' then
         left_op = self:retrieve_int_op(self:get_left_op(), ctx)
         left_op = left_op:gsub('+', '')
-        data = string.format('((_ to_fp 11 53) RNE %s 0.)', left_op)
+        data = string.format('((_ to_fp 11 53) %s)', left_op)
     elseif parsed_right_op[1] == 'int.num' then
         left_op = self:retrieve_num_op(self:get_left_op(), ctx)
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 32) RNE %s)', left_op)
+        data = string.format('((_ fp.to_sbv 32) %s)', left_op)
     elseif parsed_right_op[1] == 'num.i64' then
         left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
         -- TODO recheck rounding behaviour.
-        data = string.format('((_ to_fp 11 53) RNE %s 0.)', left_op)
+        data = string.format('((_ to_fp 11 53) %s)', left_op)
     elseif parsed_right_op[1] == 'i64.num' then
         left_op = self:retrieve_num_op(self:get_left_op(), ctx)
         -- TODO handle inputs that are out of range.

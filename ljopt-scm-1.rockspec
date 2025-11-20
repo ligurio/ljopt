@@ -45,6 +45,8 @@ build = {
         ['ljopt.ir.smt_context'] = 'ljopt/ir/smt_context.lua',
 
         ['ljopt.ir.ADD'] = 'ljopt/ir/ADD.lua',
+        ['ljopt.ir.ADDOV'] = 'ljopt/ir/ADDOV.lua',
+        ['ljopt.ir.DIV'] = 'ljopt/ir/DIV.lua',
         ['ljopt.ir.MUL'] = 'ljopt/ir/MUL.lua',
         ['ljopt.ir.SUB'] = 'ljopt/ir/SUB.lua',
 
@@ -53,6 +55,7 @@ build = {
 
         ['ljopt.ir.EQ'] = 'ljopt/ir/EQ.lua',
         ['ljopt.ir.LE'] = 'ljopt/ir/LE.lua',
+        ['ljopt.ir.NEG'] = 'ljopt/ir/NEG.lua',
         ['ljopt.ir.NE'] = 'ljopt/ir/NE.lua',
         ['ljopt.ir.ULE'] = 'ljopt/ir/ULE.lua',
 
