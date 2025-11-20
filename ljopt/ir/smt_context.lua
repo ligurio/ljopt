@@ -91,7 +91,7 @@ function VMStackBV.store(self, slot_num, type, data)
     local conv_data = string.format(conv, data)
     local stack = string.format('(select %s %d)', self._name, self._cur_stack)
     local new_stack = string.format('(store %s %d %s)', stack, slot_num, conv_data)
-    self.cur_stack = self.cur_stack + 1
+    self._cur_stack = self._cur_stack + 1
     local new_location = string.format('(select %s %d)', self._name, self._cur_stack)
     return string.format('(assert (= %s %s))', new_location, new_stack)
 end

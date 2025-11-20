@@ -11,7 +11,7 @@ ir_node.extended(impls.IRNodeEQNum, IRNodeEQBase)
 function impls.IRNodeEQNum:to_smt_lib(ctx)
     local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
     local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
-    local data = string.format('(== %s %s)', left_op, right_op)
+    local data = string.format('(= %s %s)', left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
@@ -21,7 +21,8 @@ ir_node.extended(impls.IRNodeEQInt, IRNodeEQBase)
 function impls.IRNodeEQInt:to_smt_lib(ctx)
     local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
     local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
-    local data = string.format('(== %s %s)', left_op, right_op)
+    -- At least Z3 and Bitwuzla expect `=` for floating point comparison.
+    local data = string.format('(= %s %s)', left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
