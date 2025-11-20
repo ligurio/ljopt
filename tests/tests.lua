@@ -10,10 +10,6 @@ if is_tarantool() then
     require('tests.coverage').enable()
 end
 
-if os.getenv('LJOPT_ENABLE_INTERNAL_CHECKS') == nil then
-    os.execute('export LJOPT_ENABLE_INTERNAL_CHECKS=ON')
-end
-
 test:plan(8)
 
 test:test("smt_module", function(test)
@@ -42,7 +38,7 @@ test:test("ir_smtlib", function(test)
 
     local ok, err = pcall(ljopt.ir.translate, "")
     test:is(ok, false, "exit code is correct")
-    test:like(err, "not a table", "error message is correct")
+    test:like(err, "IR%-dump is not a table", "error message is correct")
 
     local buf = ljopt.ir.translate({})
     test:is(type(buf), "string", "type of result when no traces")
