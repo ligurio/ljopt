@@ -43,6 +43,7 @@ build: $(LUA_BIN)
 
 deps:
 	@echo "Setup dependencies"
+	@luarocks install --local checks
 	@luarocks install --local ldoc 1.5.0
 	@luarocks install --local luacheck 0.25.0
 	@luarocks install --local luacov 0.15.0

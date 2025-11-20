@@ -83,10 +83,12 @@ local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
 
 local function translate(trace, smt_suffix)
-    dev_checks('table', '?string')
-
     if (type(trace) ~= 'table') then
         error('IR-dump is not a table')
+    end
+
+    if smt_suffix and type(smt_suffix) ~= 'string' then
+        error('smt_suffix is not a string')
     end
 
     dev_trace_dump(trace)
