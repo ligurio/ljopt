@@ -14,12 +14,10 @@ ignore = {
     "213/_.*",
 }
 
-files["tests/tests.lua"] = {
+files["tests/*tests.lua"] = {
     ignore = {
         -- Shadowing an upvalue.
         "431",
-        -- Line is too long.
-        "631"
     }
 }
 

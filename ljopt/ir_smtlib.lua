@@ -3,8 +3,16 @@
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations#ssa-ir-optimizations
 
 local ir_node = require('ljopt.ir.ir_nodes')
+local dump_ir = require("ljopt.ir_dump")
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
+local smt_snapshot = require('ljopt.ir.SNAP')
+local utils = require("ljopt.utils")
+local is_json, json = pcall(require, "json")
+
+local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')"
+
 
 local dev_trace_dump = function() end
 
@@ -82,30 +90,28 @@ local op_stack_prefix = 'op_'
 local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
 
-local function translate(trace, smt_suffix)
-    dev_checks('table', '?string')
+-- Translates single trace + snapshots into SMT formula + fill SMTContext.
+local function translate(trace_record, ctx_src, smt_suffix, tr_id)
+    dev_checks('table', 'table', '?string', 'number')
 
-    if (type(trace) ~= 'table') then
+    if (type(trace_record.trace) ~= 'table') then
         error('IR-dump is not a table')
     end
 
-    dev_trace_dump(trace)
+    dev_trace_dump(trace_record.trace)
 
-    local smtlib_buf = [[
-(set-option :print-success false)
-(set-option :produce-models true)
-]]
+    local smtlib_buf = ""
 
     smt_suffix = smt_suffix or 'src'
+    tr_id = tr_id or "0"
+    ctx_src = ctx_src or smt_context.SMTContext:new('BV', 'BV')
     -- 0 stage. Create 'smt-context'.
-    local ctx_src = smt_context.SMTContext:new('BV', 'BV')
-    smtlib_buf = smtlib_buf .. ctx_src.vm_stack:init_smt(vm_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix) .. '\n'
-    smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix .. tr_id) .. '\n'
+    smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix .. tr_id) .. '\n'
 
     -- 1st stage. Constructing list of `ir_nodes` from raw string data.
-    local nodes = construct_nodes(trace)
+    local nodes = construct_nodes(trace_record.trace)
 
     -- 2nd stage. Transformations (loop unrooling, function inlining, ...).
     nodes = transform_nodes(nodes)
@@ -119,11 +125,82 @@ local function translate(trace, smt_suffix)
             .. (nodes[i]:get_left_op() or '') .. ' '
             .. (nodes[i]:get_right_op() or '') .. ' '
 
-        smtlib_buf = smtlib_buf .. '; ' .. parsed_ir .. '\n' .. nodes[i]:to_smt_lib(ctx_src) .. '\n'
+        smtlib_buf = smtlib_buf .. nodes[i]:to_smt_lib(ctx_src) .. ' ; ' .. i .. '   ' .. parsed_ir .. '\n'
     end
-    return smtlib_buf
+    -- 4th stage. Construct SNAPSHOTs
+    local snap_nums = {}
+    if trace_record.snapshots ~= nil then
+        for i, snap in pairs(trace_record.snapshots) do
+            local cur_sn, slot_values = smt_snapshot.snap_to_smt_lib(ctx_src, snap)
+            smtlib_buf = smtlib_buf .. cur_sn .. "\n"
+            snap_nums[i] = slot_values
+        end
+    end
+
+    return smtlib_buf, snap_nums
+end
+
+-- Generates SMT formula that should be unsat (if optimizations are correct)
+local function translate_to_smt(lua_code, add_check)
+    local is_debug = os.getenv("DEBUG")
+    assert(load(lj_unoptimized))()
+
+    local exec_records_unopt = dump_ir.record(lua_code, is_debug)
+    assert(type(exec_records_unopt) == "table")
+    assert(load(lj_optimized))()
+    if (is_debug) then
+        print("UNOPTIMIZED ==============================================")
+    end
+    local exec_record_opt = dump_ir.record(lua_code, is_debug)
+    assert(type(exec_record_opt) == "table")
+
+    if is_json and is_debug then
+        local traces_buf = json.encode(exec_record_opt)
+        io.stdout:write(traces_buf .. "\n")
+    end
+
+    local traces_smtlib = [[
+    (set-option :print-success false)
+    (set-option :produce-models true)
+    ]]
+
+    for tr_n, exec_record in pairs(exec_records_unopt) do
+    local ctx_src = smt_context.SMTContext:new('BV', 'BV')
+    traces_smtlib = traces_smtlib .. ctx_src.vm_stack:init_smt(vm_stack_prefix .. tr_n) .. '\n'
+    local tr_smtlib_unopt, snap_unopt = translate(exec_record, ctx_src, "unopt", tr_n)
+    local tr_smtlib_opt, snap_opt = translate(exec_record_opt[tr_n], ctx_src, "opt", tr_n)
+
+    if not tr_smtlib_unopt or #tr_smtlib_unopt == 0 or not tr_smtlib_opt or #tr_smtlib_opt == 0 then
+        local msg = ("translation of trace %d to SMT-LIB has failed\n"):format(tr_n)
+        io.stderr:write(msg)
+        goto continue
+    end
+    traces_smtlib = traces_smtlib .. tr_smtlib_unopt .. "\n"
+    traces_smtlib = traces_smtlib .. tr_smtlib_opt .. "\n"
+
+    local merged_snaps = utils.merge_tables_named(snap_unopt, snap_opt)
+    traces_smtlib = traces_smtlib .. "(assert (or false\n"
+    for _snap_id, values in pairs(merged_snaps) do
+        local value1, value2 = values.value1, values.value2
+        if (value1 ~= nil) then
+        local merged_snap = utils.merge_tables_named(value1, value2)
+        for _slot_id, snap in pairs(merged_snap) do
+            local val1, val2 = snap.value1, snap.value2
+            traces_smtlib = traces_smtlib .. "    (not (= " .. val1 .. " " .. val2 .. "))\n"
+        end
+        end
+    end
+    traces_smtlib = traces_smtlib .. "))\n"
+    if (add_check) then
+        traces_smtlib = traces_smtlib .. "(check-sat)\n" -- Check current trace.
+        traces_smtlib = traces_smtlib .. "(get-model)\n" -- Print counterexample if found.
+        traces_smtlib = traces_smtlib .. "(reset)\n" -- Reset, so next snapshots will be independent.
+    end
+    ::continue::
+    end
+    return traces_smtlib
 end
 
 return {
-    translate = translate,
+    translate_to_smt = translate_to_smt,
 }

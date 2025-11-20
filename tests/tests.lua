@@ -14,7 +14,7 @@ if os.getenv('LJOPT_ENABLE_INTERNAL_CHECKS') == nil then
     os.execute('export LJOPT_ENABLE_INTERNAL_CHECKS=ON')
 end
 
-test:plan(7)
+test:plan(8)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -38,28 +38,16 @@ test:test("bc_dump", function(_test)
 end)
 
 test:test("ir_smtlib", function(test)
-    test:plan(4)
+    test:plan(2)
 
-    local ok, err = pcall(ljopt.ir.translate, "")
-    test:is(ok, false, "exit code is correct")
-    test:like(err, "not a table", "error message is correct")
-
-    local buf = ljopt.ir.translate({})
+    local buf = ljopt.ir.translate_to_smt("", false)
     test:is(type(buf), "string", "type of result when no traces")
     test:isnt(#buf, 0, "length of result when no traces")
 end)
 
 local function translate_ir (lua_code, luajit_optimization_params)
     lua_code = luajit_optimization_params..'\n'..lua_code
-    local traces = ljopt.ir.record(lua_code)
-    local result = ''
-    for i = 1, table.getn(traces) do
-        if traces[i] and type(traces[i]) == "table" then
-            result = result .. ljopt.ir.translate(traces[i])
-        end
-    end
-
-    return result
+    return ljopt.ir.translate_to_smt(lua_code, false)
 end
 
 test:test("fold_brol (LuaJIT#1079)", function(test)
@@ -123,6 +111,29 @@ end
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB output with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
+end)
+
+-- Main tests for traces equivalence.
+test:test("ir_smtlib", function(test)
+    -- Extract to directory.
+    local srcs = { [[
+local function f(y)
+  return y - y, y + y, y * y, y / y
+end
+f(0)
+f(1)
+]]}
+    test:plan(2 * #srcs)
+
+    -- XXX: We should check result is UNSAT. Investigate what's
+    -- the appropriate timeout, and maybe some complex cases for
+    -- `timeout`.
+    for i, f in ipairs(srcs) do
+        local formula = ljopt.ir.translate_to_smt(f, false)
+        -- Make sure it's UNSAT or timeout.
+        test:is(smt:parse(formula), true)
+        test:isnt(smt:check(formula), 1, "test_" .. i)
+   end
 end)
 
 test:test("bc_smtlib", function(_test)
