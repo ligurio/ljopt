@@ -75,7 +75,7 @@ local function retrieve_num_op(self, operand, ctx)
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
     elseif op_type == 'num' then
         -- TODO rewrite
-        local conv = '((_ to_fp 11 53) roundNearestTiesToEven %s)'
+        local conv = '((_ to_fp 11 53) RNE %s)'
         operand = operand:gsub('e', ' '):gsub('+', '')
         operand = string.format(conv, operand)
     end
