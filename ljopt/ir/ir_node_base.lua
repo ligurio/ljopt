@@ -105,7 +105,9 @@ local function retrieve_int_op(self, operand, ctx)
 
     local op_type = self:parse_op(operand)
     if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), self:get_type())
+        -- Result of self may be num, but operand
+        -- should be loaded as int.
+        operand = ctx.op_stack:load(tonumber(operand), "int")
     elseif op_type == 'int' then
         if string.sub(operand, 1, 2) == '#x' then
             -- Kinda optimization, lets convert inplace.
@@ -145,14 +147,14 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
         'table', 'string', 'string', '?string', 'string', '?string', '?string'
     )
 
-    self._ssa_ref = tonumber(ssa_ref)
-    self._flags = flags
-    self._type = type
-    self._opcode = opcode
-    self._left_op = left_op
-    self._right_op = right_op
-
     local public = {
+        _ssa_ref = tonumber(ssa_ref),
+        _flags = flags,
+        _type = type,
+        _opcode = opcode,
+        _left_op = left_op,
+        _right_op = right_op,
+
         get_ssa_reference = get_ssa_reference,
         get_flags = get_flags,
         get_type = get_type,
