@@ -29,8 +29,7 @@ local function snap_to_smt_lib(ctx, snapshot)
                 slot, type, ctx.op_stack:load(value_data, type))
             slot_values[slot] = ctx.snap_stack:load(slot, type)
         elseif value_type == "const" then
-            local cnst =
-                string.format('((_ to_fp 11 53) (_ %s 64))', value_data)
+            local cnst = ('((_ to_fp 11 53) %s)'):format(value_data)
             cnst = cnst:gsub('+', '')
             -- Convert constant to SMT.
             smt_expr = ctx.snap_stack:store(slot, type, cnst)
