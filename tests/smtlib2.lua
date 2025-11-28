@@ -95,6 +95,12 @@ end
 -- -1 - UNSAT
 --  0 - UNKNOWN
 --  1 - SAT
+local result = {
+    UNSAT = -1,
+    UNKNOWN = 0,
+    SAT = 1,
+}
+
 local function check(self, str)
     local solver = z3.Z3_mk_solver(self.ctx)
     z3.Z3_solver_inc_ref(self.ctx, solver)
@@ -114,18 +120,15 @@ local mt = {
     __index = {
         parse = parse_smtlib2_string,
         check = check,
+        result = result,
     },
 }
 
 local function new()
     local self = {}
     local cfg = z3.Z3_mk_config()
-    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "proof"),
-                          ffi.cast("Z3_string", "true"))
-    z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "trace"),
-                          ffi.cast("Z3_string", "true"))
     z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"),
-                          ffi.cast("Z3_string", "100"))
+                          ffi.cast("Z3_string", "1000"))
     self.ctx = z3.Z3_mk_context(cfg)
     z3.Z3_del_config(cfg)
 
