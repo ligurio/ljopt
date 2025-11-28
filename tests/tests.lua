@@ -11,7 +11,9 @@ test:test("smt_module", function(test)
     test:plan(2)
 
     test:is(smt:parse("(declare-const p0 Bool)"), true, "SMT-LIB parsing")
-    test:is(smt:check("(declare-const p0 Bool)"), 1, "SMT-LIB checking")
+    test:is(smt:check("(declare-const p0 Bool)"),
+        smt.result.SAT, "SMT-LIB checking"
+    )
 end)
 
 test:test("ir_dump", function(test)
@@ -150,16 +152,12 @@ f(1)
 ]]}
     test:plan(2 * #srcs)
 
-    -- XXX: We should check result is UNSAT. Investigate what's
-    -- the appropriate timeout, and maybe some complex cases for
-    -- `timeout`.
     for i, f in ipairs(srcs) do
         local formulas = ljopt.ir.traces_to_smt(f)
         for j, formula in ipairs(formulas) do
-            -- Make sure it's UNSAT or timeout.
             test:is(smt:parse(formula), true,
                 ("test_%s trace %d parse."):format(i, j))
-            test:isnt(smt:check(formula), 1,
+            test:is(smt:check(formula), smt.result.UNSAT,
                 ("test_%d trace %d check."):format(i, j))
         end
     end
