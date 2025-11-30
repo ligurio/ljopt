@@ -47,12 +47,8 @@ local function parse_op(self, operand, maxrecord)
     local JIT_P_maxrecord = 4000
     maxrecord = maxrecord or JIT_P_maxrecord
 
-    -- TODO support for other types
-    -- TODO inf?
-    -- TODO other modifiers
-    if operand:sub(1, 1) == '+' or operand:sub(1, 1) == '-' or
-        operand:sub(-1, -1) == 'L' or operand == 'NaN' then
-        -- TODO support for arith other types
+    -- TODO: Add integer OPs, right now we support only floats, represented as #x0123456.
+    if operand:sub(1, 2) == '#x' then
         assert(self:get_type() == 'num' or self:get_type() == 'int' or
             self:get_type() == 'i64' or self:get_type() == 'u64')
         return self:get_type()
@@ -74,13 +70,32 @@ local function retrieve_num_op(self, operand, ctx)
     if op_type == 'op' then
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
     elseif op_type == 'num' then
-        -- TODO rewrite
-        local conv = '((_ to_fp 11 53) RNE %s)'
-        operand = operand:gsub('e', ' '):gsub('+', '')
+        local conv = '((_ to_fp 11 53) %s)'
         operand = string.format(conv, operand)
     end
     return operand
 end
+
+local ffi = require("ffi")
+local function hex_double_to_i64_hex(hex_str)
+    -- Remove #x prefix if present
+    local clean_hex = hex_str:gsub("^#x", "")
+
+    -- Convert hex string to number
+    local hex_num = tonumber(clean_hex, 16)
+
+    -- Use FFI to interpret the bits as double
+    local converter = ffi.new("union { double d; uint64_t i; }")
+    converter.i = hex_num  -- Set the bit pattern
+
+    -- Get the actual double value
+    local double_val = converter.d
+
+    -- Convert to int64 and format as hex
+    local int64_val = ffi.cast("int64_t", double_val)
+    return string.format("#x%016x", tonumber(int64_val))
+end
+
 
 local function retrieve_int_op(self, operand, ctx)
     dev_checks('table', 'string', 'table')
@@ -89,8 +104,15 @@ local function retrieve_int_op(self, operand, ctx)
     if op_type == 'op' then
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
     elseif op_type == 'int' then
-        local conv = string.format('#x%.16x', operand)
-        operand = string.format(conv, operand)
+        if string.sub(operand, 1, 2) == "#x" then
+            -- Kinda optimization, lets convert inplace.
+            -- Otherwise bv(float) -> int -> bv(int).
+            operand = hex_double_to_i64_hex(operand)
+        else
+            -- Unreachable?
+            assert(false)
+            operand = string.format('((_ fp.to_sbv 64) RNE %s)', operand)
+        end
     end
     return operand
 end
@@ -108,7 +130,7 @@ local function retrieve_i64_op(self, operand, ctx)
         if operand:sub(-1, -1) == 'L' then
             operand = operand:sub(1, -2)
         end
-        local conv = string.format('#x%.32x', operand)
+        local conv = string.format('#x%.16x', operand)
         operand = string.format(conv, operand)
     end
     return operand
