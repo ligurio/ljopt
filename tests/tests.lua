@@ -14,7 +14,7 @@ if os.getenv('LJOPT_ENABLE_INTERNAL_CHECKS') == nil then
     os.execute('export LJOPT_ENABLE_INTERNAL_CHECKS=ON')
 end
 
-test:plan(7)
+test:plan(8)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -123,6 +123,36 @@ end
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB output with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
+end)
+
+-- Snapshot parsing tests
+test:test("Snapshot tests", function(test)
+    local src = [[
+jit.opt.start(0, 'hotloop=1', 'hotexit=1');
+local function f(y)
+  return y, y + 1
+end
+f(0)
+f(1)
+]]
+    -- Later we check, that parsed exactly
+    -- SNAP   #0   [ ---- ---- ]
+    -- SNAP   #1   [ ---- ---- 0001 0003 ]
+    test:plan(6)
+    local exec_state = ljopt.ir.record(src)
+    for _k, trace in pairs(exec_state) do
+        for _snapno, snap in pairs(trace.snapshots) do
+            if (table.getn(snap) ~= 0) then
+                test:is(snap[1][1], 2, "Incorrect slot")
+                test:is(snap[1][2], "ssa", "Incorrect snapshot entry type")
+                test:is(snap[1][3], 1, "Incorrect entry value")
+
+                test:is(snap[2][1], 3, "Incorrect slot")
+                test:is(snap[2][2], "ssa", "Incorrect snapshot entry type")
+                test:is(snap[2][3], 3, "Incorrect entry value")
+            end
+        end
+    end
 end)
 
 test:test("bc_smtlib", function(_test)
