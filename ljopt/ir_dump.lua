@@ -22,14 +22,17 @@ local sub, gsub, format = string.sub, string.gsub, string.format
 local byte, rep = string.byte, string.rep
 local type, tostring = type, tostring
 
+local ir_dump_utils = require('ljopt.ir_dump_utils')
+
+-- Disable JIT for ir_dump to not interfere with verification
+-- traces.
+jit.off(true, true)
+
 -- Load other modules on-demand.
 local bcline, disass
 
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
-
--- A table with recorded traces.
-local traces
 
 -- Debug mode.
 local debug = false
@@ -38,12 +41,6 @@ local function write_out(...)
   assert(out)
   if not debug then return end
   out:write(...)
-end
-
-local function trim(s)
-  if s == nil then return end
-  local ss, _ = s:gsub('^%s*(.-)%s*$', '%1')
-  return ss
 end
 
 ------------------------------------------------------------------------------
@@ -269,6 +266,8 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   if not info then return end
   local nins = info.nins
   write_out("---- TRACE ", tr, " IR\n")
+
+  ir_dump_utils.ljopt_init_new_trace(tr)
   local irnames = vmdef.irnames
   local snapref = 65536
   local snap, snapno
@@ -278,6 +277,9 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     snapno = 0
   end
   for ins=1,nins do
+    if ins >= snapref then
+      ir_dump_utils.ljopt_savesnap(tr, snap, snapno, info.linktype)
+    end
     if ins >= snapref then
       if dumpreg then
 	write_out(format("....              SNAP   #%-3d [ ", snapno))
@@ -328,11 +330,11 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	op1_txt = formatk(tr, op1)
+	op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
 	write_out(op1_txt)
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  op1_txt = formatk(tr, op1)
+	  op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
 	  write_out(op1_txt)
 	else
 	  op1_txt = format(m1 == 0 and "%04d" or "#%-3d", op1)
@@ -352,7 +354,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	      write_out(op2_txt)
 	    end
 	  elseif op2 < 0 then
-	    op2_txt = formatk(tr, op2)
+	    op2_txt = ir_dump_utils.ljopt_formatsmt(tr, op2)
 	    write_out("  ", op2_txt)
 	  else
 	    op2_txt = format("  %04d", op2)
@@ -363,22 +365,14 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       write_out("\n")
     end
 
-    local irins = {
-        num = ins,
-        flags = format("%s%s",
+    local flags = format("%s%s",
 		       (rid == 254 or rid == 253) and "}" or
 		       (band(ot, 128) == 0 and " " or ">"),
-		       band(ot, 64) == 0 and " " or "+"),
-        irt_guard = irt_guard,
-        irt_isphi = irt_isphi,
-        irtype = irtype[t],
-        irop = trim(op),
-        op1 = trim(op1_txt),
-        op2 = trim(op2_txt),
-    }
-    table.insert(traces[tr], irins)
+		       band(ot, 64) == 0 and " " or "+")
+    ir_dump_utils.ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype[t], op, op1_txt, op2_txt)
   end
   if snap then
+    ir_dump_utils.ljopt_savesnap(tr, snap, snapno, info.linktype)
     if dumpreg then
       write_out(format("....              SNAP   #%-3d [ ", snapno))
     else
@@ -403,13 +397,13 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
+  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
   end
   if what == "start" then
     write_out("---- TRACE ", tr, " ", what)
-    traces[tr] = {}
     if otr then write_out(" ", otr, "/", oex == -1 and "stitch" or oex) end
     write_out(" ", fmtfunc(func, pc), "\n")
   elseif what == "stop" or what == "abort" then
@@ -504,7 +498,7 @@ end
 -- Open the output file and attach dump handlers.
 local function dumpon(outfile)
   if active then dumpoff() end
-  dumpmode = { t=true, b=true, i=true, m=false }
+  dumpmode = { t=true, b=true, i=true, m=false, s=true, r=false }
   jit.attach(dump_trace, "trace")
   if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
@@ -523,13 +517,13 @@ local function record(lua_code, debug_mode)
   end
 
   debug = debug_mode
-  traces = {}
+  ir_dump_utils.ljopt_init_trace_state()
 
   dumpon()
   pcall(fn)
   dumpoff()
 
-  return traces
+  return ir_dump_utils.ljopt_get_execution_state()
 end
 
 return {

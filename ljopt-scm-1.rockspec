@@ -29,12 +29,15 @@ build = {
     type = 'builtin',
     modules = {
         ljopt = 'ljopt/init.lua',
-        ['ljopt.main'] = 'ljopt/main.lua',
-        ['ljopt.dev_checks'] = 'ljopt/dev_checks.lua',
         ['ljopt.bc_dump'] = 'ljopt/bc_dump.lua',
         ['ljopt.bc_smtlib'] = 'ljopt/bc_smtlib.lua',
+        ['ljopt.dev_checks'] = 'ljopt/dev_checks.lua',
         ['ljopt.ir_dump'] = 'ljopt/ir_dump.lua',
+        ['ljopt.ir_dump_utils'] = 'ljopt/ir_dump_utils.lua',
         ['ljopt.ir_smtlib'] = 'ljopt/ir_smtlib.lua',
+        ['ljopt.main'] = 'ljopt/main.lua',
+        ['ljopt.utils'] = 'ljopt/utils.lua',
+        ['ljopt.SNAP'] = 'ljopt/ir/SNAP.lua',
 
         ['ljopt.ir.ir_node_base'] = 'ljopt/ir/ir_node_base.lua',
         ['ljopt.ir.ir_node_dummy'] = 'ljopt/ir/ir_node_dummy.lua',
