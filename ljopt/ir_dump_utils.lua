@@ -27,6 +27,9 @@ local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
 
 -- Get float in SMT format.
+-- This is the most convenient way to store float, moreover,
+-- float format used by ir_dump uses some rounding behaviour,
+-- which is lead to incorrect verification
 local function float_to_smt_bv(x)
   dev_checks("number")
   local u = ffi.new("union { double d; uint64_t i; }")
@@ -58,7 +61,8 @@ local function ljopt_init_new_trace(tr)
   local tr_id = get_trace_id(tr)
   assert(exec_record[tr_id] == nil)
   exec_record[tr_id] = {}
-  exec_record[tr_id] = {}
+  exec_record[tr_id].trace = {}
+  exec_record[tr_id].snapshots = {}
 end
 
 -- This function was copied from ir_dump
@@ -85,6 +89,14 @@ local function ljopt_init_trace_uid(tr, func, pc, what)
   end
 end
 
+-- @tr - trace
+-- @snapno - snapshot number within the trace
+-- Returns uid for the snapshot based on BC PC
+-- Note: returned ID is persistent across executions
+local function get_snap_uid(tr, snapno)
+  return jutil.snappc(tr, snapno)
+end
+
 local function ctlsub(c)
   if c == "\n" then return "\\n"
   elseif c == "\r" then return "\\r"
@@ -107,8 +119,8 @@ local function ljopt_formatsmt(tr, idx, sn)
     elseif k == 2^52+2^51 then
       s = "bias"
     else
-      s = format(0 < k and k < 0x1p-1026 and "%+a" or "%+.14g", k)
-      -- s = float_to_smt_bv(k)
+      -- s = format(0 < k and k < 0x1p-1026 and "%+a" or "%+.14g", k)
+      s = float_to_smt_bv(k)
     end
   elseif tn == "string" then
     s = format(#k > 20 and '"%.20s"~' or '"%s"', gsub(k, "%c", ctlsub))
@@ -137,6 +149,36 @@ local function ljopt_formatsmt(tr, idx, sn)
   return s
 end
 
+-- Returns array<(snap_num, type, slot, Option(slot))>>
+local function ljopt_savesnap(tr, snap, snapno, linktype)
+  if (linktype == "stitch") then
+    -- stitch is not supported yet
+    return
+  end
+
+  local snapshot = {}
+  local n = 2
+  for s=0,snap[1]-1 do
+    local sn = snap[n]
+    if shr(sn, 24) == s then
+      n = n + 1
+      local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
+      if ref < 0 then
+        -- Type 1: Constant.
+        table.insert(snapshot, {s, "const", ljopt_formatsmt(tr, ref, sn)})
+      elseif band(sn, 0x80000) ~= 0 then
+        -- Type 2: Soft-float number (needs two SSA slots).
+        table.insert(snapshot, {s, "softfp", ref, ref+1})
+      else
+        -- Type 3: Regular SSA reference.
+        table.insert(snapshot, {s, "ssa", ref})
+      end
+    end
+  end
+  local tr_id = get_trace_id(tr)
+  exec_record[tr_id].snapshots[get_snap_uid(tr, snapno)] = snapshot
+end
+
 local function trim(s)
   if s == nil then return end
   local ss, _ = s:gsub('^%s*(.-)%s*$', '%1')
@@ -155,7 +197,7 @@ local function ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype, op,
     op1 = trim(op1),
     op2 = trim(op2),
   }
-  table.insert(exec_record[get_trace_id(tr)], irins)
+  table.insert(exec_record[get_trace_id(tr)].trace, irins)
 end
 
 return {
@@ -163,6 +205,7 @@ return {
   ljopt_get_execution_state = ljopt_get_execution_state,
   ljopt_init_new_trace = ljopt_init_new_trace,
   ljopt_init_trace_uid = ljopt_init_trace_uid,
+  ljopt_savesnap = ljopt_savesnap,
   ljopt_savetrace = ljopt_savetrace,
   ljopt_formatsmt = ljopt_formatsmt,
 }

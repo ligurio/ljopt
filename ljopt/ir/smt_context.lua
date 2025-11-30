@@ -158,6 +158,36 @@ function SnapStack.init_smt(self, name)
     return string.format('(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', self._name)
 end
 
+function SnapStack.load(self, slot_num, type)
+    dev_checks('table', 'number', 'string')
+
+    local stack = string.format('(select %s %d)', self._name, self._cur_stack)
+    local slot = string.format('(select %s %d)', stack, slot_num)
+    local conv
+    if bv2type[type] == nil then
+        return ''
+    else
+        conv = assert(bv2type[type], 'Unsupported load type ' .. type, nil)
+    end
+    return string.format(conv, slot)
+end
+
+function SnapStack.store(self, slot_num, type, data)
+    dev_checks('table', 'number', 'string', 'string')
+
+    local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
+    local conv_data = string.format(conv, data)
+    local stack = string.format('(select %s %d)', self._name, self._cur_stack)
+    local new_stack = string.format('(store %s %d %s)', stack, slot_num, conv_data)
+    local new_location = string.format('(select %s %d)', self._name, self._cur_stack)
+    return string.format('(assert (= %s %s))', new_location, new_stack)
+end
+
+function SnapStack.inc(self)
+    dev_checks('table')
+    self._cur_stack = self._cur_stack + 1
+end
+
 local SMTContext = {}
 function SMTContext:new(vm_stack_type, op_stack_type)
     dev_checks('table', 'string', 'string')
