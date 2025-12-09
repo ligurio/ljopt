@@ -1,3 +1,7 @@
+-- This file contains all end-to-end tests.
+-- Usually test has as an input a string on Lua,
+-- and has an output as a SMT formula.
+
 local ljopt = require("ljopt")
 local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
@@ -146,6 +150,16 @@ test:test("ir_smtlib", function(test)
     local srcs = { [[
 local function f(y)
   return y - y, y + y, y * y, y / y
+end
+f(0)
+f(1)
+]], [[
+local function f(y)
+  -- The numbers are arbitrary.
+  local x = 11
+  local y = 23
+  -- SUBOV is not supported yet
+  return x + y, x * y, x / y --, x - y
 end
 f(0)
 f(1)
