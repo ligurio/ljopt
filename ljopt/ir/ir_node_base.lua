@@ -107,19 +107,21 @@ local function retrieve_int_op(self, operand, ctx)
     if op_type == 'op' then
         -- Result of self may be num, but operand
         -- should be loaded as int.
-        operand = ctx.op_stack:load(tonumber(operand), "int")
+        return ctx.op_stack:load(tonumber(operand), 'int')
     elseif op_type == 'int' then
         if string.sub(operand, 1, 2) == '#x' then
             -- Kinda optimization, lets convert inplace.
             -- Otherwise bv(float) -> int -> bv(int).
-            operand = hex_double_to_i64_hex(operand)
+            return hex_double_to_i64_hex(operand)
         else
             -- Unreachable?
             assert(false)
-            operand = string.format('((_ fp.to_sbv 64) RNE %s)', operand)
         end
+    elseif op_type == 'num' then
+        -- Let's not convert num back and forth.
+        return operand
     end
-    return operand
+    assert(false, 'op_type ' .. op_type .. ' is not supported yet')
 end
 
 local function retrieve_i64_op(self, operand, ctx)

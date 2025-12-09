@@ -15,9 +15,21 @@ function IRNodeCONV:to_smt_lib(ctx)
 
     -- TODO: Support other conversions.
     if parsed_right_op[1] == 'num.int' then
-        left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-        left_op = left_op:gsub('+', '')
-        data = string.format('((_ to_fp 11 53) %s)', left_op)
+        left_op = self:get_left_op()
+        data = self:retrieve_int_op(left_op, ctx)
+        -- We optimize useless conversion fp -> int -> fp
+        -- in case of num.
+        -- Make actual conversion only if it's not 'num'.
+        if self:parse_op(left_op) ~= 'num' then
+            -- LuaJIT follows C semantic when converting
+            -- num -> int.
+            -- And in C it's RTZ as stated in standard 6.3.1.4:
+            -- luacheck: push no max_comment_line_length
+            -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+            -- luacheck: pop
+            data = string.format('RTZ (bv2int %s)', data)
+        end
+        data = string.format('((_ to_fp 11 53) %s)', data)
     elseif parsed_right_op[1] == 'int.num' then
         left_op = self:retrieve_num_op(self:get_left_op(), ctx)
         -- TODO handle inputs that are out of range.

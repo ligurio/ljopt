@@ -1,0 +1,174 @@
+-- This test file contains tests related to
+-- single snapshot instruction.
+-- In general test should look like:
+-- We translate single instruction with some input.
+-- We already know the expected result, so we just
+-- compare in SMT, that result of this instruction
+-- is same as expected result.
+--
+-- Example:
+--
+-- ADD 1 2
+-- In SMT will look like
+-- (assert (let ((a!1 (bvand (bvadd #x0000000000000001
+--          #x0000000000000002) #x00000000ffffffff)))
+--
+-- But we already know it should be 3, so we add
+-- assertion and check whether formula is SAT.
+
+local smt = require("tests.smtlib2").new()
+local test = require("tests.tap").test("ljopt")
+
+local translate = require("ljopt.ir_smtlib")
+local smt_context = require("ljopt.ir.smt_context")
+local ffi = require("ffi")
+local bit = require("bit")
+
+-- NOOP when environment variable LJOPT_COVERAGE is undefined.
+require("tests.coverage").enable()
+
+test:plan(2)
+
+-- Get float in SMT format.
+local function f2bv(x)
+  local u = ffi.new("union { double d; uint64_t i; }")
+  u.d = x
+  local bits = u.i
+  local hi = tonumber(bit.rshift(bits, 32))
+  local lo = tonumber(bit.band(bits, 0xFFFFFFFF))
+  return string.format("#x%08X%08X", hi, lo)
+end
+
+local function create_node(irtype, irop, op1, op2, insn)
+    insn = insn or 1
+    local node = {
+        num = insn,
+        flags = "",
+        irt_guard = nil,
+        irt_isphi = nil,
+        irtype = irtype,
+        irop = irop,
+        op1 = op1,
+        op2 = op2,
+    }
+    return node
+end
+
+test:test("IR arithmetic tests", function(test)
+
+    test:plan(42)
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+
+    local op_id = 1
+
+    local nodes_to_test = {
+        {node = create_node("num", "ADD", f2bv(2.3), f2bv(3.4)),
+                        result = 2.3 + 3.4, error = 1.},
+        {node = create_node("int", "ADD", f2bv(2.), f2bv(3.0)),
+                        result = 5, error = 1.},
+        {node = create_node("int", "BAND", f2bv(124245235.), f2bv(824124435.)),
+                        result = bit.band(124245235, 824124435), error = 1.},
+        {node = create_node("i64", "BAND", "124245235", "824124435"),
+                        result = bit.band(124245235, 824124435), error = 1.},
+        {node = create_node("i64", "BROL", "124245235", "2"),
+                        result = bit.rol(124245235, 2), error = 1.},
+        {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
+                        result = 2.3 / 3.4, error = 1.},
+        {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
+                        result = 5, error = 1.},
+        {node = create_node("num", "MUL", f2bv(2.3), f2bv(3.4)),
+                        result = 2.3 * 3.4, error = 1.},
+        {node = create_node("int", "MUL", f2bv(2.), f2bv(3.)),
+                        result = 2 * 3, error = 1.},
+        {node = create_node("num", "NEG", f2bv(2.3), nil),
+                        result = -2.3, error = 1.},
+        {node = create_node("int", "NEG", f2bv(2.), nil),
+                        result = -2, error = 1.},
+        {node = create_node("num", "SUB", f2bv(2.3), f2bv(3.4)),
+                        result = 2.3 - 3.4, error = 1.},
+        {node = create_node("int", "SUB", f2bv(2.), f2bv(4.)),
+                        result = 2 - 4, error = 1.},
+        {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
+                        result = 3, error = 2},
+    }
+    -- Test each node in a loop
+    for _i, test_case in ipairs(nodes_to_test) do
+        local res = op_init .. "\n" ..
+		    translate.translate({trace={test_case.node}}, ctx_src, nil, nil)
+
+        -- Test SMT-LIB parsing
+        test:is(smt:parse(res), true,
+            "SMT-LIB parsing for test case " .. test_case.node.irop
+        )
+
+        -- Create assertion based on the operation type
+        -- and expected result
+        local expected = ""
+        local unexpected = ""
+        if test_case.node.irtype == "num" then
+            expected = " ((_ to_fp 11 53) " .. f2bv(test_case.result) .. ")"
+            unexpected = " ((_ to_fp 11 53) " .. f2bv(test_case.error) .. ")"
+        elseif test_case.node.irtype == "i64" then
+            expected = string.format("#x%.16x", test_case.result)
+            unexpected = string.format("#x%.16x", test_case.error)
+        elseif test_case.node.irtype == "i32" or
+               test_case.node.irtype == "int" then
+            -- To not convert op_stack from 64 bytes to 32 and
+			-- back - just use 64 here.
+            expected = string.format("#x%.8x%s", 0,
+                bit.tohex(bit.band(test_case.result, 0xFFFFFFFF), 8))
+            unexpected = string.format("#x%.8x%.8x", 0,
+			    tonumber(ffi.cast("int32_t", test_case.error)))
+        else
+            assert(false, "Unsupported " .. test_case.node.irtype)
+        end
+        local expect_sat = res .. "\n(assert (= " ..
+		    ctx_src.op_stack:load(op_id, test_case.node.irtype)
+        expect_sat = expect_sat .. expected .. "))"
+        test:is(smt:check(expect_sat), smt.result.SAT,
+            "SMT-LIB checking SAT " .. test_case.node.irop
+        )
+
+        local expect_unsat = res .. "\n(assert (= " ..
+		    ctx_src.op_stack:load(op_id, test_case.node.irtype)
+        expect_unsat = expect_unsat .. unexpected .. "))"
+        test:is(smt:check(expect_unsat), smt.result.UNSAT,
+            "SMT-LIB checking UNSAT " .. test_case.node.irop
+        )
+
+    end
+end)
+
+test:test("CONV from op", function(test)
+    -- 0001 >  int ADDOV  #x4000000000000000  #x4008000000000000
+    -- 0002    num CONV   0001  num.int
+
+    test:plan(1)
+
+    local conv_slot = 2
+    local addov_node = create_node("int", "ADDOV", f2bv(2), f2bv(3), 1)
+    local conv_node = create_node("num", "CONV", "0001", "num.int", conv_slot)
+
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+
+    local conv_smt = translate.translate(
+        {trace={addov_node, conv_node}}, ctx_src, nil, nil
+    )
+
+    local expect_sat =
+        op_init ..
+        conv_smt ..
+        ("\n(assert (= %s ((_ to_fp 11 53) %s)))"):format(
+               ctx_src.op_stack:load(conv_slot, "num"), f2bv(5))
+    test:is(smt:check(expect_sat), smt.result.SAT,
+        "SMT-LIB checking CONV is SAT"
+    )
+end)
+
+require("tests.coverage").shutdown()
+
+os.exit(test:check() == true and 0 or 1)
