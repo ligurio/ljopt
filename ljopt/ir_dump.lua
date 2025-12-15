@@ -24,6 +24,10 @@ local type, tostring = type, tostring
 
 local ir_dump_utils = require('ljopt.ir_dump_utils')
 
+-- Disable JIT for ir_dump to not interfere with verification
+-- traces.
+jit.off(true, true)
+
 -- Load other modules on-demand.
 local bcline, disass
 

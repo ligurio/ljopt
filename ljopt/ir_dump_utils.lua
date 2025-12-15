@@ -1,11 +1,16 @@
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
+local jit = require("jit")
 local funcinfo = jutil.funcinfo
 local tracek = jutil.tracek
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
 local byte = string.byte
+
+-- Disable JIT for ir_dump to not interfere with verification
+-- traces.
+jit.off(true, true)
 
 -- IR dump helpers for SMT verification.
 -----------------------------------------------------
