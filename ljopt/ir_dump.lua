@@ -23,6 +23,7 @@ local byte, rep = string.byte, string.rep
 local type, tostring = type, tostring
 
 local ir_dump_utils = require('ljopt.ir_dump_utils')
+local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
 
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
@@ -494,6 +495,7 @@ end
 -- Detach dump handlers.
 local function dumpoff()
   if active then
+    toggle_debug_hook()
     active = false
     jit.attach(dump_trace)
     if out then out:close() end
@@ -504,6 +506,7 @@ end
 -- Open the output file and attach dump handlers.
 local function dumpon(outfile)
   if active then dumpoff() end
+  toggle_debug_hook()
   dumpmode = { t=true, b=true, i=true, m=false, s=true, r=false }
   jit.attach(dump_trace, "trace")
   if not bcline then bcline = require("jit.bc").line end

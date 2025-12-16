@@ -7,7 +7,8 @@ PROJECT_DIR := $(patsubst %/,%,$(dir $(MAKEFILE_PATH)))
 LUACOV_REPORT := $(PROJECT_DIR)/luacov.report.out
 LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 
-LUA_PATH="./?/init.lua;;"
+LUA_PATH_ROCKS=$(shell luarocks path --lr-path)
+LUA_PATH="${LUA_PATH_ROCKS};./?/init.lua;;"
 
 LUAJIT_DIR := $(PROJECT_DIR)/luajit
 LUA_BIN ?= $(LUAJIT_DIR)/tarantool_luajit/bin/luajit
@@ -41,7 +42,6 @@ deps:
 	@luarocks install --local checks
 	@luarocks install --local luacheck 0.25.0
 	@luarocks install --local luacov 0.15.0
-	@luarocks install --local luacov-coveralls 0.2.3
 
 install:
 	@install -d -m 755 $(LUADIR)/ljopt
@@ -59,19 +59,16 @@ test: $(LUA_BIN)
 	@echo "Run regression tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 
-$(LUACOV_STATS): test
+$(LUACOV_STATS):
+	LJOPT_COVERAGE=1 $(MAKE) test
 
 coverage: $(LUACOV_STATS)
 	@sed -i -e 's@'"$$(realpath .)"'/@@' $(LUACOV_STATS)
 	@cd $(PROJECT_DIR) && luacov ^ljopt
 	@grep -A999 '^Summary' $(LUACOV_REPORT)
 
-coveralls: coverage
-	@echo "Send code coverage data to the coveralls.io service"
-	@luacov-coveralls --include ^ljopt --verbose --repo-token ${GITHUB_TOKEN}
-
 clean:
 	@rm -rf ${CLEANUP_FILES}
 
-.PHONY: test install coveralls coverage
+.PHONY: test install coverage
 .PHONY: luacheck check deps
