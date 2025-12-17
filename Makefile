@@ -10,30 +10,42 @@ LUACOV_STATS := $(PROJECT_DIR)/luacov.stats.out
 LUA_PATH_ROCKS=$(shell luarocks path --lr-path)
 LUA_PATH="${LUA_PATH_ROCKS};./?/init.lua;;"
 
-LUAJIT_DIR := $(PROJECT_DIR)/luajit
-LUA_BIN ?= $(LUAJIT_DIR)/tarantool_luajit/bin/luajit
+# Don't forget to update the commit hash in .envrc.
 LUAJIT_TAG ?= af5d38f109b6a7f714b41f92a57e2bd67d14955a
+LUAJIT_BUGGY_TAG ?= ab0c0793a43fc0fb0c7b71b6250339117d99254a~
+BUILD_DIR := $(PROJECT_DIR)/build
+LUA_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_TAG)/src/luajit
+LUA_BUGGY_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_BUGGY_TAG)/src/luajit
 
 CLEANUP_FILES  = ${LUACOV_STATS}
 CLEANUP_FILES += ${LUACOV_REPORT}
-CLEANUP_FILES += ${LUAJIT_DIR}
+CLEANUP_FILES += ${BUILD_DIR}
 
 all: check test
 
-$(LUA_BIN):
-	@echo "Building LuaJIT..."
-	@if [ ! -d "$(LUAJIT_DIR)" ]; then \
-		git clone https://github.com/tarantool/luajit $(LUAJIT_DIR); \
+
+# @1 - commit to build LuaJIT on
+define build_luajit
+	@if [ ! -d "$(BUILD_DIR)/luajit_$(1)" ]; then \
+		git clone https://github.com/tarantool/luajit $(BUILD_DIR)/luajit_$(1); \
 	fi
-	# Install 2.1.0-beta3 tarantool's LuaJIT.
-	@cd $(LUAJIT_DIR) && \
-		echo "Reset to $(LUAJIT_TAG)..." && \
-		git reset --hard $(LUAJIT_TAG) && \
+	@cd $(BUILD_DIR)/luajit_$(1) && \
+		echo "Reset to $(1)..." && \
+		git reset --hard $(1) && \
 		echo "Applying patches..." && \
-		git apply ../lua_patches/*.patch && \
-		cmake -Bbuild -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=tarantool_luajit && \
-		echo "Building luajit..." && \
-		cmake --build build --target install
+		git apply $(PROJECT_DIR)/lua_patches/*.patch && \
+		cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)/luajit_$(1) && \
+		echo "Building..." && \
+		$(MAKE) install
+endef
+
+$(LUA_BIN):
+	@echo "Building LuaJIT $(LUAJIT_TAG)"
+	$(call build_luajit,$(LUAJIT_TAG))
+
+$(LUA_BUGGY_BIN):
+	@echo "Building buggy LuaJIT $(LUAJIT_BUGGY_TAG)"
+	$(call build_luajit,$(LUAJIT_BUGGY_TAG))
 
 build: $(LUA_BIN)
 
@@ -55,11 +67,16 @@ luacheck:
 lint:
 	@luarocks lint ljopt-scm-1.rockspec
 
-test: $(LUA_BIN)
+test: $(LUA_BUGGY_BIN) $(LUA_BIN)
 	@echo "Run regression tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 	@echo "Run unit tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/unit_tests.lua
+	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
+	@echo "Run buggy LuaJIT tests on old version"
+	BUGGY_BUILD=1 LUA_PATH=$(LUA_PATH) $(LUA_BUGGY_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
+	@echo "Run buggy LuaJIT tests on current version"
+	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
 
 $(LUACOV_STATS):
 	LJOPT_COVERAGE=1 $(MAKE) test
