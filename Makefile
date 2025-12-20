@@ -19,11 +19,6 @@ CLEANUP_FILES += ${LUAJIT_DIR}
 
 all: check test
 
-doc:
-	@ldoc -c $(PROJECT_DIR)/doc/config.ld -v \
-              -d $(PROJECT_DIR)/doc/html/ \
-                 $(PROJECT_DIR)/ljopt
-
 $(LUA_BIN):
 	@echo "Building LuaJIT..."
 	@if [ ! -d "$(LUAJIT_DIR)" ]; then \
@@ -44,7 +39,6 @@ build: $(LUA_BIN)
 deps:
 	@echo "Setup dependencies"
 	@luarocks install --local checks
-	@luarocks install --local ldoc 1.5.0
 	@luarocks install --local luacheck 0.25.0
 	@luarocks install --local luacov 0.15.0
 	@luarocks install --local luacov-coveralls 0.2.3
@@ -80,4 +74,4 @@ clean:
 	@rm -rf ${CLEANUP_FILES}
 
 .PHONY: test install coveralls coverage
-.PHONY: luacheck check doc deps
+.PHONY: luacheck check deps
