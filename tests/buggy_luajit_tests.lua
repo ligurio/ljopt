@@ -9,6 +9,7 @@
 local ljopt = require("ljopt")
 local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
+local smt_constants = require('ljopt.smt_constants')
 
 local buggy_build = os.getenv("BUGGY_BUILD")
 
@@ -43,7 +44,7 @@ foo(-0.0)
 
     local formulas = ljopt.ir.traces_to_smt(min_zero)
     for i, formula in ipairs(formulas) do
-        test_result_expected(test, i, formula)
+        test_result_expected(test, i, smt_constants.LJOPT_SMTLIB .. formula)
     end
 end)
 

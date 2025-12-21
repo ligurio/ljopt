@@ -153,7 +153,7 @@ local function ljopt_formatsmt(tr, idx, sn)
 end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>
-local function ljopt_savesnap(tr, snap, snapno, linktype)
+local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
   if (linktype == "stitch") then
     -- stitch is not supported yet
     return
@@ -179,7 +179,8 @@ local function ljopt_savesnap(tr, snap, snapno, linktype)
     end
   end
   local tr_id = get_trace_id(tr)
-  exec_record[tr_id].snapshots[get_snap_uid(tr, snapno)] = snapshot
+  local snap_id = get_snap_uid(tr, snapno)
+  exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
 end
 
 local function trim(s)

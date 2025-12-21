@@ -27,7 +27,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(2)
+test:plan(3)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -56,7 +56,6 @@ end
 
 test:test("IR arithmetic tests", function(test)
 
-    test:plan(42)
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
     local op_init = ctx_src.op_stack:init_smt("op")
@@ -64,6 +63,8 @@ test:test("IR arithmetic tests", function(test)
     local op_id = 1
 
     local nodes_to_test = {
+        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
+                        result = 5, error = 1.},
         {node = create_node("num", "ADD", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 + 3.4, error = 1.},
         {node = create_node("int", "ADD", f2bv(2.), f2bv(3.0)),
@@ -74,6 +75,8 @@ test:test("IR arithmetic tests", function(test)
                         result = bit.band(124245235, 824124435), error = 1.},
         {node = create_node("i64", "BROL", "124245235", "2"),
                         result = bit.rol(124245235, 2), error = 1.},
+        {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
+                        result = 3, error = 2},
         {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
@@ -90,13 +93,13 @@ test:test("IR arithmetic tests", function(test)
                         result = 2.3 - 3.4, error = 1.},
         {node = create_node("int", "SUB", f2bv(2.), f2bv(4.)),
                         result = 2 - 4, error = 1.},
-        {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
-                        result = 3, error = 2},
     }
-    -- Test each node in a loop
+    test:plan(3 * #nodes_to_test)
+    -- Test each node in a loop.
     for _i, test_case in ipairs(nodes_to_test) do
-        local res = op_init .. "\n" ..
-		    translate.translate({trace={test_case.node}}, ctx_src, nil, nil)
+        local res = op_init .. "\n" .. translate.translate(
+            { trace = { test_case.node } }, ctx_src, nil, nil
+        )
 
         -- Test SMT-LIB parsing
         test:is(smt:parse(res), true,
@@ -138,6 +141,63 @@ test:test("IR arithmetic tests", function(test)
             "SMT-LIB checking UNSAT " .. test_case.node.irop
         )
 
+    end
+end)
+
+test:test("IR guards tests", function(test)
+
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+
+    local op_id = 1
+
+    local nodes_to_test = {
+        {node = create_node("int", "ADDOV", f2bv(2.), f2bv(3.0)),
+                        result = "true", error = "false"},
+        {node = create_node("num", "EQ", f2bv(2), f2bv(2)),
+                        result = "true", error = "false"},
+        {node = create_node("num", "EQ", f2bv(2), f2bv(2.5)),
+                        result = "false", error = "true"},
+        {node = create_node("num", "LE", f2bv(2.3), f2bv(3.4)),
+                        result = "true", error = "false"},
+        {node = create_node("num", "NE", f2bv(2), f2bv(2)),
+                        result = "false", error = "true"},
+        {node = create_node("num", "NE", f2bv(2), f2bv(2.5)),
+                        result = "true", error = "false"},
+        -- {node = create_node("int", "ULE", f2bv(2.3), f2bv(3.4)),
+        --                 result = "true", error = "false"},
+    }
+    test:plan(3 * #nodes_to_test)
+    -- Test each node in a loop.
+    for _i, test_case in ipairs(nodes_to_test) do
+        local res = op_init .. "\n" .. translate.translate(
+            { trace = {test_case.node} }, ctx_src, nil, nil
+        )
+
+        -- Test SMT-LIB parsing.
+        test:is(smt:parse(res), true,
+            "SMT-LIB parsing for test case " .. test_case.node.irop
+        )
+
+        -- Create assertion based on the operation type
+        -- and expected result.
+        local te_value = ctx_src.te_stack:load(op_id)
+        local expected = test_case.result
+        local unexpected = test_case.error
+        local expect_sat = ("%s\n(assert (= %s %s))\n"):format(
+            res, te_value, expected
+        )
+        test:is(smt:check(expect_sat), smt.result.SAT,
+            "SMT-LIB checking guard SAT " .. test_case.node.irop
+        )
+
+        local expect_unsat = ("%s\n(assert (= %s %s))"):format(
+            res, te_value, unexpected
+        )
+        test:is(smt:check(expect_unsat), smt.result.UNSAT,
+            "SMT-LIB checking guard UNSAT " .. test_case.node.irop
+        )
     end
 end)
 
