@@ -16,11 +16,10 @@
 -- @a snapshot output of ir_dump.
 -- In format: array<(slot, value, optional_value)>
 local function snap_to_smt_lib(ctx, snapshot)
-    ctx.snap_stack:inc()
     local snap_data = {}
     -- Slot number -> SMT expression.
     local slot_values = {}
-    for _, pair in ipairs(snapshot) do
+    for _, pair in ipairs(snapshot.snap) do
         local slot, value_type, value_data = pair[1], pair[2], pair[3]
         local smt_expr
         local type = "num"
@@ -46,6 +45,16 @@ local function snap_to_smt_lib(ctx, snapshot)
         end
         table.insert(snap_data, smt_expr)
     end
+
+    local e = nil
+    for _, b in ipairs(snapshot.exits) do
+        if e ~= nil then
+            e = ('(or (select %s %s) %s)'):format(ctx.te_stack:get_name(), b, e)
+        else
+            e = ('(select %s %s)'):format(ctx.te_stack:get_name(), b)
+        end
+    end
+    ctx.snap_stack:inc(e)
     return table.concat(snap_data, "\n"), slot_values
 end
 

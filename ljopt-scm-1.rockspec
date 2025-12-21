@@ -36,8 +36,8 @@ build = {
         ['ljopt.ir_dump_utils'] = 'ljopt/ir_dump_utils.lua',
         ['ljopt.ir_smtlib'] = 'ljopt/ir_smtlib.lua',
         ['ljopt.main'] = 'ljopt/main.lua',
+        ['ljopt.smt_constants'] = 'ljopt/smt_constants.lua',
         ['ljopt.utils'] = 'ljopt/utils.lua',
-        ['ljopt.SNAP'] = 'ljopt/ir/SNAP.lua',
 
         ['ljopt.ir.arith_utils'] = 'ljopt/ir/arith_utils.lua',
         ['ljopt.ir.ir_node_base'] = 'ljopt/ir/ir_node_base.lua',
@@ -49,6 +49,7 @@ build = {
         ['ljopt.ir.ADDOV'] = 'ljopt/ir/ADDOV.lua',
         ['ljopt.ir.DIV'] = 'ljopt/ir/DIV.lua',
         ['ljopt.ir.MUL'] = 'ljopt/ir/MUL.lua',
+        ['ljopt.ir.SNAP'] = 'ljopt/ir/SNAP.lua',
         ['ljopt.ir.SUB'] = 'ljopt/ir/SUB.lua',
 
         ['ljopt.ir.BAND'] = 'ljopt/ir/BAND.lua',
