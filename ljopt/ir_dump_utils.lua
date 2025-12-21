@@ -189,8 +189,9 @@ local function trim(s)
 end
 
 
-local function ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype,
-                               op, op1, op2)
+local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
+  local irt_guard = flags:sub(1, 1) == ">"
+  local irt_isphi = flags:sub(2, 2) == "+"
   local irins = {
     num = ins,
     flags = flags,
