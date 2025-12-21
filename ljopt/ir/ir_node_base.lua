@@ -54,6 +54,8 @@ local function parse_op(self, operand, maxrecord)
         assert(self:get_type() == 'num' or self:get_type() == 'int' or
             self:get_type() == 'i64' or self:get_type() == 'u64')
         return self:get_type()
+    elseif operand == "false" or operand == "true" then
+        return "bool"
     elseif string.len(operand) == string.len(tostring(maxrecord)) then
         return 'op'
     end
@@ -115,7 +117,7 @@ local function retrieve_int_op(self, operand, ctx)
             return hex_double_to_i64_hex(operand)
         else
             -- Unreachable?
-            assert(false)
+            assert(false, operand)
         end
     elseif op_type == 'num' then
         -- Let's not convert num back and forth.

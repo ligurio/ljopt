@@ -1,3 +1,4 @@
+local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local IRNodeMULBase = {}
@@ -6,24 +7,10 @@ ir_node.extended(IRNodeMULBase, ir_node.ir_node_base)
 local impls = {}
 
 impls.IRNodeMULNum = {}
-ir_node.extended(impls.IRNodeMULNum, IRNodeMULBase)
-
-function impls.IRNodeMULNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
-    local data = string.format('(fp.mul RNE %s %s)', left_op, right_op)
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
-end
+ir_node.extended(impls.IRNodeMULNum, bin_op.BinOpNum)
 
 impls.IRNodeMULInt = {}
-ir_node.extended(impls.IRNodeMULInt, IRNodeMULBase)
-
-function impls.IRNodeMULInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
-    local data = string.format('(bvmul %s %s)', left_op, right_op)
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
-end
+ir_node.extended(impls.IRNodeMULInt, bin_op.BinOpInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -38,10 +25,16 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
+    local op_table = {
+        ['num'] = 'fp.mul',
+        ['int'] = 'bvmul',
+    }
     assert(type_table[type], 'Unsupported type for MUL operation')
-    return impls['IRNodeMUL' ..
-        type_table[type]]:new(ssa_ref, flags, type, 'MUL', left_op, right_op
+    local node = impls['IRNodeMUL' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'MUL', left_op, right_op
     )
+    node.op_str = op_table[type]
+    return node
 end
 
 return {

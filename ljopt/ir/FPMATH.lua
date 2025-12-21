@@ -3,11 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = {}
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
-
-impls.IRNodeDIVInt = {}
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeFPMATHNum = {}
+ir_node.extended(impls.IRNodeFPMATHNum, bin_op.BinOpNum)
+impls.IRNodeFPMATHInt = {}
+ir_node.extended(impls.IRNodeFPMATHInt, bin_op.BinOpInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -23,12 +22,12 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['sfp'] = false,
     }
     local op_table = {
-        ['num'] = 'fp.div',
-        ['int'] = 'bvsdiv',
+        ['num'] = 'fp.sub',
+        ['int'] = 'bvsub',
     }
-    assert(type_table[type], 'Unsupported type for DIV operation')
-    local node = impls['IRNodeDIV' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'DIV', left_op, right_op
+    assert(type_table[type], 'Unsupported type for FPMATH operation', nil)
+    local node = impls['IRNodeFPMATH' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'FPMATH', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

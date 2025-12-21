@@ -3,32 +3,30 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = {}
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
+impls.IRNodeBSHRI64 = {}
+ir_node.extended(impls.IRNodeBSHRI64, bin_op.BinOpI64)
 
-impls.IRNodeDIVInt = {}
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeBSHRInt = {}
+ir_node.extended(impls.IRNodeBSHRInt, bin_op.BinOpInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ['num'] = 'Num',
         ['i8'] = false,
         ['u8'] = false,
         ['i16'] = false,
         ['u16'] = false,
         ['int'] = 'Int',
         ['u32'] = false,
-        ['i64'] = false,
+        ['i64'] = 'I64',
         ['u64'] = false,
-        ['sfp'] = false,
     }
     local op_table = {
-        ['num'] = 'fp.div',
-        ['int'] = 'bvsdiv',
+        ['i64'] = 'bvashr',
+        ['int'] = 'bvashr',
     }
-    assert(type_table[type], 'Unsupported type for DIV operation')
-    local node = impls['IRNodeDIV' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'DIV', left_op, right_op
+    assert(type_table[type], 'Unsupported type for BSHR operation', nil)
+    local node = impls['IRNodeBSHR' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'BSHR', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

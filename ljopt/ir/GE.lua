@@ -1,13 +1,12 @@
-local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
+local bin_op = require('ljopt.ir.BinOp')
 
 local impls = {}
 
-impls.IRNodeDIVNum = {}
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
-
-impls.IRNodeDIVInt = {}
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeGENum = {}
+ir_node.extended(impls.IRNodeGENum, bin_op.BinOpGuardNum)
+impls.IRNodeGEInt = {}
+ir_node.extended(impls.IRNodeGEInt, bin_op.BinOpGuardInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -23,13 +22,12 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['sfp'] = false,
     }
     local op_table = {
-        ['num'] = 'fp.div',
-        ['int'] = 'bvsdiv',
+        ['num'] = 'fp.geq',
+        ['int'] = 'bvsge',
     }
-    assert(type_table[type], 'Unsupported type for DIV operation')
-    local node = impls['IRNodeDIV' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'DIV', left_op, right_op
-    )
+    assert(type_table[type], 'Unsupported type for GE operation', nil)
+    local node = impls['IRNodeGE' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'GE', left_op, right_op)
     node.op_str = op_table[type]
     return node
 end

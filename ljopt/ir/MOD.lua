@@ -3,32 +3,35 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = {}
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
+impls.IRNodeMODNum = {}
+ir_node.extended(impls.IRNodeMODNum, bin_op.BinOpNum)
 
-impls.IRNodeDIVInt = {}
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeMODInt = {}
+ir_node.extended(impls.IRNodeMODInt, bin_op.BinOpInt)
+
+impls.IRNodeMODI64 = {}
+ir_node.extended(impls.IRNodeMODI64, bin_op.BinOpI64)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ['num'] = 'Num',
+        ['num'] = false,
         ['i8'] = false,
         ['u8'] = false,
         ['i16'] = false,
         ['u16'] = false,
         ['int'] = 'Int',
         ['u32'] = false,
-        ['i64'] = false,
+        ['i64'] = 'I64',
         ['u64'] = false,
         ['sfp'] = false,
     }
     local op_table = {
-        ['num'] = 'fp.div',
-        ['int'] = 'bvsdiv',
+        ['int'] = 'bvsrem',
+        ['i64'] = 'bvsrem',
     }
-    assert(type_table[type], 'Unsupported type for DIV operation')
-    local node = impls['IRNodeDIV' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'DIV', left_op, right_op
+    assert(type_table[type], 'Unsupported type for MOD operation', nil)
+    local node = impls['IRNodeMOD' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'MOD', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

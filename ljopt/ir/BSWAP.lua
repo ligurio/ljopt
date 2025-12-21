@@ -1,10 +1,10 @@
-local bin_op = require('ljopt.ir.BinOp')
+local un_op = require('ljopt.ir.UnOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeBROLI64 = {}
-ir_node.extended(impls.IRNodeBROLI64, bin_op.BinOpI64)
+impls.IRNodeBSWAPI64 = {}
+ir_node.extended(impls.IRNodeBSWAPI64, un_op.UnOpI64)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -18,11 +18,11 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
     }
     local op_table = {
-        ['i64'] = 'ext_rotate_left',
+        ['i64'] = 'bswap64',
     }
-    assert(type_table[type], 'Unsupported type for BROL operation')
-    local node = impls['IRNodeBROL' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'BROL', left_op, right_op
+    assert(type_table[type], 'Unsupported type for BSWAP operation', nil)
+    local node = impls['IRNodeBSWAP' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'BSWAP', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

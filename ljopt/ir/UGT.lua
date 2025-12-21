@@ -3,15 +3,14 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = {}
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
-
-impls.IRNodeDIVInt = {}
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeUGTNum = {}
+ir_node.extended(impls.IRNodeUGTNum, bin_op.BinOpGuardNum)
+impls.IRNodeUGTInt = {}
+ir_node.extended(impls.IRNodeUGTInt, bin_op.BinOpGuardInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ['num'] = 'Num',
+        ['num'] = "Num",
         ['i8'] = false,
         ['u8'] = false,
         ['i16'] = false,
@@ -22,13 +21,13 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
+    assert(type_table[type], 'Unsupported type for UGT operation', nil)
     local op_table = {
-        ['num'] = 'fp.div',
-        ['int'] = 'bvsdiv',
+        ['num'] = 'fp.gt',
+        ['int'] = 'bvsgt',
     }
-    assert(type_table[type], 'Unsupported type for DIV operation')
-    local node = impls['IRNodeDIV' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'DIV', left_op, right_op
+    local node = impls['IRNodeUGT' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'UGT', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

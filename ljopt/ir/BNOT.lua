@@ -1,13 +1,13 @@
-local bin_op = require('ljopt.ir.BinOp')
+local un_op = require('ljopt.ir.UnOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeBANDInt = {}
-ir_node.extended(impls.IRNodeBANDInt, bin_op.BinOpInt)
+impls.IRNodeBNOTInt = {}
+ir_node.extended(impls.IRNodeBNOTInt, un_op.UnOpInt)
 
-impls.IRNodeBANDI64 = {}
-ir_node.extended(impls.IRNodeBANDI64, bin_op.BinOpI64)
+impls.IRNodeBNOTI64 = {}
+ir_node.extended(impls.IRNodeBNOTI64, un_op.UnOpI64)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -21,12 +21,12 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
     }
     local op_table = {
-        ['int'] = 'bvand',
-        ['i64'] = 'bvand',
+        ['int'] = 'bvnot',
+        ['i64'] = 'bvnot',
     }
-    assert(type_table[type], 'Unsupported type for BAND operation')
-    local node = impls['IRNodeBAND' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'BAND', left_op, right_op
+    assert(type_table[type], 'Unsupported type for BNOT operation', nil)
+    local node = impls['IRNodeBNOT' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'BNOT', left_op, right_op
     )
     node.op_str = op_table[type]
     return node

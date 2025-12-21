@@ -1,23 +1,16 @@
+local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
-
-local IRNodeULEBase = {}
-ir_node.extended(IRNodeULEBase, ir_node.ir_node_base)
 
 local impls = {}
 
+impls.IRNodeULENum = {}
+ir_node.extended(impls.IRNodeULENum, bin_op.BinOpGuardNum)
 impls.IRNodeULEInt = {}
-ir_node.extended(impls.IRNodeULEInt, IRNodeULEBase)
-
-function impls.IRNodeULEInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
-    local data = string.format('(bvule %s %s)', left_op, right_op)
-    return ctx.te_stack:store(self:get_ssa_reference(), data)
-end
+ir_node.extended(impls.IRNodeULEInt, bin_op.BinOpGuardInt)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
-        ['num'] = false,
+        ['num'] = 'Num',
         ['i8'] = false,
         ['u8'] = false,
         ['i16'] = false,
@@ -28,10 +21,16 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u64'] = false,
         ['sfp'] = false,
     }
+    local op_table = {
+        ['num'] = 'fp.leq',
+        ['int'] = 'bvule',
+    }
     assert(type_table[type], 'Unsupported type for ULE operation')
-    return impls['IRNodeULE' ..
-        type_table[type]]:new(ssa_ref, flags, type, 'ULE', left_op, right_op
+    local node = impls['IRNodeULE' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'ULE', left_op, right_op
     )
+    node.op_str = op_table[type]
+    return node
 end
 
 return {

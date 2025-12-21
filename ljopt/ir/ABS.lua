@@ -1,16 +1,16 @@
 local un_op = require('ljopt.ir.UnOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
-local IRNodeNEGBase = {}
-ir_node.extended(IRNodeNEGBase, ir_node.ir_node_base)
-
 local impls = {}
 
-impls.IRNodeNEGInt = {}
-ir_node.extended(impls.IRNodeNEGInt, un_op.UnOpInt)
+impls.IRNodeABSNum = {}
+ir_node.extended(impls.IRNodeABSNum, un_op.UnOpNum)
 
-impls.IRNodeNEGNum = {}
-ir_node.extended(impls.IRNodeNEGNum, un_op.UnOpNum)
+impls.IRNodeABSInt = {}
+ir_node.extended(impls.IRNodeABSInt, un_op.UnOpInt)
+
+impls.IRNodeABSI64 = {}
+ir_node.extended(impls.IRNodeABSI64, un_op.UnOpI64)
 
 local function instance(ssa_ref, flags, type, left_op, right_op)
     local type_table = {
@@ -21,17 +21,17 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['u16'] = false,
         ['int'] = 'Int',
         ['u32'] = false,
-        ['i64'] = false,
+        ['i64'] = 'I64',
         ['u64'] = false,
-        ['sfp'] = false,
     }
     local op_table = {
-        ['num'] = 'fp.neg',
-        ['int'] = 'bvneg',
+        ['num'] = 'fp.abs',
+        ['i64'] = '-',
+        ['int'] = 'bvabs',
     }
-    assert(type_table[type], 'Unsupported type for NEG operation')
-    local node = impls['IRNodeNEG' .. type_table[type]]:new(
-        ssa_ref, flags, type, 'NEG', left_op, right_op
+    assert(type_table[type], 'Unsupported type for ABS operation', nil)
+    local node = impls['IRNodeABS' .. type_table[type]]:new(
+        ssa_ref, flags, type, 'ABS', left_op, right_op
     )
     node.op_str = op_table[type]
     return node
