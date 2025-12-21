@@ -295,7 +295,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local m, ot, op1, op2, ridsp = traceir(tr, ins)
     local oidx, t = 6*shr(ot, 8), band(ot, 31)
     local op = sub(irnames, oidx+1, oidx+6)
-    local op1_txt, op2_txt, irt_guard, irt_isphi
+    local op1_txt, op2_txt
     local rid
     if op == "LOOP  " then
       if dumpreg then
@@ -311,9 +311,6 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       else
 	write_out(format("%04d ", ins))
       end
-      irt_guard = (rid == 254 or rid == 253) and "}" or
-                  (band(ot, 128) == 0 and false or true)
-      irt_isphi = band(ot, 64) == 0 and false or true
       write_out(format("%s%s %s %s ",
 		       (rid == 254 or rid == 253) and "}" or
 		       (band(ot, 128) == 0 and " " or ">"),
@@ -371,7 +368,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 		       (band(ot, 128) == 0 and " " or ">"),
 		       band(ot, 64) == 0 and " " or "+")
     ir_dump_utils.ljopt_savetrace(
-      tr, ins, flags, irt_guard, irt_isphi, irtype[t], op, op1_txt, op2_txt
+      tr, ins, flags, irtype[t], op, op1_txt, op2_txt
     )
   end
   if snap then
