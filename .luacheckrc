@@ -24,7 +24,7 @@ files["ljopt/ir_dump.lua"] = {
     max_comment_line_length = 80
 }
 
-files["tests/tests.lua"] = {
+files["tests/*tests.lua"] = {
     ignore = {
         -- Shadowing an upvalue.
         "431",

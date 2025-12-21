@@ -58,6 +58,8 @@ lint:
 test: $(LUA_BIN)
 	@echo "Run regression tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
+	@echo "Run unit tests"
+	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/unit_tests.lua
 
 $(LUACOV_STATS):
 	LJOPT_COVERAGE=1 $(MAKE) test
