@@ -3,11 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = { op_str = 'fp.div' }
-ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
-
-impls.IRNodeDIVInt = { op_str = 'bvsdiv' }
-ir_node.extended(impls.IRNodeDIVInt, bin_op.BinOpInt)
+impls.IRNodeUGENum = { op_str = 'fp.gt' }
+ir_node.extended(impls.IRNodeUGENum, bin_op.BinOpGuardNum)
+impls.IRNodeUGEInt = { op_str = 'bvsge' }
+ir_node.extended(impls.IRNodeUGEInt, bin_op.BinOpGuardInt)
 
 local function instance(node_str)
     return impls[node_str]
