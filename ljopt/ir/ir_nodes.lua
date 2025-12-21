@@ -5,7 +5,6 @@ Provides mapping between IR node opcodes and their translators.
 local dev_checks = require('ljopt.dev_checks')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
-local ir_node_ADDOV = require('ljopt.ir.ADDOV')
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
 local ir_node_BROL = require('ljopt.ir.BROL')
@@ -35,46 +34,46 @@ local opcodes_table = {
     ['KSLOT'] = false,
     -- Guarded Assertions.
     ['OP'] = false,
-    ['LT'] = false,
-    ['GE'] = false,
+    ['LT'] = require('ljopt.ir.LT'),
+    ['GE'] = require('ljopt.ir.GE'),
     ['LE'] = ir_node_LE,
-    ['GT'] = false,
-    ['ULT'] = false,
-    ['UGE'] = false,
+    ['GT'] = require('ljopt.ir.GT'),
+    ['UGE'] = require('ljopt.ir.UGE'),
     ['ULE'] = ir_node_ULE,
-    ['UGT'] = false,
+    ['ULT'] = require('ljopt.ir.ULT'),
+    ['UGT'] = require('ljopt.ir.UGT'),
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
     ['ABC'] = ir_node_dummy,
     ['RETF'] = false,
     -- Bit Ops.
-    ['BNOT'] = false,
+    ['BNOT'] = require('ljopt.ir.BNOT'),
     ['BSWAP'] = false,
     ['BAND'] = ir_node_BAND,
-    ['BOR'] = false,
-    ['BXOR'] = false,
-    ['BSHL'] = false,
-    ['BSHR'] = false,
-    ['BSAR'] = false,
+    ['BOR'] = require('ljopt.ir.BOR'),
+    ['BXOR'] = require('ljopt.ir.BXOR'),
+    ['BSHL'] = require('ljopt.ir.BSHL'),
+    ['BSHR'] = require('ljopt.ir.BSHR'),
+    ['BSAR'] = require('ljopt.ir.BSAR'),
     ['BROL'] = ir_node_BROL,
-    ['BROR'] = false,
+    ['BROR'] = require('ljopt.ir.BROR'),
     -- Arithmetic Ops.
     ['ADD'] = ir_node_ADD,
     ['SUB'] = ir_node_SUB,
     ['MUL'] = ir_node_MUL,
     ['DIV'] = ir_node_DIV,
-    ['MOD'] = false,
-    ['POW'] = false,
+    ['MOD'] = require('ljopt.ir.MOD'),
+    ['POW'] = require('ljopt.ir.POW'),
     ['NEG'] = ir_node_NEG,
-    ['ABS'] = false,
+    ['ABS'] = require('ljopt.ir.ABS'),
     ['ATAN2'] = false,
     ['LDEXP'] = false,
-    ['MIN'] = false,
-    ['MAX'] = false,
+    ['MIN'] = require('ljopt.ir.MIN'),
+    ['MAX'] = require('ljopt.ir.MAX'),
     ['FPMATH'] = false,
-    ['ADDOV'] = ir_node_ADDOV,
-    ['SUBOV'] = false,
-    ['MULOV'] = false,
+    ['ADDOV'] = require('ljopt.ir.ADDOV'),
+    ['SUBOV'] = require('ljopt.ir.SUBOV'),
+    ['MULOV'] = require('ljopt.ir.MULOV'),
     ['FPM_FLOOR'] = false,
     ['FPM_CEIL'] = false,
     ['FPM_TRUNC'] = false,
@@ -167,9 +166,27 @@ end
 local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('string', 'string', '?string', 'string', '?string', '?string')
 
-    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    local type_table = {
+        ['num'] = 'Num',
+        ['i8'] = false,
+        ['u8'] = false,
+        ['i16'] = false,
+        ['u16'] = false,
+        ['int'] = 'Int',
+        ['u32'] = false,
+        ['i64'] = 'I64',
+        ['u64'] = false,
+    }
+    local node_str = 'IRNode' .. opcode
+    if opcode == 'NOP' then
+        assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    else
+        assert(type_table[type], 'Unsupported type', nil)
+        assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+        node_str = node_str .. type_table[type]
+    end
     return opcodes_table[opcode].instance(
-        ssa_ref, flags, type, left_op, right_op
+        ssa_ref, flags, node_str, type, left_op, right_op
     )
 end
 

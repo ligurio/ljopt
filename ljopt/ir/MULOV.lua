@@ -1,14 +1,10 @@
 local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
-local IRNodeMULBase = {}
-ir_node.extended(IRNodeMULBase, ir_node.ir_node_base)
-
 local impls = {}
 
 impls.IRNodeMULNum = {}
 ir_node.extended(impls.IRNodeMULNum, bin_op.BinOpNum)
-
 impls.IRNodeMULInt = {}
 ir_node.extended(impls.IRNodeMULInt, bin_op.BinOpInt)
 
