@@ -39,6 +39,7 @@ build = {
         ['ljopt.utils'] = 'ljopt/utils.lua',
         ['ljopt.SNAP'] = 'ljopt/ir/SNAP.lua',
 
+        ['ljopt.ir.arith_utils'] = 'ljopt/ir/arith_utils.lua',
         ['ljopt.ir.ir_node_base'] = 'ljopt/ir/ir_node_base.lua',
         ['ljopt.ir.ir_node_dummy'] = 'ljopt/ir/ir_node_dummy.lua',
         ['ljopt.ir.ir_nodes'] = 'ljopt/ir/ir_nodes.lua',
