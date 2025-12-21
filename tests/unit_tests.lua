@@ -2,7 +2,10 @@
 -- to tests correctnes of arbitrary
 -- data structures we use.
 
+local arith_utils = require("ljopt.ir.arith_utils")
 local utils = require("ljopt.utils")
+
+local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
@@ -13,7 +16,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(1)
+test:plan(2)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -43,6 +46,25 @@ test:test("merge_tables", function(test)
     expect_fail(test, "Right nil", utils.merge_tables,
 	    {a = 1},
 		{a = nil})
+end)
+
+test:test("Arithmetic utils tests", function(test)
+    test:plan(3)
+    local no_overflow = arith_utils.i32_overflow_check("#x000000007fffffff")
+    local max_i32_inc = "#x0000000080000000"
+    local positive_overflow = arith_utils.i32_overflow_check(max_i32_inc)
+    local min_i32_dec = "#xffffffff7fffffff"
+    local negative_overflow = arith_utils.i32_overflow_check(min_i32_dec)
+
+    test:is(smt:check(("(assert %s)"):format(no_overflow)),
+        smt.result.SAT, "SMT-LIB check no i32 overflow"
+    )
+    test:is(smt:check(("(assert %s)"):format(positive_overflow)),
+        smt.result.UNSAT, "SMT-LIB check positive i32 overflow"
+    )
+    test:is(smt:check(("(assert %s)"):format(negative_overflow)),
+        smt.result.UNSAT, "SMT-LIB check negative i32 overflow"
+    )
 end)
 
 require("tests.coverage").shutdown()
