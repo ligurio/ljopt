@@ -10,6 +10,7 @@ local ir_node = require('ljopt.ir.ir_nodes')
 local dump_ir = require('ljopt.ir_dump')
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
+local smt_constants = require('ljopt.smt_constants')
 local smt_snapshot = require('ljopt.ir.SNAP')
 local utils = require('ljopt.utils')
 
@@ -147,15 +148,17 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
     if trace_record.snapshots ~= nil then
+        utils.enrich_snapshots_with_exits(trace_record)
         for i, snap in pairs(trace_record.snapshots) do
             local cur_sn, slot_values =
                 smt_snapshot.snap_to_smt_lib(ctx_src, snap)
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
             snap_nums[i] = slot_values
         end
+        smtlib_buf = smtlib_buf .. ctx_src.snap_stack:finalize()
     end
 
-    return smtlib_buf, snap_nums
+    return smtlib_buf, { slots = snap_nums, te = ctx_src.snap_stack:load_te() }
 end
 
 local function trace2smt(trace, ctx, suffix, traceno)
@@ -168,8 +171,13 @@ local function trace2smt(trace, ctx, suffix, traceno)
 end
 
 local function snapshots2smt(snapshots1, snapshots2)
-    local merged_snaps = utils.merge_tables(snapshots1, snapshots2)
-    local smt_result = '(assert (or false\n'
+    local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
+    -- Trick to extract lowest set bit. (x & -x) reset
+    -- all bits except the lowest one. If they are equal
+    -- it means we exited on the same snapshot.
+    local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
+        snapshots1.te, snapshots2.te
+    )
     for _snap_id, values in pairs(merged_snaps) do
         local value1, value2 = unpack(values)
         if (value1 ~= nil) then
@@ -254,14 +262,15 @@ local function translate_to_smt(lua_code)
     assert(load(lj_unoptimized))()
     local traces_formulas = traces_to_smt(lua_code)
 
-    local traces_smtlib = [[
+    local SMT_PREAMBLE = [[
 (set-option :print-success false)
 (set-option :produce-models true)
-]]
+]] .. smt_constants.LJOPT_SMTLIB
+    local traces_smtlib = ''
 
     -- Concatenate all traces
     for _, tr_smt in pairs(traces_formulas) do
-        traces_smtlib = traces_smtlib .. tr_smt
+        traces_smtlib = traces_smtlib .. SMT_PREAMBLE .. tr_smt
         -- Check current trace.
         traces_smtlib = traces_smtlib .. '(check-sat)\n'
         -- Print counterexample if found.

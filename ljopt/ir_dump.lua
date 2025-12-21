@@ -279,7 +279,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   end
   for ins=1,nins do
     if ins >= snapref then
-      ir_dump_utils.ljopt_savesnap(tr, snap, snapno, info.linktype)
+      ir_dump_utils.ljopt_savesnap(tr, ins, snap, snapno, info.linktype)
     end
     if ins >= snapref then
       if dumpreg then
@@ -372,7 +372,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     )
   end
   if snap then
-    ir_dump_utils.ljopt_savesnap(tr, snap, snapno, info.linktype)
+    ir_dump_utils.ljopt_savesnap(tr, nins, snap, snapno, info.linktype)
     if dumpreg then
       write_out(format("....              SNAP   #%-3d [ ", snapno))
     else
