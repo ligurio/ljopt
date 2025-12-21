@@ -5,7 +5,7 @@ local test = require("tests.tap").test("ljopt")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(8)
+test:plan(9)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -23,7 +23,9 @@ test:test("ir_dump", function(test)
     local traces = ljopt.ir.record("for i in 1, 100 do local a = 1 end")
     test:is(next(traces), nil, "lua code without traces")
 
-    traces = ljopt.ir.record("for i = 1, 100 do local a, b = 23, 11; y = a + b end")
+    traces = ljopt.ir.record(
+        "for i = 1, 100 do local a, b = 23, 11; y = a + b end"
+    )
     test:isnt(next(traces), nil, "lua code with traces")
 end)
 
@@ -32,28 +34,16 @@ test:test("bc_dump", function(_test)
 end)
 
 test:test("ir_smtlib", function(test)
-    test:plan(4)
+    test:plan(2)
 
-    local ok, err = pcall(ljopt.ir.translate, "")
-    test:is(ok, false, "exit code is correct")
-    test:like(err, "IR%-dump is not a table", "error message is correct")
-
-    local buf = ljopt.ir.translate({})
+    local buf = ljopt.ir.translate_to_smt("")
     test:is(type(buf), "string", "type of result when no traces")
     test:isnt(#buf, 0, "length of result when no traces")
 end)
 
 local function translate_ir (lua_code, luajit_optimization_params)
     lua_code = luajit_optimization_params..'\n'..lua_code
-    local traces = ljopt.ir.record(lua_code)
-    local result = ''
-    for i = 1, table.getn(traces) do
-        if traces[i] and type(traces[i]) == "table" then
-            result = result .. ljopt.ir.translate(traces[i])
-        end
-    end
-
-    return result
+    return ljopt.ir.translate_to_smt(lua_code)
 end
 
 test:test("fold_brol (LuaJIT#1079)", function(test)
@@ -145,6 +135,32 @@ f(1)
                 test:is(snap[2][2], "ssa", "Incorrect snapshot entry type")
                 test:is(snap[2][3], 3, "Incorrect entry value")
             end
+        end
+    end
+end)
+
+-- Main tests for traces equivalence.
+test:test("ir_smtlib", function(test)
+    local srcs = { [[
+local function f(y)
+  return y - y, y + y, y * y, y / y
+end
+f(0)
+f(1)
+]]}
+    test:plan(2 * #srcs)
+
+    -- XXX: We should check result is UNSAT. Investigate what's
+    -- the appropriate timeout, and maybe some complex cases for
+    -- `timeout`.
+    for i, f in ipairs(srcs) do
+        local formulas = ljopt.ir.traces_to_smt(f)
+        for j, formula in ipairs(formulas) do
+            -- Make sure it's UNSAT or timeout.
+            test:is(smt:parse(formula), true,
+                ("test_%s trace %d parse."):format(i, j))
+            test:isnt(smt:check(formula), 1,
+                ("test_%d trace %d check."):format(i, j))
         end
     end
 end)
