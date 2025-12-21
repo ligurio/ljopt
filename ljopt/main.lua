@@ -1,11 +1,7 @@
 local ljopt = require("ljopt")
-local is_json, json = pcall(require, "json")
 local jit = require("jit")
 
 local is_debug = os.getenv("LJOPT_DEBUG")
-
--- Documentation: https://luajit.org/running.html
-local lj_opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
 
 local exit_codes = {
   ok = 0,
@@ -33,30 +29,11 @@ end
 
 if is_debug then
   io.stdout:write(("Lua code: %s\n"):format(lua_code))
-  io.stdout:write(("LuaJIT flags: %s\n"):format(lj_opt))
 end
 
-assert(load(lj_opt))()
-
-local traces = ljopt.ir.record(lua_code, is_debug)
-assert(type(traces) == "table")
-
-if is_json and is_debug then
-  local traces_buf = json.encode(traces)
-  io.stdout:write(traces_buf .. "\n")
-end
-
-local traces_smtlib = ""
-for tr_n, tr_ir in pairs(traces) do
-  local tr_smtlib = ljopt.ir.translate(tr_ir)
-  if not tr_smtlib or #tr_smtlib == 0 then
-    local msg = ("translation of trace %d to SMT-LIB has failed\n"):format(tr_n)
-    io.stderr:write(msg)
-  else
-    traces_smtlib = traces_smtlib .. tr_smtlib
-  end
-end
-io.stdout:write(traces_smtlib .. "\n")
+local result = ljopt.ir.translate_to_smt(lua_code, true)
+io.stdout:write(result)
+os.exit(exit_codes.ok)
 
 local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
 if #bc == 0 then
