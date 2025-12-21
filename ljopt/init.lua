@@ -18,7 +18,8 @@ local VERSION = "0.0.1"
 return {
     ir = {
 	    record = dump_ir.record,
-	    translate = smtlib_ir.translate,
+	    traces_to_smt = smtlib_ir.traces_to_smt,
+	    translate_to_smt = smtlib_ir.translate_to_smt,
     },
     bc = {
 	    record = dump_bc.record,
