@@ -56,7 +56,7 @@ end
 
 test:test("IR arithmetic tests", function(test)
 
-    test:plan(42)
+    test:plan(3 * 14)
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
     local op_init = ctx_src.op_stack:init_smt("op")
