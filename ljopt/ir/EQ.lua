@@ -1,3 +1,4 @@
+local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local IRNodeEQBase = {}
@@ -5,27 +6,16 @@ ir_node.extended(IRNodeEQBase, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.IRNodeEQNum = {}
-ir_node.extended(impls.IRNodeEQNum, IRNodeEQBase)
+-- At least Z3 and Bitwuzla expect `=` for floating point
+-- comparison.
+impls.IRNodeEQNum = { op_str = '=' }
+ir_node.extended(impls.IRNodeEQNum, bin_op.BinOpGuardNum)
 
-function impls.IRNodeEQNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
-    local data = string.format('(= %s %s)', left_op, right_op)
-    return ctx.te_stack:store(self:get_ssa_reference(), data)
-end
+impls.IRNodeEQInt = { op_str = '=' }
+ir_node.extended(impls.IRNodeEQInt, bin_op.BinOpGuardInt)
 
-impls.IRNodeEQInt = {}
-ir_node.extended(impls.IRNodeEQInt, IRNodeEQBase)
-
-function impls.IRNodeEQInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
-    -- At least Z3 and Bitwuzla expect `=` for floating point
-    -- comparison.
-    local data = string.format('(= %s %s)', left_op, right_op)
-    return ctx.te_stack:store(self:get_ssa_reference(), data)
-end
+impls.IRNodeEQI64 = { op_str = '=' }
+ir_node.extended(impls.IRNodeEQI64, bin_op.BinOpGuardI64)
 
 impls.IRNodeEQTab = {}
 ir_node.extended(impls.IRNodeEQTab, IRNodeEQBase)

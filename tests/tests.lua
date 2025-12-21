@@ -241,6 +241,14 @@ end
 f(0)
 f(1)
 f(1)
+]],
+[[
+local function f(x)
+  return x + 0.23, x > 0.23, x < 0.23, x >= 0.23, x <= 0.23, x - 0.23, x / 0.23, x * 0.23
+end
+f(0.1)
+f(1.2)
+f(1.2)
 ]]}
     test:plan(2 * #srcs)
 
