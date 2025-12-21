@@ -9,7 +9,7 @@ local test = require("tests.tap").test("ljopt")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(9)
+test:plan(10)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -144,6 +144,32 @@ f(1)
             end
         end
     end
+end)
+
+-- IR flags parsing tests.
+test:test("IR flags parsing tests.", function(test)
+    local src = [[
+jit.opt.start(3, 'hotloop=1');
+local LOOP_LIMIT=2
+for idx = 1, 4 do
+    local tab = { idx }
+    if idx > LOOP_LIMIT then break end
+end
+]]
+    test:plan(6)
+
+    local exec_state = ljopt.ir.record(src)
+    -- Our trace is always number 3 (line number).
+    local trace = exec_state[3]
+
+    test:is(trace.trace[9].irt_isphi, true, "9-th instruction is a phi")
+    test:is(trace.trace[6].irt_mark, true, "6-th instruction is marked")
+    test:is(trace.trace[7].irt_guard, true, "7-th instruction is a guard")
+
+    -- Ensure sometimes these flags are false.
+    test:is(trace.trace[1].irt_isphi, false, "1-st instruction is not phi")
+    test:is(trace.trace[1].irt_mark, false, "1-st instruction is not marked")
+    test:is(trace.trace[1].irt_guard, false, "1-st instruction is not guard")
 end)
 
 -- Main tests for traces equivalence.

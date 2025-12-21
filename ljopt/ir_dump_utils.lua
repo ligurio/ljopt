@@ -189,13 +189,23 @@ local function trim(s)
 end
 
 
-local function ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype,
-                               op, op1, op2)
+local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
+  -- The symbol ">" indicates the instruction of the
+  -- guard's location
+  -- (leading to possible side exits from the trace).
+  local irt_guard = flags:sub(1, 1) == ">"
+  -- The symbol "+" indicates the instruction is a
+  -- left or right PHI operand.
+  -- (i.e. referred to in some PHI instruction).
+  local irt_isphi = flags:sub(2, 2) == "+"
+  -- As stated in LuaJIT comment: `Marker for misc. purposes`.
+  local irt_mark = flags:sub(1, 1) == "}"
   local irins = {
     num = ins,
     flags = flags,
     irt_guard = irt_guard,
     irt_isphi = irt_isphi,
+    irt_mark = irt_mark,
     irtype = irtype,
     irop = trim(op),
     op1 = trim(op1),
