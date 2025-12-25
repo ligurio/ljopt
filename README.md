@@ -8,6 +8,10 @@ is an implementation of translation validation for LuaJIT.
 make build
 ```
 
+### Requirements
+
+LuaJIT v2.1 with a Lua function `jit.util.snappc()`.
+
 ### Usage
 
 Create a file with Lua source code:
