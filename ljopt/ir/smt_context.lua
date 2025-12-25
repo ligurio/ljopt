@@ -115,7 +115,7 @@ function OpStackBV.load(self, op_num, type)
 end
 
 function OpStackBV.store(self, op_num, type, data)
-    -- dev_checks('table', 'number', 'string', 'string')
+    dev_checks('table', 'number', 'string', 'string')
 
     if data == '' then
         return ''
