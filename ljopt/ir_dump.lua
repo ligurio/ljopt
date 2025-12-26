@@ -522,7 +522,7 @@ local function record(lua_code, debug_mode)
     error(("cannot load Lua code: %s"):format(err))
   end
 
-  debug = debug_mode
+  debug = debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
 
   dumpon()
