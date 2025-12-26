@@ -39,7 +39,9 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['sfp'] = false,
     }
     assert(type_table[type], 'Unsupported type for MUL operation')
-    return impls['IRNodeMUL' .. type_table[type]]:new(ssa_ref, flags, type, 'MUL', left_op, right_op)
+    return impls['IRNodeMUL' ..
+        type_table[type]]:new(ssa_ref, flags, type, 'MUL', left_op, right_op
+    )
 end
 
 return {

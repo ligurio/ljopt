@@ -1,6 +1,8 @@
 -- Translate IR to SMT-LIB.
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-SSA-IR
+-- luacheck: push no max_comment_line_length
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations#ssa-ir-optimizations
+-- luacheck: pop
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local smt_context = require('ljopt.ir.smt_context')
@@ -101,15 +103,19 @@ local function translate(trace, smt_suffix)
     smt_suffix = smt_suffix or 'src'
     -- 0 stage. Create 'smt-context'.
     local ctx_src = smt_context.SMTContext:new('BV', 'BV')
+    -- luacheck: push no max_code_line_length
     smtlib_buf = smtlib_buf .. ctx_src.vm_stack:init_smt(vm_stack_prefix .. smt_suffix) .. '\n'
     smtlib_buf = smtlib_buf .. ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix) .. '\n'
     smtlib_buf = smtlib_buf .. ctx_src.te_stack:init_smt(te_stack_prefix .. smt_suffix) .. '\n'
     smtlib_buf = smtlib_buf .. ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix) .. '\n'
+    -- luacheck: pop
 
-    -- 1st stage. Constructing list of `ir_nodes` from raw string data.
+    -- 1st stage. Constructing list of `ir_nodes` from raw string
+    -- data.
     local nodes = construct_nodes(trace)
 
-    -- 2nd stage. Transformations (loop unrooling, function inlining, ...).
+    -- 2nd stage. Transformations (loop unrooling, function
+    -- inlining, ...).
     nodes = transform_nodes(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
@@ -121,7 +127,8 @@ local function translate(trace, smt_suffix)
             .. (nodes[i]:get_left_op() or '') .. ' '
             .. (nodes[i]:get_right_op() or '') .. ' '
 
-        smtlib_buf = smtlib_buf .. '; ' .. parsed_ir .. '\n' .. nodes[i]:to_smt_lib(ctx_src) .. '\n'
+        smtlib_buf = smtlib_buf .. '; ' .. parsed_ir .. '\n' ..
+            nodes[i]:to_smt_lib(ctx_src) .. '\n'
     end
     return smtlib_buf
 end

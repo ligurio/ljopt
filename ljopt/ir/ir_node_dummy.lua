@@ -1,6 +1,7 @@
 --[[
-    Provides an instance of an IR node that represents a dummy operation.
-    It's used to skip IR nodes that are not yet supported by the ljopt.
+Provides an instance of an IR node that represents a dummy
+operation. It's used to skip IR nodes that are not yet supported
+by the ljopt.
 ]]--
 
 local ir_node = require('ljopt.ir.ir_node_base')

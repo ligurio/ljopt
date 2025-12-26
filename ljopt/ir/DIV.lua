@@ -39,7 +39,9 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['sfp'] = false,
     }
     assert(type_table[type], 'Unsupported type for DIV operation')
-    return impls['IRNodeDIV' .. type_table[type]]:new(ssa_ref, flags, type, 'DIV', left_op, right_op)
+    return impls['IRNodeDIV' ..
+        type_table[type]]:new(ssa_ref, flags, type, 'DIV', left_op, right_op
+    )
 end
 
 return {

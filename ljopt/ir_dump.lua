@@ -370,7 +370,9 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 		       (rid == 254 or rid == 253) and "}" or
 		       (band(ot, 128) == 0 and " " or ">"),
 		       band(ot, 64) == 0 and " " or "+")
-    ir_dump_utils.ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype[t], op, op1_txt, op2_txt)
+    ir_dump_utils.ljopt_savetrace(
+      tr, ins, flags, irt_guard, irt_isphi, irtype[t], op, op1_txt, op2_txt
+    )
   end
   if snap then
     ir_dump_utils.ljopt_savesnap(tr, snap, snapno, info.linktype)
