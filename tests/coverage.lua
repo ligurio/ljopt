@@ -1,5 +1,11 @@
 local ffi = require('ffi')
 local has_luacov, runner = pcall(require, 'luacov.runner')
+local jit = require("jit")
+
+-- Disable JIT for coverage to not interfere with verification
+-- traces.
+jit.off(true, true)
+
 
 -- Module with utilities for collecting code coverage from
 -- external processes.
