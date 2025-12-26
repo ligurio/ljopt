@@ -21,7 +21,7 @@ local function dump(o)
     end
 end
 
-if os.getenv('LJOPT_ENABLE_DEBUG_LOGGING') then
+if os.getenv('LJOPT_DEBUG') then
     dev_trace_dump = dump
 end
 

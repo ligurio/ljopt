@@ -2,7 +2,7 @@ local ljopt = require("ljopt")
 local is_json, json = pcall(require, "json")
 local jit = require("jit")
 
-local is_debug = os.getenv("DEBUG")
+local is_debug = os.getenv("LJOPT_DEBUG")
 
 -- Documentation: https://luajit.org/running.html
 local lj_opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
