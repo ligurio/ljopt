@@ -1,5 +1,5 @@
 --[[
-    Provides mapping between IR node opcodes and their translators.
+Provides mapping between IR node opcodes and their translators.
 ]]--
 
 local dev_checks = require('ljopt.dev_checks')
@@ -168,7 +168,9 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('string', 'string', '?string', 'string', '?string', '?string')
 
     assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
-    return opcodes_table[opcode].instance(ssa_ref, flags, type, left_op, right_op)
+    return opcodes_table[opcode].instance(
+        ssa_ref, flags, type, left_op, right_op
+    )
 end
 
 return {

@@ -1,4 +1,8 @@
 std = "luajit"
+
+max_code_line_length = 80
+max_comment_line_length = 66
+
 ignore = {
     -- Accessing an undefined field of a global variable <os>.
     "143/os",
@@ -12,6 +16,12 @@ ignore = {
     "212/_.*",
     -- Unused loop variable with `_` prefix.
     "213/_.*",
+}
+
+-- The file contains a code borrowed from LuaJIT. Changes to it
+-- complicate synchronization with upstream.
+files["ljopt/ir_dump.lua"] = {
+    max_comment_line_length = 80
 }
 
 files["tests/tests.lua"] = {

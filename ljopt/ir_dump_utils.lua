@@ -119,7 +119,9 @@ local function ljopt_formatsmt(tr, idx, sn)
     elseif k == 2^52+2^51 then
       s = "bias"
     else
+      -- luacheck: push no max_comment_line_length
       -- s = format(0 < k and k < 0x1p-1026 and "%+a" or "%+.14g", k)
+      -- luacheck: pop
       s = float_to_smt_bv(k)
     end
   elseif tn == "string" then
@@ -138,7 +140,8 @@ local function ljopt_formatsmt(tr, idx, sn)
   elseif t == 21 then -- int64_t
     s = sub(tostring(k), 1, -3)
     if sub(s, 1, 1) ~= "-" then s = "+"..s end
-  elseif sn == 0x1057fff then -- SNAP(1, SNAP_FRAME | SNAP_NORESTORE, REF_NIL)
+  -- SNAP(1, SNAP_FRAME | SNAP_NORESTORE, REF_NIL)
+  elseif sn == 0x1057fff then
     return "----" -- Special case for LJ_FR2 slot 1.
   else
     s = tostring(k) -- For primitives.
@@ -186,7 +189,8 @@ local function trim(s)
 end
 
 
-local function ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype, op, op1, op2)
+local function ljopt_savetrace(tr, ins, flags, irt_guard, irt_isphi, irtype,
+                               op, op1, op2)
   local irins = {
     num = ins,
     flags = flags,

@@ -1,7 +1,6 @@
 --[[
-    Provides different types of stacks for IR.
-    Data stored in stacks is used for checking if
-    two IR traces are equivalent.
+Provides different types of stacks for IR. Data stored in stacks
+is used for checking if two IR traces are equivalent.
 ]]--
 
 local dev_checks = require('ljopt.dev_checks')
@@ -67,7 +66,9 @@ function VMStackBV.init_smt(self, name)
 
     self._name = name
     self._cur_stack = 0
-    return string.format('(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', name)
+    return string.format(
+        '(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', name
+    )
 end
 
 function VMStackBV.load(self, slot_num, type)
@@ -89,10 +90,16 @@ function VMStackBV.store(self, slot_num, type, data)
 
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     local conv_data = string.format(conv, data)
-    local stack = string.format('(select %s %d)', self._name, self._cur_stack)
-    local new_stack = string.format('(store %s %d %s)', stack, slot_num, conv_data)
+    local stack = string.format(
+        '(select %s %d)', self._name, self._cur_stack
+    )
+    local new_stack = string.format(
+        '(store %s %d %s)', stack, slot_num, conv_data
+    )
     self._cur_stack = self._cur_stack + 1
-    local new_location = string.format('(select %s %d)', self._name, self._cur_stack)
+    local new_location = string.format(
+        '(select %s %d)', self._name, self._cur_stack
+    )
     return string.format('(assert (= %s %s))', new_location, new_stack)
 end
 
@@ -103,7 +110,9 @@ function OpStackBV.init_smt(self, name)
     dev_checks('table', 'string')
 
     self._name = name
-    return string.format('(declare-fun %s () (Array Int (_ BitVec 64)))', self._name)
+    return string.format(
+        '(declare-fun %s () (Array Int (_ BitVec 64)))', self._name
+    )
 end
 
 function OpStackBV.load(self, op_num, type)
@@ -144,7 +153,9 @@ function TEStackBV.store(self, op_num, type, data)
     dev_checks('table', 'number', 'string', 'string')
 
     assert(true, type)
-    return string.format('(assert (let ((a!1 %s)) (= (select %s %d) a!1)))', data, self._name, op_num)
+    return string.format('(assert (let ((a!1 %s)) (= (select %s %d) a!1)))',
+        data, self._name, op_num
+    )
 end
 
 local SnapStack = {}
@@ -155,7 +166,9 @@ function SnapStack.init_smt(self, name)
 
     self._name = name
     self._cur_stack = 0
-    return string.format('(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', self._name)
+    return string.format(
+        '(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', self._name
+    )
 end
 
 function SnapStack.load(self, slot_num, type)
@@ -178,8 +191,12 @@ function SnapStack.store(self, slot_num, type, data)
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     local conv_data = string.format(conv, data)
     local stack = string.format('(select %s %d)', self._name, self._cur_stack)
-    local new_stack = string.format('(store %s %d %s)', stack, slot_num, conv_data)
-    local new_location = string.format('(select %s %d)', self._name, self._cur_stack)
+    local new_stack = string.format('(store %s %d %s)',
+        stack, slot_num, conv_data
+    )
+    local new_location = string.format('(select %s %d)',
+        self._name, self._cur_stack
+    )
     return string.format('(assert (= %s %s))', new_location, new_stack)
 end
 

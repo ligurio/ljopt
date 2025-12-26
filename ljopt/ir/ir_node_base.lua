@@ -1,5 +1,6 @@
 --[[
-    This class provides interface for all LuaJIT IR operations translators.
+This class provides interface for all LuaJIT IR operations
+translators.
 ]] --
 
 local dev_checks = require('ljopt.dev_checks')
@@ -47,7 +48,8 @@ local function parse_op(self, operand, maxrecord)
     local JIT_P_maxrecord = 4000
     maxrecord = maxrecord or JIT_P_maxrecord
 
-    -- TODO: Add integer OPs, right now we support only floats, represented as #x0123456.
+    -- TODO: Add integer OPs, right now we support only floats,
+    -- represented as #x0123456.
     if operand:sub(1, 2) == '#x' then
         assert(self:get_type() == 'num' or self:get_type() == 'int' or
             self:get_type() == 'i64' or self:get_type() == 'u64')
@@ -139,7 +141,9 @@ end
 
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
-    dev_checks('table', 'string', 'string', '?string', 'string', '?string', '?string')
+    dev_checks(
+        'table', 'string', 'string', '?string', 'string', '?string', '?string'
+    )
 
     self._ssa_ref = tonumber(ssa_ref)
     self._flags = flags

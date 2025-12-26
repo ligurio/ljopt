@@ -1,6 +1,8 @@
 -- Translate BC to SMT-LIB.
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Bytecodes
+-- luacheck: push no max_comment_line_length
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations#bytecode-optimizations
+-- luacheck: pop
 -- src/lj_parse.c
 
 -- BC ops blacklist.

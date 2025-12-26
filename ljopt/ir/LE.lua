@@ -40,7 +40,9 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['sfp'] = false,
     }
     assert(type_table[type], 'Unsupported type for LE operation')
-    return impls['IRNodeLE' .. type_table[type]]:new(ssa_ref, flags, type, 'LE', left_op, right_op)
+    return impls['IRNodeLE' ..
+        type_table[type]]:new(ssa_ref, flags, type, 'LE', left_op, right_op
+    )
 end
 
 return {
