@@ -497,11 +497,11 @@ end
 -- Detach dump handlers.
 local function dumpoff()
   if active then
-    toggle_debug_hook()
     active = false
     jit.attach(dump_trace)
     if out then out:close() end
     out = nil
+    toggle_debug_hook()
   end
 end
 

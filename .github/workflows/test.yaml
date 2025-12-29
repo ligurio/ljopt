@@ -46,3 +46,6 @@ jobs:
         run: |
           eval $(luarocks path)
           make coverage
+      - uses: actions/checkout@v4
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3

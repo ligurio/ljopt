@@ -69,14 +69,14 @@ lint:
 
 test: $(LUA_BUGGY_BIN) $(LUA_BIN)
 	@echo "Run regression tests"
-	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
+	LJOPT_DEBUG=1 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/tests.lua
 	@echo "Run unit tests"
-	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/unit_tests.lua
-	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
+	LJOPT_DEBUG=1 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/unit_tests.lua
+	LJOPT_DEBUG=1 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
 	@echo "Run buggy LuaJIT tests on old version"
-	BUGGY_BUILD=1 LUA_PATH=$(LUA_PATH) $(LUA_BUGGY_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
+	LJOPT_DEBUG=1 BUGGY_BUILD=1 LUA_PATH=$(LUA_PATH) $(LUA_BUGGY_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
 	@echo "Run buggy LuaJIT tests on current version"
-	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
+	LJOPT_DEBUG=1 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
 
 $(LUACOV_STATS):
 	LJOPT_COVERAGE=1 $(MAKE) test

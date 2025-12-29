@@ -4,7 +4,7 @@ local jit = require("jit")
 
 -- Disable JIT for coverage to not interfere with verification
 -- traces.
-jit.off(true, true)
+-- jit.off(true, true)
 
 
 -- Module with utilities for collecting code coverage from
