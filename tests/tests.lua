@@ -124,6 +124,7 @@ local function f(y)
 end
 f(0)
 f(1)
+f(1)
 ]]
     -- Later we check, that parsed exactly
     -- SNAP   #0   [ ---- ---- ]
@@ -153,6 +154,7 @@ local function f(y)
 end
 f(0)
 f(1)
+f(1)
 ]], [[
 local function f(y)
   -- The numbers are arbitrary.
@@ -162,6 +164,7 @@ local function f(y)
   return x + y, x * y, x / y --, x - y
 end
 f(0)
+f(1)
 f(1)
 ]]}
     test:plan(2 * #srcs)
