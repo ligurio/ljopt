@@ -54,6 +54,7 @@ local function create_node(irtype, irop, op1, op2, insn)
     return node
 end
 
+-- luacheck: push no max_comment_line_length
 test:test("IR arithmetic tests", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
@@ -63,24 +64,52 @@ test:test("IR arithmetic tests", function(test)
     local op_id = 1
 
     local nodes_to_test = {
-        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
-                        result = 5, error = 1.},
+        {node = create_node('num', 'ABS', f2bv(-2.3), nil),
+		                    result = 2.3, error = 1.},
+        -- {node = create_node('int', 'ABS', f2bv(-2.), nil),
+		--                     result = 2, error = 1.},
         {node = create_node("num", "ADD", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 + 3.4, error = 1.},
         {node = create_node("int", "ADD", f2bv(2.), f2bv(3.0)),
                         result = 5, error = 1.},
+        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
+                        result = 5, error = 1.},
+        -- {node = create_node('num', 'ATAN2', f2bv(1.0), f2bv(1.0)),
+		--                     result = 1.5707963267948966, error = 1.},
         {node = create_node("int", "BAND", f2bv(124245235.), f2bv(824124435.)),
                         result = bit.band(124245235, 824124435), error = 1.},
         {node = create_node("i64", "BAND", "124245235", "824124435"),
                         result = bit.band(124245235, 824124435), error = 1.},
+        {node = create_node('int', 'BNOT', f2bv(124245235), nil),
+                            result = bit.bnot(124245235), error = 1.},
+        {node = create_node('i64', 'BOR', '124245235', '824124435'),
+                            result = bit.bor(124245235, 824124435), error = 1.},
         {node = create_node("i64", "BROL", "124245235", "2"),
                         result = bit.rol(124245235, 2), error = 1.},
         {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
                         result = 3, error = 2},
+        -- {node = create_node('i64', 'BROR', '124245235', '2'),
+        --                     result = bit.ror(124245235, 2), error = 1.},
+        {node = create_node('int', 'BSAR', f2bv(124245235), f2bv(2)),
+                            result = bit.rshift(124245235, 2), error = 1.},
+        {node = create_node('int', 'BSHL', f2bv(124245235), f2bv(2)),
+                            result = bit.lshift(124245235, 2), error = 1.},
+        {node = create_node('int', 'BSHR', f2bv(124245235), f2bv(2)),
+                            result = bit.rshift(124245235, 2), error = 1.},
+        -- {node = create_node('int', 'BSWAP', f2bv(124245235), f2bv(2)),
+        --                     result = bit.rshift(124245235, 2), error = 1.},
+        {node = create_node('int', 'BXOR', f2bv(124245235), f2bv(2)),
+                            result = bit.bxor(124245235, 2), error = 1.},
         {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
                         result = 5, error = 1.},
+        -- {node = create_node('i64', 'FLOAD', f2bv(23.), f2bv(4.)),
+		--                     result = false, error = true},
+        -- {node = create_node('i64', 'FPMATH', f2bv(23.), f2bv(4.)),
+		--                     result = false, error = true},
+        -- {node = create_node('i64', 'LDEXPP', f2bv(23.), f2bv(23.)),
+        --                     result = false, error = true},
         {node = create_node("num", "MUL", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 * 3.4, error = 1.},
         {node = create_node("int", "MUL", f2bv(2.), f2bv(3.)),
@@ -154,16 +183,37 @@ test:test("IR guards tests", function(test)
     local nodes_to_test = {
         {node = create_node("int", "ADDOV", f2bv(2.), f2bv(3.0)),
                         result = "true", error = "false"},
+        {node = create_node('int', 'EQ', f2bv(23.), f2bv(23.)),
+		                    result = true, error = false, te=true},
+        -- {node = create_node('i64', 'EQ', f2bv(23.), f2bv(4.)),
+		--                     result = false, error = true, te=true},
         {node = create_node("num", "EQ", f2bv(2), f2bv(2)),
                         result = "true", error = "false"},
         {node = create_node("num", "EQ", f2bv(2), f2bv(2.5)),
                         result = "false", error = "true"},
-        {node = create_node("num", "LE", f2bv(2.3), f2bv(3.4)),
-                        result = "true", error = "false"},
+        {node = create_node('int', 'GE', f2bv(23.), f2bv(4.)),
+		                    result = true, error = false},
+        -- {node = create_node('i64', 'GE', f2bv(23.), f2bv(23.)),
+		--                     result = true, error = false},
+
+        {node = create_node('int', 'GT', f2bv(24.), f2bv(23.)),
+		                    result = true, error = false},
+        -- {node = create_node('i64', 'GT', f2bv(23.), f2bv(23.)),
+		--                     result = false, error = true},
+
         {node = create_node("num", "NE", f2bv(2), f2bv(2)),
                         result = "false", error = "true"},
         {node = create_node("num", "NE", f2bv(2), f2bv(2.5)),
                         result = "true", error = "false"},
+
+        {node = create_node("num", "LE", f2bv(2.3), f2bv(3.4)),
+                        result = "true", error = "false"},
+        {node = create_node('int', 'LE', f2bv(23.), f2bv(4.)),
+		                    result = false, error = true},
+        {node = create_node('int', 'LT', f2bv(22.), f2bv(23.)),
+		                    result = true, error = false},
+        -- {node = create_node('i64', 'LT', f2bv(23.), f2bv(23.)),
+		--                     result = false, error = true},
         {node = create_node("int", "ULE", f2bv(2.3), f2bv(3.4)),
                         result = "true", error = "false"},
     }
@@ -199,6 +249,7 @@ test:test("IR guards tests", function(test)
 
     end
 end)
+-- luacheck: pop
 
 test:test("CONV from op", function(test)
     -- 0001 >  int ADDOV  #x4000000000000000  #x4008000000000000
