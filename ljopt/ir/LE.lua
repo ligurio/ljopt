@@ -12,25 +12,12 @@ ir_node.extended(impls.IRNodeLEInt, bin_op.BinOpGuardInt)
 impls.IRNodeLENum = {}
 ir_node.extended(impls.IRNodeLENum, bin_op.BinOpGuardNum)
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['num'] = 'Num',
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = false,
-        ['u64'] = false,
-        ['sfp'] = false,
-    }
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
     local op_table = {
         ['num'] = 'fp.leq',
         ['int'] = 'bvsle',
     }
-    assert(type_table[type], 'Unsupported type for LE operation')
-    local node = impls['IRNodeLE' .. type_table[type]]:new(
+    local node = impls[node_str]:new(
         ssa_ref, flags, type, 'LE', left_op, right_op
     )
     node.op_str = op_table[type]

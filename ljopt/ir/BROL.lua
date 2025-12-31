@@ -6,22 +6,11 @@ local impls = {}
 impls.IRNodeBROLI64 = {}
 ir_node.extended(impls.IRNodeBROLI64, bin_op.BinOpI64)
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = false,
-        ['u32'] = false,
-        ['i64'] = 'I64',
-        ['u64'] = false,
-    }
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
     local op_table = {
         ['i64'] = 'ext_rotate_left',
     }
-    assert(type_table[type], 'Unsupported type for BROL operation')
-    local node = impls['IRNodeBROL' .. type_table[type]]:new(
+    local node = impls[node_str]:new(
         ssa_ref, flags, type, 'BROL', left_op, right_op
     )
     node.op_str = op_table[type]

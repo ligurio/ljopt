@@ -9,23 +9,13 @@ ir_node.extended(impls.IRNodeBANDInt, bin_op.BinOpInt)
 impls.IRNodeBANDI64 = {}
 ir_node.extended(impls.IRNodeBANDI64, bin_op.BinOpI64)
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = 'I64',
-        ['u64'] = false,
-    }
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
     local op_table = {
         ['int'] = 'bvand',
         ['i64'] = 'bvand',
     }
-    assert(type_table[type], 'Unsupported type for BAND operation')
-    local node = impls['IRNodeBAND' .. type_table[type]]:new(
+    assert(op_table[type], 'Should not be nil.')
+    local node = impls[node_str]:new(
         ssa_ref, flags, type, 'BAND', left_op, right_op
     )
     node.op_str = op_table[type]

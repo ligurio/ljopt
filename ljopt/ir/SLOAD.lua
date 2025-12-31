@@ -14,7 +14,7 @@ function IRNodeSLOAD:to_smt_lib(ctx)
     )
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
     return IRNodeSLOAD:new(ssa_ref, flags, type, 'SLOAD', left_op, right_op)
 end
 

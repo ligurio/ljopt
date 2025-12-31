@@ -171,9 +171,27 @@ end
 local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('string', 'string', '?string', 'string', '?string', '?string')
 
-    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    local type_table = {
+        ['num'] = 'Num',
+        ['i8'] = false,
+        ['u8'] = false,
+        ['i16'] = false,
+        ['u16'] = false,
+        ['int'] = 'Int',
+        ['u32'] = false,
+        ['i64'] = 'I64',
+        ['u64'] = false,
+    }
+    local node_str = 'IRNode' .. opcode
+    if opcode == 'NOP' then
+        assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    else
+        assert(type_table[type], 'Unsupported type', nil)
+        assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+        node_str = node_str .. type_table[type]
+    end
     return opcodes_table[opcode].instance(
-        ssa_ref, flags, type, left_op, right_op
+        ssa_ref, flags, node_str, type, left_op, right_op
     )
 end
 

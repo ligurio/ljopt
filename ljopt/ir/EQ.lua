@@ -31,21 +31,7 @@ function impls.IRNodeEQFun:to_smt_lib()
     return ''
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['tab'] = 'Tab',
-        ['fun'] = 'Fun',
-        ['num'] = 'Num',
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = 'I64',
-        ['u64'] = false,
-        ['sfp'] = false,
-    }
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
     -- At least Z3 and Bitwuzla expect `=` for floating point
     -- comparison.
     local op_table = {
@@ -53,8 +39,7 @@ local function instance(ssa_ref, flags, type, left_op, right_op)
         ['int'] = '=',
         ['i64'] = '=',
     }
-    assert(type_table[type], 'Unsupported type for EQ operation ' .. type)
-    local node = impls['IRNodeEQ' .. type_table[type]]:new(
+    local node = impls[node_str]:new(
         ssa_ref, flags, type, 'EQ', left_op, right_op
     )
     node.op_str = op_table[type]
