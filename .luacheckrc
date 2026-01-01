@@ -28,6 +28,10 @@ files["ljopt/ir_dump.lua"] = {
     max_comment_line_length = 80
 }
 
+files["tests/buggy_luajit_tests.lua"] = {
+    max_comment_line_length = 105
+}
+
 files["tests/*tests.lua"] = {
     ignore = {
         -- Shadowing an upvalue.
@@ -45,5 +49,6 @@ include_files = {
 exclude_files = {
     '.rocks',
     'tests/tap.lua',
+    'tests/lj_*.lua',
     'ljopt/bc_dump.lua',
 }
