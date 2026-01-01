@@ -53,6 +53,7 @@ build = {
         ['ljopt.ir.ADD'] = 'ljopt/ir/ADD.lua',
         ['ljopt.ir.ADDOV'] = 'ljopt/ir/ADDOV.lua',
         ['ljopt.ir.DIV'] = 'ljopt/ir/DIV.lua',
+        ['ljopt.ir.FPMATH'] = 'ljopt/ir/FPMATH.lua',
         ['ljopt.ir.MOD'] = 'ljopt/ir/MOD.lua',
         ['ljopt.ir.MUL'] = 'ljopt/ir/MUL.lua',
         ['ljopt.ir.MULOV'] = 'ljopt/ir/MULOV.lua',
