@@ -27,7 +27,9 @@ function IRNodeCONV:to_smt_lib(ctx)
             -- luacheck: push no max_comment_line_length
             -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
             -- luacheck: pop
-            data = string.format('RTZ (bv2int %s)', data)
+            data = ('RTZ ((_ sign_extend 32) ((_ extract 31 0) %s)) '):format(
+                data
+            )
         end
         data = string.format('((_ to_fp 11 53) %s)', data)
     elseif parsed_right_op[1] == 'int.num' then
