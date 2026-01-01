@@ -1,11 +1,18 @@
 local ffi = require('ffi')
 
 local ir_node = require('ljopt.ir.ir_node_base')
+local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
-local IRNodeFLOAD = {}
-ir_node.extended(IRNodeFLOAD, ir_node.ir_node_base)
+local impls = {}
 
-function IRNodeFLOAD:to_smt_lib(ctx)
+impls.IRNodeFLOADTab = ir_node_dummy.Node
+impls.IRNodeFLOADFun = ir_node_dummy.Node
+impls.IRNodeFLOADP32 = ir_node_dummy.Node
+
+impls.IRNodeFLOADNum = {}
+ir_node.extended(impls.IRNodeFLOADNum, ir_node.ir_node_base)
+
+function impls.IRNodeFLOADNum:to_smt_lib(ctx)
     local left_op
     local right_op = self:get_right_op()
     local data = ''
@@ -49,8 +56,10 @@ function IRNodeFLOAD:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-local function instance(ssa_ref, flags, _node_str, type, left_op, right_op)
-    return IRNodeFLOAD:new(ssa_ref, flags, type, 'FLOAD', left_op, right_op)
+local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
+    return impls[node_str]:new(
+        ssa_ref, flags, type, 'FLOAD', left_op, right_op
+    )
 end
 
 return {

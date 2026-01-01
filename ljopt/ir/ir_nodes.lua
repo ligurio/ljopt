@@ -70,7 +70,7 @@ local opcodes_table = {
     ['LDEXP'] = false,
     ['MIN'] = require('ljopt.ir.MIN'),
     ['MAX'] = require('ljopt.ir.MAX'),
-    ['FPMATH'] = false,
+    ['FPMATH'] = require('ljopt.ir.FPMATH'),
     ['ADDOV'] = require('ljopt.ir.ADDOV'),
     ['SUBOV'] = require('ljopt.ir.SUBOV'),
     ['MULOV'] = require('ljopt.ir.MULOV'),
@@ -89,12 +89,12 @@ local opcodes_table = {
     -- Memory References.
     ['AREF'] = ir_node_dummy,
     ['HREFK'] = ir_node_dummy,
-    ['HREF'] = false,
+    ['HREF'] = ir_node_dummy,
     ['NEWREF'] = ir_node_dummy,
-    ['UREFO'] = false,
+    ['UREFO'] = ir_node_dummy,
     ['UREFC'] = ir_node_dummy,
-    ['FREF'] = false,
-    ['STRREF'] = false,
+    ['FREF'] = ir_node_dummy,
+    ['STRREF'] = ir_node_dummy,
     -- Loads and Stores.
     ['ALOAD'] = false,
     ['HLOAD'] = ir_node_dummy,
@@ -176,13 +176,16 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ['u32'] = false,
         ['i64'] = 'I64',
         ['u64'] = false,
+        ['tab'] = 'Tab',
+        ['fun'] = 'Fun',
+        ['p32'] = 'P32',
     }
     local node_str = 'IRNode' .. opcode
     if opcode == 'NOP' then
         assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
     else
         assert(type_table[type],
-            'Unsupported type ' .. type .. ' for ' .. opcode
+            'Unsupported type `' .. type .. '` for ' .. opcode
         )
         assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
         node_str = node_str .. type_table[type]

@@ -21,5 +21,6 @@ local is_dummy_node = true
 
 return {
     instance = instance,
+    Node = IRNodeDummy,
     is_dummy_node = is_dummy_node
 }
