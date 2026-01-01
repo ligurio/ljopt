@@ -235,8 +235,7 @@ local function f(y)
   -- The numbers are arbitrary.
   local x = 11
   local y = 23
-  -- SUBOV is not supported yet
-  return x + y, x * y, x / y --, x - y
+  return x + y, x * y, x / y, x - y
 end
 f(0)
 f(1)
