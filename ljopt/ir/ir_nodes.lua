@@ -48,7 +48,7 @@ local opcodes_table = {
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
-    ['BSWAP'] = false,
+    ['BSWAP'] = require('ljopt.ir.BSWAP'),
     ['BAND'] = ir_node_BAND,
     ['BOR'] = require('ljopt.ir.BOR'),
     ['BXOR'] = require('ljopt.ir.BXOR'),
@@ -181,7 +181,9 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     if opcode == 'NOP' then
         assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
     else
-        assert(type_table[type], 'Unsupported type', nil)
+        assert(type_table[type],
+            'Unsupported type ' .. type .. ' for ' .. opcode
+        )
         assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
         node_str = node_str .. type_table[type]
     end

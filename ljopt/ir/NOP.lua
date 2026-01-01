@@ -7,7 +7,7 @@ function IRNodeNOP:to_smt_lib()
     return ''
 end
 
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
+local function instance(ssa_ref, flags, _node_str, type, left_op, right_op)
     return IRNodeNOP:new(ssa_ref, flags, type, 'NOP', left_op, right_op)
 end
 

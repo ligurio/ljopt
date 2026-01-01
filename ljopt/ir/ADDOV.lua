@@ -1,5 +1,5 @@
-local ir_node = require('ljopt.ir.ir_node_base')
 local arith_utils = require('ljopt.ir.arith_utils')
+local ir_node = require('ljopt.ir.ir_node_base')
 
 local IRNodeADDOVBase = {}
 ir_node.extended(IRNodeADDOVBase, ir_node.ir_node_base)

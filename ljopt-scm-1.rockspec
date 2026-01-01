@@ -48,6 +48,7 @@ build = {
         ['ljopt.ir.BinOp'] = 'ljopt/ir/BinOp.lua',
         ['ljopt.ir.UnOp'] = 'ljopt/ir/UnOp.lua',
 
+        ['ljopt.ir.ABS'] = 'ljopt/ir/ABS.lua',
         ['ljopt.ir.ADD'] = 'ljopt/ir/ADD.lua',
         ['ljopt.ir.ADDOV'] = 'ljopt/ir/ADDOV.lua',
         ['ljopt.ir.DIV'] = 'ljopt/ir/DIV.lua',
@@ -67,6 +68,7 @@ build = {
         ['ljopt.ir.BSAR'] = 'ljopt/ir/BSAR.lua',
         ['ljopt.ir.BSHL'] = 'ljopt/ir/BSHL.lua',
         ['ljopt.ir.BSHR'] = 'ljopt/ir/BSHR.lua',
+        ['ljopt.ir.BSWAP'] = 'ljopt/ir/BSWAP.lua',
         ['ljopt.ir.BXOR'] = 'ljopt/ir/BXOR.lua',
 
         ['ljopt.ir.EQ'] = 'ljopt/ir/EQ.lua',
@@ -74,6 +76,8 @@ build = {
         ['ljopt.ir.GT'] = 'ljopt/ir/GT.lua',
         ['ljopt.ir.LE'] = 'ljopt/ir/LE.lua',
         ['ljopt.ir.LT'] = 'ljopt/ir/LT.lua',
+        ['ljopt.ir.MAX'] = 'ljopt/ir/MAX.lua',
+        ['ljopt.ir.MIN'] = 'ljopt/ir/MIN.lua',
         ['ljopt.ir.NEG'] = 'ljopt/ir/NEG.lua',
         ['ljopt.ir.NE'] = 'ljopt/ir/NE.lua',
         ['ljopt.ir.UGE'] = 'ljopt/ir/UGE.lua',
