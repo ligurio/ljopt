@@ -19,7 +19,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(2)
+test:plan(29)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -79,6 +79,38 @@ local function read_reproducer_file(filename)
     return buf
 end
 
+local function run_shell_command(cmd)
+    local _cmd = cmd .. " 2>&1"
+    local ph = io.popen(_cmd, "r")
+    assert(ph)
+    -- The function reads the entire output (both standard output
+    -- and standard error) into a single Lua string variable.
+    local buffer = ph:read("*a")
+    ph:close()
+    return buffer
+end
+
+local function progname(argv)
+    -- arg[-1] is guaranteed to be not nil.
+    local idx = -2
+    while argv[idx] do
+        idx = idx - 1
+    end
+    return argv[idx + 1]
+end
+
+-- Some bugs cannot be reproduced using `pcall()`. In such cases
+-- test executes Lua chunk in a separated LuaJIT process.
+local function reproduce_bug_in_popen(filename, err_msg)
+    local cmd = ("%s %s/tests/reproducers/%s"):format(
+        progname(arg), coverage.cwd(), filename)
+    local output = run_shell_command(cmd)
+    if buggy_build then
+       return string.match(output, err_msg) ~= nil
+    end
+    return true
+end
+
 -- https://github.com/LuaJIT/LuaJIT/pull/783
 -- https://github.com/tarantool/luajit/commit/ab0c0793a43fc0fb0c7b71b6250339117d99254a
 -- https://github.com/LuaJIT/LuaJIT/commit/7b994e0ee0399caf6319865bbac88ddf62129a36
@@ -99,6 +131,288 @@ test:test("FFI: Fix 64 bit shift fold rules (LuaJIT#1079)", function(test)
     test:ok(reproduce_bug_in_runtime(chunk, "folding bitwise rol"),
         "reproduce in runtime")
     test:skip("reproduce using SMT (broken, see ljopt#16)")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1086
+test:test("LuaJIT#1086", function(test)
+    test:plan(2)
+    local chunk = read_reproducer_file("lj_1086.lua")
+    local is_reproduced_in_runtime =
+        reproduce_bug_in_runtime(chunk, "assertion is violated")
+    -- XXX: The bug is reproduced on LuaJIT version without bugs,
+    -- see https://github.com/ligurio/ljopt/issues/44.
+    if not buggy_build then
+        is_reproduced_in_runtime = true
+    end
+    test:ok(is_reproduced_in_runtime, "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/784
+-- https://github.com/tarantool/luajit/commit/804f85a823d619fb25dfbd27da2bb2bb7c22d05e
+-- https://github.com/LuaJIT/LuaJIT/commit/e73916d811710ab02a4dfe447d621c99f4e7186c
+test:test("Prevent CSE of a REF_BASE operand across IR_RETF (LuaJIT#784)",
+function(test)
+    test:plan(2)
+    local filename = "lj_784.lua"
+    test:ok(reproduce_bug_in_popen(filename,
+        "no SUB uref REF_BASE CSE across RETF"), "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/791
+-- https://github.com/tarantool/luajit/commit/e895818a7ac9c25c8ac07f7b79d89c66bfcefcb2
+-- https://github.com/LuaJIT/LuaJIT/commit/bc1bdbf620f58f0978385828bc51272903601e17
+test:test("Fix FOLD rule for BUFHDR append (LuaJIT#791)", function(test)
+    test:plan(2)
+    local chunk = read_reproducer_file("lj_791.lua")
+    test:ok(reproduce_bug_in_runtime(chunk, "assertion is violated"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/792
+-- https://github.com/LuaJIT/LuaJIT/commit/d5a237eae03d2ad346f82390836371a952e9a286
+-- https://github.com/tarantool/luajit/commit/aed147cd9e40e480c4fe3dc8494a5431727dba87
+test:test("Problem of HREFK with table.clear (LuaJIT#792)", function(test)
+    test:plan(2)
+    local filename = "lj_792.lua"
+    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/9
+-- https://github.com/LuaJIT/LuaJIT/issues/684
+-- https://github.com/LuaJIT/LuaJIT/issues/817
+-- https://github.com/tarantool/luajit/commit/203a98682e925d3740291db26184b8a847857943
+-- https://github.com/tarantool/luajit/commit/7c959243ab5d10545b33003c71add48b5a6825dc
+-- https://github.com/LuaJIT/LuaJIT/commit/96d6d5032098ea9f0002165394a8774dcaa0c0ce
+-- https://github.com/LuaJIT/LuaJIT/commit/9512d5c1aced61e13e7be2d3208ec7ae3516b458
+test:test("pow() inaccuracy (LuaJIT#817)", function(test)
+    test:plan(2)
+    test:skip("reproduce in runtime")
+    test:skip("reproduce using SMT")
+end)
+
+-- Fix FOLD rules for math.abs() and FP negation.
+-- https://github.com/LuaJIT/LuaJIT/commit/4416e885d28c0f49d2c7bb3f9630ab23c22fbc9a
+test:test("Fix FOLD rules for math.abs() and FP negation", function(test)
+    test:plan(2)
+    test:ok("reproduce in runtime")
+    test:ok("reproduce using SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/994
+-- https://github.com/tarantool/luajit/commit/b2548681769604f56bf55cf3d8d8f6a75c44bd1d
+-- https://github.com/tarantool/luajit/commit/b89186cb03e79359847cdbeb000a830cc464db35
+-- https://github.com/LuaJIT/LuaJIT/commit/a9d183b2be63fd91be4b8c9494c213c56c491092
+-- https://github.com/LuaJIT/LuaJIT/commit/9f452bbef5031afc506d8615f5e720c45acd6fdf
+test:test(
+"Simplify handling of instable types in TNEW/TDUP load forwarding (LuaJIT#994)",
+function(test)
+    test:plan(2)
+    local filename = "lj_994.lua"
+    test:ok(reproduce_bug_in_popen(filename,
+        "TNEW load forwarding was successful"), "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1133
+-- https://github.com/LuaJIT/LuaJIT/commit/658530562c2ac7ffa8e4ca5d18856857471244e9
+-- https://github.com/tarantool/luajit/commit/61cef9ec434dd69b7d614ca579a3ffdbb9b333eb
+test:test(
+"Check for IR_HREF vs. IR_HREFK aliasing in non-nil store check (LuaJIT#1133)",
+function(test)
+    test:plan(2)
+    local filename = "lj_1133.lua"
+    test:ok(reproduce_bug_in_popen(filename, "aliasing check is correct"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1069
+-- https://github.com/tarantool/luajit/commit/89f1a82cbdfc6bd285d4a2f6e27f5676f403b526
+-- https://github.com/LuaJIT/LuaJIT/commit/7f9907b4ed0870ba64342bcc4b26cff0a94540da
+test:test("IR_NEWREF is missing a NaN check (LuaJIT#1069)", function(test)
+    test:plan(2)
+    local filename = "lj_1069.lua"
+    test:ok(reproduce_bug_in_popen(filename, "function returns an error"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/6163
+-- https://github.com/tarantool/luajit/commit/c05d103305da0626e025dbf81370ca9f4f788c83
+-- https://github.com/LuaJIT/LuaJIT/commit/03208c8162af9cc01ca76ee1676ca79e5abe9b60
+test:test("(LuaJIT#6163)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_6163.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1094
+-- https://github.com/tarantool/luajit/commit/dbf132960a3c5b9992c71eeb24f9a3f1d010e86e
+-- https://github.com/LuaJIT/LuaJIT/commit/f72c19e482b6f918b7cf42b0436e2b117d160a29
+test:test("Maintain chain invariant in DCE (LuaJIT#1094)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_1094.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1084
+-- https://github.com/LuaJIT/LuaJIT/commit/b8919781d4717d8c3171b0002d230e03304d8174
+test:test("Promote 32-bit constants in 64-bit operations (LuaJIT#1084)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_1084.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/299
+test:test("GC64: BC_CALLM snapshot handling (LuaJIT#299)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_299.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/311
+test:test("LuaJIT#311", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_311.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce using SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/505
+-- https://github.com/tarantool/luajit/commit/510b8a1dda5f19df7c5b783b020e51fea5d69abd
+test:test("Fold machinery misses data dependency (LuaJIT#505)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_505.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/540
+test:test("LuaJIT#540", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_540.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/606
+test:test("Fix table bump optimization (LuaJIT#606)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_606.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/797
+test:test("Missing phi check in bufput_bufstr fold rule (LuaJIT#797)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_797.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1244
+-- https://github.com/LuaJIT/LuaJIT/commit/3bdc6498c4c012a8fbf9cfa2756a5b07f56f1540
+-- https://github.com/tarantool/luajit/commit/b52fe9795db249e7803aeef22c2ed6129a97aaeb
+test:test("Limit CSE for IR_CARG to fix loop optimizations (LuaJIT#1244)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_1244.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/980
+-- https://github.com/tarantool/luajit/commit/46418db5fdbfc5dcf5515edea7df1c652b3a5974
+-- https://github.com/LuaJIT/LuaJIT/commit/c7db8255e1eb59f933fac7bc9322f0e4f8ddc6e6
+test:test("Fix TDUP load forwarding after table rehash. (LuaJIT#980)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_980.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/6976
+-- https://github.com/tarantool/luajit/commit/f067cf638cf8987ab3b6db372d609a5982e458b5
+-- https://github.com/LuaJIT/LuaJIT/commit/1e6e8aaa20626ac94cf907c69b0452f76e9f5fa5
+test:test("(LuaJIT#6976)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_6976.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/524
+-- https://github.com/tarantool/luajit/commit/c9588f51301844d11a2a9dfa9070e437961c9787
+test:test("fold: keep type of emitted CONV in sync with its mode (LuaJIT#524)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_524.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/tarantool/luajit/commit/51f722c2dc9b1db3b214a683678e570491fb82d7
+-- https://github.com/LuaJIT/LuaJIT/commit/9f0caad0e43f97a4613850b3874b851cb1bc301d
+test:test("Fix FOLD rule for strength reduction of widening", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_fix-fold-simplify-conv-sext.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/584
+-- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
+test:test("RENAME IR invariant violation (LuaJIT#584)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_584.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- (again) https://github.com/LuaJIT/LuaJIT/issues/1295
+-- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
+-- https://github.com/tarantool/luajit/commit/e0c8208ee2a41f06b6ce9134a7aa3db8fd36d12d
+test:test("RENAME IR invariant violation (again) (LuaJIT#1295)", function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_1295.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1262
+-- https://github.com/tarantool/luajit/commit/600dbbdab19003bbf06cfb66b04066371add3fc2
+-- https://github.com/LuaJIT/LuaJIT/commit/e45fd4cb713b610506213692f3b55a1869febb03
+test:test("Fix limit check in narrow_conv_backprop() (LuaJIT#1262)",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_1262.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/commit/c98660c8c3921e43029625e51166c9d273ad09df
+-- https://www.freelists.org/post/luajit/bug-in-21-head,3
+-- Introduced by
+-- https://github.com/LuaJIT/LuaJIT/commit/ccae333844c7aad0934f13f7698894c883a6b561
+test:test("Must preserve J->fold.ins (fins) around call to lj_ir_ksimd()",
+function(test)
+    test:plan(2)
+    local _ = read_reproducer_file("lj_ir_ksimd.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
 end)
 
 coverage.shutdown()
