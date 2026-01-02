@@ -3,6 +3,7 @@
 -- data structures we use.
 
 local arith_utils = require("ljopt.ir.arith_utils")
+local ljopt_config = require("ljopt.config")
 local utils = require("ljopt.utils")
 
 local smt = require("tests.smtlib2").new()
@@ -19,6 +20,8 @@ end
 test:plan(2)
 
 test:test("merge_tables", function(test)
+    -- This tests requires to be run in strict mode.
+    ljopt_config.set_strict_mode(1)
     test:plan(10)
     -- Test 1: Basic functionality with string keys
     local t1 = {a = 1, b = 2, c = 3}

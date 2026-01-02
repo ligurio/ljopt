@@ -1,10 +1,6 @@
 local ir_node = require('ljopt.ir.ir_node_base')
-local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
 local impls = {}
-
-impls.IRNodeSLOADTab = ir_node_dummy.Node
-impls.IRNodeSLOADFun = ir_node_dummy.Node
 
 impls.IRNodeSLOADNum = {}
 ir_node.extended(impls.IRNodeSLOADNum, ir_node.ir_node_base)

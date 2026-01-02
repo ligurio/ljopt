@@ -4,6 +4,7 @@ Provides mapping between IR node opcodes and their translators.
 
 local dev_checks = require('ljopt.dev_checks')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
+local ljopt_config = require('ljopt.config')
 
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
@@ -97,7 +98,7 @@ local opcodes_table = {
     ['STRREF'] = ir_node_dummy,
     -- Loads and Stores.
     ['ALOAD'] = false,
-    ['HLOAD'] = ir_node_dummy,
+    ['HLOAD'] = false,
     ['ULOAD'] = false,
     ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = false,
@@ -163,9 +164,7 @@ local function get_unsupported_count()
     return get_all_count() - get_supported_count()
 end
 
-local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
-    dev_checks('string', 'string', '?string', 'string', '?string', '?string')
-
+local function get_node(opcode, type)
     local type_table = {
         -- NOP doesn't have a type.
         ['nil'] = '',
@@ -195,38 +194,57 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ['sfp'] = 'Sfp',
     }
     local node_str = 'IRNode' .. opcode
-    assert(type_table[type],
+    node_str = node_str .. type_table[type]
+    assert(not ljopt_config.is_strict_mode() or type_table[type],
         'Unsupported type `' .. type .. '` for ' .. opcode
     )
-    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
-    node_str = node_str .. type_table[type]
+    assert(not ljopt_config.is_strict_mode() or opcodes_table[opcode],
+        'Unsupported operation ' .. opcode
+    )
+    if not opcodes_table[opcode] then
+        return nil
+    end
     local node = opcodes_table[opcode].instance(node_str, type)
-    assert(node, 'Node ' .. node_str .. ' is nil!')
+    assert(not ljopt_config.is_strict_mode() or node,
+        'Node ' .. node_str .. ' is nil!'
+    )
+    return node
+end
+
+local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
+    dev_checks('string', 'string', '?string', 'string', '?string', '?string')
+    local node = get_node(opcode, type)
     return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
 end
 
 -- Let's mark all unimplemented nodes and ignore them and their
 -- dependencies
 local function get_nyi_nodes(nodes)
-    local nye_nodes = {}
+    local nyi_nodes = {}
     for i = 1, table.getn(nodes) do
-        local node = nodes[i]
-        if opcodes_table[node.irop] == nil or
-           opcodes_table[node.irop] == false or
-           opcodes_table[node.irop] == ir_node_dummy then
-            nye_nodes[i] = true
-            if is_debug then
-                io.stderr:write('NYE node ' .. node.irop)
+        local node = get_node(nodes[i].irop, nodes[i].irtype)
+        if node == nil then
+            nyi_nodes[i] = true
+            if ljopt_config.is_debug() then
+                local node_str = 'IRNode' .. nodes[i].irop
+                node_str = node_str .. nodes[i].irtype
+                io.stderr:write(('%d: NYI node %s\n'):format(i, node_str))
             end
-        elseif nye_nodes[node.op1] ~= nil or
-               nye_nodes[node.op2] ~= nil then
-            nye_nodes[i] = true
-            if is_debug then
-                io.stderr:write('NYE one of the arguments for ' .. node.irop)
+        elseif nyi_nodes[tonumber(nodes[i].op1)] ~= nil or
+               nyi_nodes[tonumber(nodes[i].op2)] ~= nil then
+            nyi_nodes[i] = true
+            if ljopt_config.is_debug() then
+                local node_str = 'IRNode' .. nodes[i].irop
+                node_str = node_str .. nodes[i].irtype
+                io.stderr:write(
+                    ('%d: NYI one of the arguments for %s \n'):format(
+                        i, node_str
+                    )
+                )
             end
         end
     end
-    return nye_nodes
+    return nyi_nodes
 end
 
 return {
