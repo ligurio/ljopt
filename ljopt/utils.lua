@@ -4,11 +4,17 @@ local function merge_tables(t1, t2)
     local merged = {}
     local all_keys = {}
     for k, _v in pairs(t1) do
-        all_keys[k] = true
-        assert(t2[k] ~= nil, "key does not exist " .. k)
+        if ljopt_config.is_strict_mode() then
+            assert(t2[k] ~= nil, "key does not exist " .. k)
+            all_keys[k] = true
+        elseif t2[k] ~= nil then
+            all_keys[k] = true
+        end
     end
-    for k, _v in pairs(t2) do
-        assert(t1[k] ~= nil, "key does not exist " .. k)
+    if ljopt_config.is_strict_mode() then
+        for k, _v in pairs(t2) do
+            assert(t1[k] ~= nil, "key does not exist " .. k)
+        end
     end
 
     for k, _v in pairs(all_keys) do

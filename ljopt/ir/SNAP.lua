@@ -1,3 +1,5 @@
+local ljopt_config = require("ljopt.config")
+
 -- Translate snapshot representation to SMT-LIB string.
 -- We have snap_stack of type array<array<BV>>, where first index
 -- is a number of snapshot, second index is snapshot values.
@@ -15,7 +17,7 @@
 -- https://ujit.readthedocs.io/en/latest/public/tut-snap.html
 -- @a snapshot output of ir_dump.
 -- In format: array<(slot, value, optional_value)>
-local function snap_to_smt_lib(ctx, snapshot)
+local function snap_to_smt_lib(ctx, snapshot, filtered_nodes)
     local snap_data = {}
     -- Slot number -> SMT expression.
     local slot_values = {}
@@ -24,10 +26,15 @@ local function snap_to_smt_lib(ctx, snapshot)
         local smt_expr
         local type = "num"
         if value_type == "ssa" then
-            smt_expr = ctx.snap_stack:store(
-                slot, type, ctx.op_stack:load(value_data, type)
-            )
-            slot_values[slot] = ctx.snap_stack:load(slot, type)
+            -- Write only if this value is implemented.
+            if filtered_nodes[value_data] == nil then
+                smt_expr = ctx.snap_stack:store(
+                    slot, type, ctx.op_stack:load(value_data, type)
+                )
+                slot_values[slot] = ctx.snap_stack:load(slot, type)
+            elseif ljopt_config.is_debug() then
+                io.stderr:write("Ignore snapshot\n")
+            end
         elseif value_type == "const" then
             if value_data == 'true' then
                 -- 1.0 as float
@@ -48,6 +55,7 @@ local function snap_to_smt_lib(ctx, snapshot)
             local right = ctx.snap_stack:store(
                 slot + 1, type, ctx.op_stack:load(ref2, type))
             smt_expr = left .. right
+            assert("Never!")
         else
             error("unreachable")
         end

@@ -150,7 +150,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
 
     -- 1st stage. Constructing list of `ir_nodes`
     -- from raw string data.
-    local nodes, _filtered_nodes = construct_nodes(trace_record)
+    local nodes, filtered_nodes = construct_nodes(trace_record)
 
     -- 2nd stage. Transformations (loop unrooling, function
     -- inlining, ...).
@@ -174,7 +174,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
         utils.enrich_snapshots_with_exits(trace_record)
         for i, snap in pairs(trace_record.snapshots) do
             local cur_sn, slot_values =
-                smt_snapshot.snap_to_smt_lib(ctx_src, snap)
+                smt_snapshot.snap_to_smt_lib(ctx_src, snap, filtered_nodes)
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
             snap_nums[i] = slot_values
         end
@@ -257,7 +257,11 @@ local function traces_to_smt(lua_code)
 
     local traces_smtlib = {}
     for traceno in pairs(rec_unopt) do
-        assert(rec_opt[traceno] ~= nil)
+        if ljopt_config.is_strict_mode() then
+            assert(rec_opt[traceno] ~= nil)
+        elseif rec_opt[traceno] == nil then
+            goto continue
+        end
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         local cur_trace =
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
@@ -274,6 +278,7 @@ local function traces_to_smt(lua_code)
         cur_trace = cur_trace .. smt_snapshots .. '\n'
 
         traces_smtlib[traceno] = cur_trace
+        ::continue::
     end
     return traces_smtlib
 end
@@ -297,7 +302,6 @@ local function translate_to_smt(lua_code)
         -- Check current trace.
         traces_smtlib = traces_smtlib .. '(check-sat)\n'
         -- Print counterexample if found.
-        traces_smtlib = traces_smtlib .. '(get-model)\n'
         -- Reset, so next snapshots will be independent.
         traces_smtlib = traces_smtlib .. '(reset)\n'
     end
