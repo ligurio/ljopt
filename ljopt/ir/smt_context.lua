@@ -233,7 +233,7 @@ function TEStackBV.store(self, op_num, data)
 end
 
 function TEStackBV.load(self, slot_num)
-    dev_checks('table', 'number', 'string')
+    dev_checks('table', 'number')
 
     return ('(select %s %d)'):format(self._name, slot_num)
 end

@@ -272,7 +272,7 @@ test:test("IR guards tests", function(test)
 
         -- Create assertion based on the operation type
         -- and expected result
-        local te_value = ctx_src.te_stack:load(op_id, test_case.node.irtype)
+        local te_value = ctx_src.te_stack:load(op_id)
         local expected = test_case.result
         local unexpected = test_case.error
         local expect_sat = ("%s\n(assert (= %s %s))\n"):format(
