@@ -21,7 +21,7 @@ jobs:
         with:
           # This path should be same as the path in Makefile,
           # where tarantool's LuaJIT repo stored.
-          path: luajit
+          path: build
           key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}
 
       - name: Setup packages
