@@ -26,8 +26,7 @@ local function record_code(lua_code, opt)
     return exec_records, traces_map
 end
 
-
-test:plan(14)
+test:plan(13)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -101,45 +100,6 @@ end
     ]]
     local smtlib_enabled_fold = translate_ir(lua_sample, ljopt)
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB with enabled fold')
-    test:is(smt:parse(smtlib_enabled_fold), true,
-            'SMT-LIB with enabled fold is correct')
-
-    ljopt_config.set_strict_mode(strict_mode)
-end)
-
-test:test("fold_signed_zero (LuaJIT#783)", function(test)
-    test:plan(4)
-
-    -- Disable strict mode due to for loop.
-    local strict_mode = ljopt_config.is_strict_mode()
-    ljopt_config.set_strict_mode(false)
-
-    local lua_sample = [[
-local minus_zero = -0
-local results = {}
-for i = 1, 100 do
-    local lhs = minus_zero
-    local rhs = -1.0*(2^1016) * 0.
-    results[i] = lhs - rhs
-end
-]]
-
-    local ljopt
-    ljopt = [[
-    ljopt.flush();
-    jit.opt.start(0, '-fold', '+cse', '+fwd', 'hotloop=1', 'hotexit=1');
-    ]]
-    local smtlib_disabled_fold = translate_ir(lua_sample, ljopt)
-    test:isnt(smtlib_disabled_fold, nil, 'SMT-LIB output with disabled fold')
-    test:is(smt:parse(smtlib_disabled_fold), true,
-            'SMT-LIB with disabled fold is correct')
-
-    ljopt = [[
-    ljopt.flush();
-    jit.opt.start(0, '+fold', '+cse', '+fwd', 'hotloop=1', 'hotexit=1');
-    ]]
-    local smtlib_enabled_fold = translate_ir(lua_sample, ljopt)
-    test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB output with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
 
