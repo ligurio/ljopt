@@ -165,8 +165,8 @@ test:test("IR guards tests", function(test)
                         result = "false", error = "true"},
         {node = create_node("num", "NE", f2bv(2), f2bv(2.5)),
                         result = "true", error = "false"},
-        -- {node = create_node("int", "ULE", f2bv(2.3), f2bv(3.4)),
-        --                 result = "true", error = "false"},
+        {node = create_node("int", "ULE", f2bv(2.3), f2bv(3.4)),
+                        result = "true", error = "false"},
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.
