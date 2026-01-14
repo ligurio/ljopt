@@ -19,7 +19,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(1)
+test:plan(2)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -80,16 +80,25 @@ local function read_reproducer_file(filename)
 end
 
 -- https://github.com/LuaJIT/LuaJIT/pull/783
--- luacheck: push no max_comment_line_length
 -- https://github.com/tarantool/luajit/commit/ab0c0793a43fc0fb0c7b71b6250339117d99254a
 -- https://github.com/LuaJIT/LuaJIT/commit/7b994e0ee0399caf6319865bbac88ddf62129a36
--- luacheck: pop
 test:test("Fix FOLD rule for x-0 (LuaJIT#783)", function(test)
     test:plan(2)
     local chunk = read_reproducer_file("lj_783.lua")
     test:ok(reproduce_bug_in_runtime(chunk,
         "-0 folding in simplify_numsub_k"), "reproduce in runtime")
     test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1079
+-- https://github.com/LuaJIT/LuaJIT/commit/9e0437240f1fb4bfa7248f6ec8be0e3181016119
+-- https://github.com/tarantool/luajit/commit/f0bc08920f1d1b91131bad469f0516fec66e404b
+test:test("FFI: Fix 64 bit shift fold rules (LuaJIT#1079)", function(test)
+    test:plan(2)
+    local chunk = read_reproducer_file("lj_1079.lua")
+    test:ok(reproduce_bug_in_runtime(chunk, "folding bitwise rol"),
+        "reproduce in runtime")
+    test:skip("reproduce using SMT (broken, see ljopt#16)")
 end)
 
 coverage.shutdown()
