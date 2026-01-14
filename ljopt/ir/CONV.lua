@@ -51,8 +51,8 @@ function IRNodeCONV:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-local function instance(ssa_ref, flags, _node_str, type, left_op, right_op)
-    return IRNodeCONV:new(ssa_ref, flags, type, 'CONV', left_op, right_op)
+local function instance(_node_str)
+    return IRNodeCONV
 end
 
 return {

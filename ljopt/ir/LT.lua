@@ -3,22 +3,14 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeLTNum = {}
+impls.IRNodeLTNum = { op_str = 'fp.lt' }
 ir_node.extended(impls.IRNodeLTNum, bin_op.BinOpGuardNum)
 
-impls.IRNodeLTInt = {}
+impls.IRNodeLTInt = { op_str = 'bvslt' }
 ir_node.extended(impls.IRNodeLTInt, bin_op.BinOpGuardInt)
 
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
-    local op_table = {
-        ['num'] = 'fp.lt',
-        ['int'] = 'bvslt',
-    }
-    local node = impls[node_str]:new(
-        ssa_ref, flags, type, 'LT', left_op, right_op
-    )
-    node.op_str = op_table[type]
-    return node
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

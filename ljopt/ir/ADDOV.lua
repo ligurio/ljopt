@@ -20,10 +20,9 @@ function impls.IRNodeADDOVInt:to_smt_lib(ctx)
     )
 end
 
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
-    return impls[node_str]:new(
-        ssa_ref, flags, type, 'ADDOV', left_op, right_op
-    )
+
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

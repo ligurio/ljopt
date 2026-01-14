@@ -17,16 +17,8 @@ function impls.IRNodeBSWAPInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
-    local op_table = {
-        ['int'] = '',
-    }
-    assert(op_table[type], 'Should not be nil.')
-    local node = impls[node_str]:new(
-        ssa_ref, flags, type, 'BSWAP', left_op, right_op
-    )
-    node.op_str = op_table[type]
-    return node
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

@@ -63,7 +63,7 @@ local opcodes_table = {
     ['MUL'] = ir_node_MUL,
     ['DIV'] = ir_node_DIV,
     ['MOD'] = require('ljopt.ir.MOD'),
-    ['POW'] = require('ljopt.ir.POW'),
+    ['POW'] = false,
     ['NEG'] = ir_node_NEG,
     ['ABS'] = require('ljopt.ir.ABS'),
     ['ATAN2'] = false,
@@ -190,9 +190,9 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
         node_str = node_str .. type_table[type]
     end
-    return opcodes_table[opcode].instance(
-        ssa_ref, flags, node_str, type, left_op, right_op
-    )
+    local node = opcodes_table[opcode].instance(node_str, type)
+    assert(node, 'Node ' .. node_str .. ' is nil!')
+    return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
 end
 
 return {

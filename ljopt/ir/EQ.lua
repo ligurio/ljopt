@@ -6,13 +6,15 @@ ir_node.extended(IRNodeEQBase, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.IRNodeEQNum = {}
+-- At least Z3 and Bitwuzla expect `=` for floating point
+-- comparison.
+impls.IRNodeEQNum = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQNum, bin_op.BinOpGuardNum)
 
-impls.IRNodeEQInt = {}
+impls.IRNodeEQInt = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQInt, bin_op.BinOpGuardInt)
 
-impls.IRNodeEQI64 = {}
+impls.IRNodeEQI64 = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQI64, bin_op.BinOpGuardI64)
 
 impls.IRNodeEQTab = {}
@@ -31,19 +33,8 @@ function impls.IRNodeEQFun:to_smt_lib()
     return ''
 end
 
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
-    -- At least Z3 and Bitwuzla expect `=` for floating point
-    -- comparison.
-    local op_table = {
-        ['num'] = '=',
-        ['int'] = '=',
-        ['i64'] = '=',
-    }
-    local node = impls[node_str]:new(
-        ssa_ref, flags, type, 'EQ', left_op, right_op
-    )
-    node.op_str = op_table[type]
-    return node
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

@@ -3,7 +3,7 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMAXNum = {}
+impls.IRNodeMAXNum = { op_str = 'fp.max', ignore_rounding = true }
 ir_node.extended(impls.IRNodeMAXNum, bin_op.BinOpNum)
 
 impls.IRNodeMAXInt = {}
@@ -30,17 +30,8 @@ function impls.IRNodeMAXI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-
-local function instance(ssa_ref, flags, node_str, type, left_op, right_op)
-    local op_table = {
-        ['num'] = 'fp.max',
-    }
-    local node = impls[node_str]:new(
-        ssa_ref, flags, type, 'MAX', left_op, right_op
-    )
-    node.op_str = op_table[type]
-    node.ignore_rounding = true
-    return node
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {
