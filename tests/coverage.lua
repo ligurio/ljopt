@@ -27,6 +27,7 @@ local function cwd()
     local current_dir = C.getcwd(buf, 256)
     return ffi.string(current_dir)
 end
+export.cwd = cwd
 
 -- Change working directory.
 -- Return boolean: true if success, false if failure.
