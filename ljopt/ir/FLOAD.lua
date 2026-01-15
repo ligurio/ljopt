@@ -49,8 +49,8 @@ function IRNodeFLOAD:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    return IRNodeFLOAD:new(ssa_ref, flags, type, 'FLOAD', left_op, right_op)
+local function instance(node_str)
+    return IRNodeFLOAD
 end
 
 return {
