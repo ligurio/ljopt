@@ -25,23 +25,8 @@ function impls.IRNodeSUBInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['num'] = 'Num',
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = false,
-        ['u64'] = false,
-        ['sfp'] = false,
-    }
-    assert(type_table[type], 'Unsupported type for SUB operation')
-    return impls['IRNodeSUB' ..
-        type_table[type]]:new(ssa_ref, flags, type, 'SUB', left_op, right_op
-    )
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

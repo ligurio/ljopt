@@ -167,10 +167,31 @@ end
 local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('string', 'string', '?string', 'string', '?string', '?string')
 
-    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
-    return opcodes_table[opcode].instance(
-        ssa_ref, flags, type, left_op, right_op
+    local type_table = {
+        ['num'] = 'Num',
+        ['i8'] = false,
+        ['u8'] = false,
+        ['i16'] = false,
+        ['u16'] = false,
+        ['int'] = 'Int',
+        ['u32'] = false,
+        ['i64'] = 'I64',
+        ['u64'] = false,
+        ['tab'] = 'Tab',
+        ['fun'] = 'Fun',
+        ['p32'] = 'P32',
+        -- NOP doesn't have a type.
+        ['nil'] = '',
+    }
+    local node_str = 'IRNode' .. opcode
+    assert(type_table[type],
+        'Unsupported type `' .. type .. '` for ' .. opcode
     )
+    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    node_str = node_str .. type_table[type]
+    local node = opcodes_table[opcode].instance(node_str, type)
+    assert(node, 'Node ' .. node_str .. ' is nil!')
+    return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
 end
 
 return {
