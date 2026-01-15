@@ -43,25 +43,8 @@ function impls.IRNodeEQFun:to_smt_lib()
     return ''
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['tab'] = 'Tab',
-        ['fun'] = 'Fun',
-        ['num'] = 'Num',
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = false,
-        ['u64'] = false,
-        ['sfp'] = false,
-    }
-    assert(type_table[type], 'Unsupported type for EQ operation ' .. type)
-    return impls['IRNodeEQ' ..
-        type_table[type]]:new(ssa_ref, flags, type, 'EQ', left_op, right_op
-    )
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {

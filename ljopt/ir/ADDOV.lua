@@ -20,23 +20,8 @@ function impls.IRNodeADDOVInt:to_smt_lib(ctx)
     )
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    local type_table = {
-        ['num'] = false,
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = false,
-        ['u64'] = false,
-        ['sfp'] = false,
-    }
-    assert(type_table[type], 'Unsupported type for ADDOV operation')
-    return impls['IRNodeADDOV' ..
-        type_table[type]]:new(ssa_ref, flags, type, 'ADDOV', left_op, right_op
-    )
+local function instance(node_str)
+    return impls[node_str]
 end
 
 return {
