@@ -19,7 +19,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(29)
+test:plan(33)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -411,6 +411,46 @@ test:test("Must preserve J->fold.ins (fins) around call to lj_ir_ksimd()",
 function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_ir_ksimd.lua")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1194
+-- https://github.com/tarantool/luajit/commit/cc96994ae7cae290b22e6f3233062804ea533c8d
+-- https://github.com/LuaJIT/LuaJIT/commit/7369eff67d46d7f5fac9ee064e3fbf97a15458de
+test:test("Fix IR_ABC hoisting (LuaJIT#1194)", function(test)
+    test:plan(2)
+    local filename = "lj_1194.lua"
+    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/794
+-- https://github.com/tarantool/luajit/commit/4018d3a8f75c5e59531d314a3bd7bd4bc911805e
+-- https://github.com/LuaJIT/LuaJIT/commit/c8bcf1e5fb8eb72c7e35604fdfd27bba512761bb
+test:test("Fix ABC FOLD rule with constants (LuaJIT#794)", function(test)
+    test:plan(2)
+    local filename = "lj_794.lua"
+    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
+        "reproduce in runtime")
+    test:skip("reproduce using SMT")
+end)
+
+-- https://www.freelists.org/post/luajit/Segmentation-fault-with-JITed-code,1
+-- https://github.com/LuaJIT/LuaJIT/commit/a6c34b85f776d8c83b0c01cbdc50550e613d1fda
+test:test("Fix ABC elimination in lj_record.c",
+function(test)
+    test:plan(2)
+    test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://www.freelists.org/post/luajit/Crash-on-lua-code-with-LuaJIT
+-- https://github.com/LuaJIT/LuaJIT/commit/6964a7752ae314dcae693abcb0c1175c95ad22e0
+test:test("Fix ABC elimination in lj_fold.c",
+function(test)
+    test:plan(2)
     test:skip("reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
