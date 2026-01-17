@@ -686,7 +686,7 @@ local function dumpon(outfile)
   colorize = colorize_text
   irtype = irtype_text
   active = true
-  out = outfile or io.stdout
+  out = outfile or io.stderr
 end
 
 local function record(lua_code, debug_mode)
