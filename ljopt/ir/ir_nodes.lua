@@ -3,7 +3,6 @@ Provides mapping between IR node opcodes and their translators.
 ]]--
 
 local dev_checks = require('ljopt.dev_checks')
-local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
@@ -44,7 +43,7 @@ local opcodes_table = {
     ['UGT'] = require('ljopt.ir.UGT'),
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
-    ['ABC'] = ir_node_dummy,
+    ['ABC'] = false,
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
@@ -91,24 +90,24 @@ local opcodes_table = {
     ['FPM_COS'] = false,
     ['FPM_TAN'] = false,
     -- Memory References.
-    ['AREF'] = ir_node_dummy,
-    ['HREFK'] = ir_node_dummy,
+    ['AREF'] = false,
+    ['HREFK'] = false,
     ['HREF'] = false,
-    ['NEWREF'] = ir_node_dummy,
+    ['NEWREF'] = false,
     ['UREFO'] = false,
-    ['UREFC'] = ir_node_dummy,
+    ['UREFC'] = false,
     ['FREF'] = false,
     ['STRREF'] = false,
     -- Loads and Stores.
     ['ALOAD'] = false,
-    ['HLOAD'] = ir_node_dummy,
+    ['HLOAD'] = false,
     ['ULOAD'] = false,
     ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = false,
     ['SLOAD'] = ir_node_SLOAD,
     ['VLOAD'] = false,
-    ['ASTORE'] = ir_node_dummy,
-    ['HSTORE'] = ir_node_dummy,
+    ['ASTORE'] = false,
+    ['HSTORE'] = false,
     ['USTORE'] = false,
     ['FSTORE'] = false,
     ['XSTORE'] = false,
@@ -118,7 +117,7 @@ local opcodes_table = {
     ['TNEW'] = false,
     ['TDUP'] = false,
     ['CNEW'] = false,
-    ['CNEWI'] = ir_node_dummy,
+    ['CNEWI'] = false,
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,
@@ -135,15 +134,15 @@ local opcodes_table = {
     ['CALLXS'] = false,
     ['CARG'] = false,
     -- Miscellaneous Ops.
-    ['SNAP'] = ir_node_dummy,
+    ['SNAP'] = false,
     ['NOP'] = ir_node_NOP,
     ['BASE'] = false,
     ['PVAL'] = false,
     ['GCSTEP'] = false,
     ['HIOP'] = false,
-    ['LOOP'] = ir_node_dummy,
+    ['LOOP'] = false,
     ['USE'] = false,
-    ['PHI'] = ir_node_dummy,
+    ['PHI'] = false,
     ['RENAME'] = false,
 }
 
@@ -171,21 +170,32 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks('string', 'string', '?string', 'string', '?string', '?string')
 
     local type_table = {
-        ['num'] = 'Num',
-        ['i8'] = false,
-        ['u8'] = false,
-        ['i16'] = false,
-        ['u16'] = false,
-        ['int'] = 'Int',
-        ['u32'] = false,
-        ['i64'] = 'I64',
-        ['u64'] = false,
-        ['tab'] = 'Tab',
-        ['fun'] = 'Fun',
-        ['p32'] = 'P32',
-        ['sfp'] = false,
         -- NOP doesn't have a type.
         ['nil'] = '',
+
+        ['fal'] = 'Fal',
+        ['tru'] = 'Tru',
+        ['lud'] = 'Lud',
+        ['str'] = 'Str',
+        ['p32'] = 'P32',
+        ['thr'] = 'Thr',
+        ['pro'] = 'Pro',
+        ['fun'] = 'Fun',
+        ['p64'] = 'P64',
+        ['cdt'] = 'Cdt',
+        ['tab'] = 'Tab',
+        ['udt'] = 'Udt',
+        ['flt'] = 'Flt',
+        ['num'] = 'Num',
+        ['i8'] = 'I8',
+        ['u8'] = 'U8',
+        ['i16'] = 'I16',
+        ['u16'] = 'U16',
+        ['int'] = 'Int',
+        ['u32'] = 'U32',
+        ['i64'] = 'I64',
+        ['u64'] = 'U64',
+        ['sfp'] = 'Sfp',
     }
     local node_str = 'IRNode' .. opcode
     assert(type_table[type],
