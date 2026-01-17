@@ -17,22 +17,6 @@ ir_node.extended(impls.IRNodeEQInt, bin_op.BinOpGuardInt)
 impls.IRNodeEQI64 = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQI64, bin_op.BinOpGuardI64)
 
-impls.IRNodeEQTab = {}
-ir_node.extended(impls.IRNodeEQTab, IRNodeEQBase)
-
-function impls.IRNodeEQTab:to_smt_lib(--[[ctx]])
-    -- TODO: Implement.
-    return ''
-end
-
-impls.IRNodeEQFun = {}
-ir_node.extended(impls.IRNodeEQFun, IRNodeEQBase)
-
-function impls.IRNodeEQFun:to_smt_lib()
-    -- TODO: Implement.
-    return ''
-end
-
 local function instance(node_str)
     return impls[node_str]
 end
