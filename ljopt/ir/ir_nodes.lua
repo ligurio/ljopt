@@ -205,8 +205,33 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
     return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
 end
 
+-- Let's mark all unimplemented nodes and ignore them and their
+-- dependencies
+local function get_nyi_nodes(nodes)
+    local nye_nodes = {}
+    for i = 1, table.getn(nodes) do
+        local node = nodes[i]
+        if opcodes_table[node.irop] == nil or
+           opcodes_table[node.irop] == false or
+           opcodes_table[node.irop] == ir_node_dummy then
+            nye_nodes[i] = true
+            if is_debug then
+                io.stderr:write('NYE node ' .. node.irop)
+            end
+        elseif nye_nodes[node.op1] ~= nil or
+               nye_nodes[node.op2] ~= nil then
+            nye_nodes[i] = true
+            if is_debug then
+                io.stderr:write('NYE one of the arguments for ' .. node.irop)
+            end
+        end
+    end
+    return nye_nodes
+end
+
 return {
     instance = instance,
+    get_nyi_nodes = get_nyi_nodes,
     get_supported_count = get_supported_count,
     get_unsupported_count = get_unsupported_count,
     get_all_count = get_all_count,
