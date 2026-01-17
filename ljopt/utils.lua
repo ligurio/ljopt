@@ -6,15 +6,25 @@ local function debug_msg(s)
     end
 end
 
+local function unreachable(s)
+    assert(false, s)
+end
+
 local function merge_tables(t1, t2)
     local merged = {}
     local all_keys = {}
     for k, _v in pairs(t1) do
-        all_keys[k] = true
-        assert(t2[k] ~= nil, "key does not exist " .. k)
+        if ljopt_config.is_strict_mode() then
+            assert(t2[k] ~= nil, "key does not exist " .. k)
+            all_keys[k] = true
+        elseif t2[k] ~= nil then
+            all_keys[k] = true
+        end
     end
-    for k, _v in pairs(t2) do
-        assert(t1[k] ~= nil, "key does not exist " .. k)
+    if ljopt_config.is_strict_mode() then
+        for k, _v in pairs(t2) do
+            assert(t1[k] ~= nil, "key does not exist " .. k)
+        end
     end
 
     for k, _v in pairs(all_keys) do
@@ -52,7 +62,7 @@ local function enrich_snapshots_with_exits(trace_record)
             if (ins2snap[cur_snap_id].nins <= ir_id) then
                 local snap_uid = ins2snap[cur_snap_id].uid
                 table.insert(trace_record.snapshots[snap_uid].exits, ir_id)
-                debug_msg(("Snapshot %d depends on %d\n"):format(
+                debug_msg(("Snapshot %d depends on %d"):format(
                     ins2snap[cur_snap_id].nins, ir_id
                 ))
             end
@@ -64,4 +74,5 @@ return {
     debug_msg = debug_msg,
     merge_tables = merge_tables,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
+    unreachable = unreachable,
 }

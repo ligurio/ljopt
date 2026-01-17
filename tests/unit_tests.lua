@@ -3,6 +3,7 @@
 -- data structures we use.
 
 local arith_utils = require("ljopt.ir.arith_utils")
+local ljopt_config = require("ljopt.config")
 local utils = require("ljopt.utils")
 
 local smt = require("tests.smtlib2").new()
@@ -31,6 +32,12 @@ test:test("merge_tables", function(test)
     test:is(result.b[2], 20, "Wrong b[2]")
     test:is(result.c[2], 30, "Wrong c[2]")
 
+
+    -- Failure tests requires to be run in strict mode to
+    -- trigger assertion.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(true)
+
     -- Missing 'c'.
     expect_fail(test, "Left missing c", utils.merge_tables,
         {a = 1, b = 2},
@@ -46,6 +53,7 @@ test:test("merge_tables", function(test)
     expect_fail(test, "Right nil", utils.merge_tables,
 	    {a = 1},
 		{a = nil})
+    ljopt_config.set_strict_mode(strict_mode)
 end)
 
 test:test("Arithmetic utils tests", function(test)

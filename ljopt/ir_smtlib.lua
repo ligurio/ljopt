@@ -7,6 +7,7 @@
 local jit = require('jit')
 
 local ir_node = require('ljopt.ir.ir_nodes')
+local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local dump_ir = require('ljopt.ir_dump')
 local ljopt_config = require('ljopt.config')
 local smt_context = require('ljopt.ir.smt_context')
@@ -47,17 +48,43 @@ local function construct_nodes(trace)
     dev_checks('table')
 
     local nodes_table = {}
-    for i = 1, table.getn(trace) do
-        nodes_table[i] = ir_node.instance(
-            string.format("%04d", trace[i].num),
-            trace[i].flags,
-            trace[i].irtype,
-            trace[i].irop,
-            trace[i].op1,
-            trace[i].op2
+    local filtered_nodes = ir_node.get_nyi_nodes(trace.trace)
+    if ljopt_config.is_strict_mode() and next(filtered_nodes) ~= nil then
+        local err_msg = ''
+        for i, _ in pairs(filtered_nodes) do
+            err_msg = err_msg .. ' ' .. trace.trace[i].irop
+        end
+        io.stderr:write(
+            'Ooopsie, some instructions is not implemented:' .. err_msg .. '.\n'
         )
+        assert(false, 'Disable `strict` mode if you still want to verify it.')
     end
-    return nodes_table
+    for i = 1, table.getn(trace.trace) do
+        local node = trace.trace[i]
+        if filtered_nodes[i] == nil then
+            table.insert(nodes_table, ir_node.instance(
+                string.format('%04d', node.num),
+                node.flags,
+                node.irtype,
+                node.irop,
+                node.op1,
+                node.op2
+            ))
+        else
+            table.insert(nodes_table, ir_node_dummy.instance(
+                string.format('%04d', node.num),
+                {
+                    irt_guard=false,
+                    raw=' '
+                },
+                node.irtype,
+                node.irop,
+                node.op1,
+                node.op2
+            ))
+        end
+    end
+    return nodes_table, filtered_nodes
 end
 
 -- Nodes transformers.
@@ -131,7 +158,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
 
     -- 1st stage. Constructing list of `ir_nodes`
     -- from raw string data.
-    local nodes = construct_nodes(trace_record.trace)
+    local nodes, filtered_nodes = construct_nodes(trace_record)
 
     -- 2nd stage. Transformations (loop unrooling, function
     -- inlining, ...).
@@ -154,8 +181,9 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     if trace_record.snapshots ~= nil then
         utils.enrich_snapshots_with_exits(trace_record)
         for i, snap in pairs(trace_record.snapshots) do
-            local cur_sn, slot_values =
-                smt_snapshot.snap_to_smt_lib(ctx_src, snap)
+            local cur_sn, slot_values = smt_snapshot.snap_to_smt_lib(
+                nodes, ctx_src, tr_id, i, snap, filtered_nodes
+            )
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
             snap_nums[i] = slot_values
         end
@@ -236,7 +264,11 @@ local function traces_to_smt(lua_code)
 
     local traces_smtlib = {}
     for traceno in pairs(rec_unopt) do
-        assert(rec_opt[traceno] ~= nil)
+        if ljopt_config.is_strict_mode() then
+            assert(rec_opt[traceno] ~= nil)
+        elseif rec_opt[traceno] == nil then
+            goto continue
+        end
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         local cur_trace =
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
@@ -253,6 +285,7 @@ local function traces_to_smt(lua_code)
         cur_trace = cur_trace .. smt_snapshots .. '\n'
 
         traces_smtlib[traceno] = cur_trace
+        ::continue::
     end
     return traces_smtlib
 end
