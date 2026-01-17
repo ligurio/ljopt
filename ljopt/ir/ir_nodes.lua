@@ -3,6 +3,8 @@ Provides mapping between IR node opcodes and their translators.
 ]]--
 
 local dev_checks = require('ljopt.dev_checks')
+local ljopt_config = require('ljopt.config')
+local utils = require('ljopt.utils')
 
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
@@ -166,9 +168,7 @@ local function get_unsupported_count()
     return get_all_count() - get_supported_count()
 end
 
-local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
-    dev_checks('string', 'table', '?string', 'string', '?string', '?string')
-
+local function get_node(opcode, type)
     local type_table = {
         -- NOP doesn't have a type.
         ['nil'] = '',
@@ -198,18 +198,58 @@ local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
         ['sfp'] = 'Sfp',
     }
     local node_str = 'IRNode' .. opcode
-    assert(type_table[type],
+    assert(not ljopt_config.is_strict_mode() or type_table[type],
         'Unsupported type `' .. type .. '` for ' .. opcode
     )
-    assert(opcodes_table[opcode], 'Unsupported operation ' .. opcode)
+    assert(not ljopt_config.is_strict_mode() or opcodes_table[opcode],
+        'Unsupported operation ' .. opcode
+    )
     node_str = node_str .. type_table[type]
+    if not opcodes_table[opcode] then
+        return nil
+    end
     local node = opcodes_table[opcode].instance(node_str, type)
-    assert(node, 'Node ' .. node_str .. ' is nil!')
+    assert(not ljopt_config.is_strict_mode() or node,
+        'Node ' .. node_str .. ' is nil!'
+    )
+    return node
+end
+
+local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
+    dev_checks('string', 'table', '?string', 'string', '?string', '?string')
+    local node = get_node(opcode, type)
     return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
+end
+
+-- Let's mark all unimplemented nodes and ignore them and their
+-- dependencies.
+local function get_nyi_nodes(nodes)
+    local nyi_nodes = {}
+    local in_loop = false
+    for i = 1, table.getn(nodes) do
+        in_loop = in_loop or nodes[i].irop == "LOOP"
+        local node = get_node(nodes[i].irop, nodes[i].irtype)
+        if node == nil or in_loop then
+            nyi_nodes[i] = true
+            utils.debug_msg(('%d: NYI node %s'):format(
+                i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+            ))
+        elseif nyi_nodes[tonumber(nodes[i].op1)] ~= nil or
+               nyi_nodes[tonumber(nodes[i].op2)] ~= nil then
+            nyi_nodes[i] = true
+            utils.debug_msg(
+                ('%d: NYI one of the arguments for %s'):format(
+                    i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+                )
+            )
+        end
+    end
+    return nyi_nodes
 end
 
 return {
     instance = instance,
+    get_nyi_nodes = get_nyi_nodes,
     get_supported_count = get_supported_count,
     get_unsupported_count = get_unsupported_count,
     get_all_count = get_all_count,

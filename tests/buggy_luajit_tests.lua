@@ -19,7 +19,7 @@ require("tests.coverage").enable()
 test:plan(1)
 
 local function test_result_expected(test, id, formula)
-    test:is(smt:parse(formula), true)
+    test:is(smt:parse(formula), true, "formula_" .. id .. " parsed")
     if buggy_build then
         test:is(smt:check(formula), smt.result.SAT, "test_buggy_luajit_" .. id)
     else

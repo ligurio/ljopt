@@ -1,3 +1,5 @@
+local utils = require("ljopt.utils")
+
 -- Translate snapshot representation to SMT-LIB string.
 -- We have snap_stack of type array<array<BV>>, where first index
 -- is a number of snapshot, second index is snapshot values.
@@ -15,7 +17,8 @@
 -- https://ujit.readthedocs.io/en/latest/public/tut-snap.html
 -- @a snapshot output of ir_dump.
 -- In format: array<(slot, value, optional_value)>
-local function snap_to_smt_lib(ctx, snapshot)
+local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
+                               snapshot, filtered_nodes)
     local snap_data = {}
     -- Slot number -> SMT expression.
     local slot_values = {}
@@ -24,9 +27,19 @@ local function snap_to_smt_lib(ctx, snapshot)
         local smt_expr
         local type = "num"
         if value_type == "ssa" then
-            smt_expr = ctx.snap_stack:store(
-                slot, type, ctx.op_stack:load(value_data, type)
-            )
+            -- Write only if this value is implemented.
+            if filtered_nodes[value_data] ~= nil then
+                utils.debug_msg(
+                    ("Ignore snapshot %s %s"):format(tr_id, snap_id)
+                )
+                goto continue
+            end
+            local op_type = trace[value_data]:get_type()
+            local data = ctx.op_stack:load(value_data,op_type)
+            if op_type == "int" then
+                data = string.format("((_ to_fp 11 53) %s)", data)
+            end
+            smt_expr = ctx.snap_stack:store(slot, type, data)
             slot_values[slot] = ctx.snap_stack:load(slot, type)
         elseif value_type == "const" then
             if value_data == 'true' then
@@ -42,6 +55,7 @@ local function snap_to_smt_lib(ctx, snapshot)
             smt_expr = ctx.snap_stack:store(slot, type, cnst)
             slot_values[slot] = ctx.snap_stack:load(slot, type)
         elseif value_type == "softfp" then
+            error("This path was not tested and never occured before.")
             local ref2 = pair[4]
             local left = ctx.snap_stack:store(
                 slot, type, ctx.op_stack:load(value_data, type))
@@ -49,9 +63,10 @@ local function snap_to_smt_lib(ctx, snapshot)
                 slot + 1, type, ctx.op_stack:load(ref2, type))
             smt_expr = left .. right
         else
-            error("unreachable")
+            utils.unreachable()
         end
         table.insert(snap_data, smt_expr)
+        ::continue::
     end
 
     local e = nil
