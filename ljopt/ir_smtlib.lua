@@ -7,6 +7,7 @@
 local jit = require('jit')
 
 local ir_node = require('ljopt.ir.ir_nodes')
+local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local dump_ir = require('ljopt.ir_dump')
 local ljopt_config = require('ljopt.config')
 local smt_context = require('ljopt.ir.smt_context')
@@ -42,17 +43,40 @@ local function construct_nodes(trace)
     dev_checks('table')
 
     local nodes_table = {}
-    for i = 1, table.getn(trace) do
-        nodes_table[i] = ir_node.instance(
-            string.format("%04d", trace[i].num),
-            trace[i].flags,
-            trace[i].irtype,
-            trace[i].irop,
-            trace[i].op1,
-            trace[i].op2
+    local filter_nodes = ir_node.get_nyi_nodes(trace.trace)
+    if ljopt_config.is_strict_mode() and next(filter_nodes) ~= nil then
+        local err_msg = ""
+        for i, _ in pairs(filter_nodes) do
+            err_msg = err_msg .. " " .. trace.trace[i].irop
+        end
+        io.stderr:write(
+            "Ooopsie, some instructions is not implemented:" .. err_msg .. ".\n"
         )
+        assert(false, "Disable `strict` mode if you still want to verify it.")
     end
-    return nodes_table
+    for i = 1, table.getn(trace.trace) do
+        local node = trace.trace[i]
+        if filter_nodes[i] == nil then
+            table.insert(nodes_table, ir_node.instance(
+                string.format("%04d", node.num),
+                node.flags,
+                node.irtype,
+                node.irop,
+                node.op1,
+                node.op2
+            ))
+        else
+            table.insert(nodes_table, ir_node_dummy.instance(
+                string.format("%04d", node.num),
+                node.flags,
+                node.irtype,
+                node.irop,
+                node.op1,
+                node.op2
+            ))
+        end
+    end
+    return nodes_table, filter_nodes
 end
 
 -- Nodes transformers.
@@ -126,7 +150,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
 
     -- 1st stage. Constructing list of `ir_nodes`
     -- from raw string data.
-    local nodes = construct_nodes(trace_record.trace)
+    local nodes, _filtered_nodes = construct_nodes(trace_record)
 
     -- 2nd stage. Transformations (loop unrooling, function
     -- inlining, ...).
