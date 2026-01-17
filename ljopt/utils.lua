@@ -1,3 +1,5 @@
+local ljopt_config = require("ljopt.config")
+
 local function merge_tables(t1, t2)
     local merged = {}
     local all_keys = {}
@@ -17,8 +19,6 @@ local function merge_tables(t1, t2)
 
     return merged
 end
-
-local is_debug = os.getenv("LJOPT_DEBUG")
 
 -- Takes as input snapshots and exits.
 -- Snapshot table is uid -> Snapshot.
@@ -46,7 +46,7 @@ local function enrich_snapshots_with_exits(trace_record)
             if (ins2snap[cur_snap_id].nins <= ir_id) then
                 local snap_uid = ins2snap[cur_snap_id].uid
                 table.insert(trace_record.snapshots[snap_uid].exits, ir_id)
-                if (is_debug) then
+                if ljopt_config.is_debug() then
                     io.stderr:write(
                         ("Snapshot %d depends on %d\n"):format(
                             ins2snap[cur_snap_id].nins, ir_id
