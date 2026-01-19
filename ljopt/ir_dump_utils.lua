@@ -153,11 +153,11 @@ local function ljopt_formatsmt(tr, idx, sn)
 end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>
-local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
-  if (linktype == "stitch") then
-    -- stitch is not supported yet
-    return
-  end
+local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
+  -- if (linktype == "stitch") then
+  --   -- stitch is not supported yet
+  --   return
+  -- end
 
   local snapshot = {}
   local n = 2
@@ -168,7 +168,10 @@ local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
       local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
       if ref < 0 then
         -- Type 1: Constant.
-        table.insert(snapshot, {s, "const", ljopt_formatsmt(tr, ref, sn)})
+        local is_frame = band(sn, 0x10000)
+        if not is_frame then
+          table.insert(snapshot, {s, "const", ljopt_formatsmt(tr, ref, sn)})
+        end
       elseif band(sn, 0x80000) ~= 0 then
         -- Type 2: Soft-float number (needs two SSA slots).
         table.insert(snapshot, {s, "softfp", ref, ref+1})
