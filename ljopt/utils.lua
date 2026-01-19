@@ -45,8 +45,9 @@ local function enrich_snapshots_with_exits(trace_record)
     local ins2snap = {}
     for uid, ins_snap in pairs(trace_record.snapshots) do
         trace_record.snapshots[uid].exits = {}
-        local nins = ins_snap.nins
-        table.insert(ins2snap, {nins = nins, uid = uid})
+        for _, nins in ipairs(ins_snap.nins) do
+            table.insert(ins2snap, {nins = nins, uid = uid})
+        end
     end
     table.sort(ins2snap, function(a, b)
         return a.nins < b.nins
