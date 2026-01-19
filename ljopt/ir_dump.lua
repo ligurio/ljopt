@@ -402,7 +402,7 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
-  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what)
+  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end

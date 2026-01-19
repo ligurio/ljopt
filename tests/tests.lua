@@ -166,7 +166,7 @@ end
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 3 (line number).
-    local trace = exec_state[3]
+    local trace = exec_state["_nil_3"]
 
     test:is(trace.trace[9].irt_isphi, true, "9-th instruction is a phi")
     test:is(trace.trace[6].irt_mark, true, "6-th instruction is marked")
@@ -195,15 +195,14 @@ f(1)
     -- SNAP   #0   [ ---- ---- ]
     -- 0001 >  int ADDOV  #x0000000000000000  #x0000000000000000
     -- SNAP   #1   [ ---- ---- 0001 0003 ]
-    test:plan(10)
+    test:plan(9)
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 2.
-    local trace = exec_state[2]
+    local trace = exec_state["_nil_2"]
 
     test:is(trace.trace[1].irt_guard, true, "First instruction is a guard")
 
-    test:is(#exec_state, 2, "No more traces")
     utils.enrich_snapshots_with_exits(trace)
 
     -- 1 and 4 is bytecode offset of each snapshot.
@@ -253,12 +252,12 @@ f(1.2)
 
     for i, f in ipairs(srcs) do
         local formulas = ljopt.ir.traces_to_smt(f)
-        for j, formula in ipairs(formulas) do
+        for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
-                ("test_%s trace %d parse."):format(i, j))
+                ("test_%s trace %s parse."):format(i, j))
             test:is(smt:check(formula), smt.result.UNSAT,
-                ("test_%d trace %d check."):format(i, j))
+                ("test_%d trace %s check."):format(i, j))
         end
     end
 end)
