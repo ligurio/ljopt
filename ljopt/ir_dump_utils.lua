@@ -3,6 +3,7 @@ local vmdef = require("jit.vmdef")
 local jit = require("jit")
 local funcinfo = jutil.funcinfo
 local tracek = jutil.tracek
+local ljopt_config = require("ljopt.config")
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
@@ -23,6 +24,8 @@ local exec_record = {}
 -- table<id, line_number>
 local traces_num
 
+local trace_bc_hash
+
 local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
 
@@ -40,6 +43,7 @@ end
 local function ljopt_init_trace_state()
   exec_record = {}
   traces_num = {}
+  trace_bc_hash = {}
 end
 
 local function ljopt_get_execution_state()
@@ -56,7 +60,12 @@ end
 local function ljopt_init_new_trace(tr)
   dev_checks("number")
   local tr_id = get_trace_id(tr)
-  assert(exec_record[tr_id] == nil)
+  if tr_id == nil then
+    return
+  end
+  assert(exec_record[tr_id] == nil,
+    "Trace with exactly this bytecode already exists " .. tr_id
+  )
   exec_record[tr_id] = {}
   exec_record[tr_id].trace = {}
   exec_record[tr_id].snapshots = {}
@@ -78,11 +87,18 @@ local function fmtfunc(func, pc)
 end
 
 
--- Remember line where trace starts
-local function ljopt_init_trace_uid(tr, func, pc, what)
-  if what == "start" then
-    dev_checks("number", "function", "number", "string")
-    traces_num[tr] = tonumber(string.match(fmtfunc(func, pc), ":(%d+)"))
+local function fnv1a_hash(str)
+  local hash = 2166136261
+  for i = 1, #str do
+    hash = bit.bxor(hash, string.byte(str, i))
+    hash = (hash * 16777619) % 2^32
+  end
+  return string.format("%08x", hash)
+end
+
+local function ljopt_record_trace(traceno, _func, pt, _fd)
+  if trace_bc_hash[traceno] then
+    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. ' ' .. (pt + 1)
   end
 end
 
@@ -92,6 +108,53 @@ end
 -- Note: returned ID is persistent across executions
 local function get_snap_uid(tr, snapno)
   return jutil.snappc(tr, snapno)
+end
+
+-- Trace id is:
+-- 1. Current trace bytecode hash.
+-- 2. Parent trace bytecode hash.
+-- 3. Parent trace exit snapshot offset.
+-- All of the above together gives unique ID
+-- (except for cases, when there's multiple snapshots
+--  with same ID, we'll ignore them for now).
+local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
+  if what == "start" then
+    trace_bc_hash[tr] = ""
+    dev_checks("number", "function", "number", "string")
+
+    traces_num[tr] = ""
+    if otr then
+      if traces_num[otr] ~= nil then
+        -- Set parent <trace_id>_<snap_id>
+        traces_num[tr] = traces_num[otr]
+        if oex >= 0 then
+          traces_num[tr] = traces_num[tr] .. "_" .. get_snap_uid(otr, oex)
+        end
+      else
+        -- Parent trace was removed, remove all children as well.
+        traces_num[tr] = nil
+      end
+    end
+  elseif what == "stop" or what == "abort" then
+    if ljopt_config.is_debug_mode() then
+      io.stderr:write(("Parent trace id: %s Trace hash: %s"):format(
+        tostring(traces_num[tr]), trace_bc_hash[tr]
+      ))
+    end
+    if traces_num[tr] ~= nil then
+      local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
+      traces_num[tr] = traces_num[tr] .. "_" .. bc_hash
+      if ljopt_config.is_debug_mode() then
+        io.stderr:write("Cur trace id: " .. traces_num[tr] .. "\n")
+      end
+    else
+      if ljopt_config.is_debug_mode() then
+        io.stderr:write(
+          "Skip trace, parent=nil, trace hash: " .. trace_bc_hash[tr] .. '\n'
+        )
+      end
+    end
+  end
 end
 
 local function ctlsub(c)
@@ -155,6 +218,12 @@ end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>
 local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
+  local tr_id = get_trace_id(tr)
+  if tr_id == nil then
+    -- Skip this trace.
+    return
+  end
+
   local snapshot = {}
   local n = 2
   for s=0,snap[1]-1 do
@@ -177,9 +246,19 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
       end
     end
   end
-  local tr_id = get_trace_id(tr)
   local snap_id = get_snap_uid(tr, snapno)
-  exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
+  assert(snap_id >= 0)
+  if ljopt_config.is_debug_mode() then
+    io.stderr:write("Snap offset: " .. snap_id .. "\n")
+  end
+  if exec_record[tr_id].snapshots[snap_id] == nil then
+    -- Do not support yet traces with more than 1
+    -- snapshot with same offset.
+    -- More details: https://github.com/ligurio/ljopt/issues/30
+    exec_record[tr_id].snapshots[snap_id] = {nins = {nins}, slots = snapshot}
+  else
+    table.insert(exec_record[tr_id].snapshots[snap_id].nins, nins)
+  end
 end
 
 local function trim(s)
@@ -190,6 +269,12 @@ end
 
 
 local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
+  local tr_id = get_trace_id(tr)
+  if tr_id == nil then
+    -- Skip this trace.
+    return
+  end
+
   -- The symbol ">" indicates the instruction of the
   -- guard's location
   -- (leading to possible side exits from the trace).
@@ -213,7 +298,11 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
     op1 = trim(op1),
     op2 = trim(op2),
   }
-  table.insert(exec_record[get_trace_id(tr)].trace, irins)
+  if exec_record[tr_id] ~= nil then
+    -- Otherwise this trace was removed due to Snapshot
+    -- duplication.
+    table.insert(exec_record[tr_id].trace, irins)
+  end
 end
 
 return {
@@ -222,6 +311,7 @@ return {
   ljopt_init_new_trace = ljopt_init_new_trace,
   ljopt_init_trace_uid = ljopt_init_trace_uid,
   ljopt_savesnap = ljopt_savesnap,
+  ljopt_record_trace = ljopt_record_trace,
   ljopt_savetrace = ljopt_savetrace,
   ljopt_formatsmt = ljopt_formatsmt,
 }

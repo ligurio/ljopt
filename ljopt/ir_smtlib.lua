@@ -146,6 +146,9 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     smt_suffix = smt_suffix or 'src'
     tr_id = tr_id or '0'
     ctx_src = ctx_src or smt_context.SMTContext:new('BV', 'BV')
+
+    utils.debug_msg('Handle ' .. tr_id)
+
     -- 0 stage. Create 'smt-context'.
     smtlib_buf = smtlib_buf ..
         ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) ..

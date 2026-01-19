@@ -575,7 +575,7 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
-  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what)
+  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
@@ -682,6 +682,7 @@ local function dumpon(outfile)
   toggle_debug_hook()
   dumpmode = { t=true, b=true, i=true, m=false, s=true, r=false }
   jit.attach(dump_trace, "trace")
+  jit.attach(ir_dump_utils.ljopt_record_trace, "record")
   if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
   irtype = irtype_text

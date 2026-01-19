@@ -17,7 +17,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(2)
+test:plan(3)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -73,6 +73,27 @@ test:test("Arithmetic utils tests", function(test)
     test:is(smt:check(("(assert %s)"):format(negative_overflow)),
         smt.result.UNSAT, "SMT-LIB check negative i32 overflow"
     )
+end)
+
+test:test("Trace exit merge snapshots", function(test)
+    test:plan(4)
+    local snapshots = {}
+    snapshots[1] = {nins={1}}
+    snapshots[3] = {nins={3}}
+    local nodes = {}
+    nodes[1] = {flags={irt_guard = true}}
+    nodes[2] = {flags={irt_guard = true}}
+    nodes[3] = {flags={irt_guard = true}}
+    nodes[4] = {flags={irt_guard = true}}
+
+    local all_trace = {trace=nodes, snapshots=snapshots}
+    utils.enrich_snapshots_with_exits(all_trace)
+    local snaps = all_trace.snapshots
+    test:is(snaps[1].exits[1], 1, "1 guard matched with 1 snapshot")
+    test:is(snaps[1].exits[2], 2, "2 guard matched with 1 snapshot")
+    test:is(snaps[3].exits[1], 3, "3 guard matched with 3 snapshot")
+    test:is(snaps[3].exits[2], 4, "4 guard matched with 3 snapshot")
+
 end)
 
 require("tests.coverage").shutdown()
