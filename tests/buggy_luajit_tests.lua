@@ -7,7 +7,7 @@
 -- them to separate file.
 
 local ljopt = require("ljopt")
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 local buggy_build = os.getenv("BUGGY_BUILD")

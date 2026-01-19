@@ -1,5 +1,6 @@
 local ljopt = require("ljopt")
 local jit = require("jit")
+local smt = require('ljopt.smtlib2').new()
 
 local is_debug = os.getenv("LJOPT_DEBUG")
 
@@ -32,8 +33,16 @@ if is_debug then
 end
 
 local result = ljopt.ir.translate_to_smt(lua_code, true)
-io.stdout:write(result)
-os.exit(exit_codes.ok)
+local is_ok = 0
+for _, tr_smt in pairs(result) do
+  assert(smt:parse(tr_smt))
+  local trace_result = smt:check(tr_smt)
+  if trace_result == smt.result.SAT then
+    io.stderr:write(trace_result)
+    is_ok = -1
+  end
+end
+os.exit(is_ok)
 
 local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
 if #bc == 0 then

@@ -8,6 +8,7 @@ local jit = require('jit')
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local dump_ir = require('ljopt.ir_dump')
+local smt = require('ljopt.smtlib2').new()
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
 local smt_snapshot = require('ljopt.ir.SNAP')
@@ -238,13 +239,19 @@ local function traces_to_smt(lua_code)
         cur_trace = cur_trace .. trace_unopt .. '\n'
         cur_trace = cur_trace .. trace_opt .. '\n'
 
+        -- Verify trace without SNAPshot constraints is parsable
+        -- and SAT.
+        assert(smt:parse(cur_trace))
+        local smt_res = smt:check(cur_trace)
+        assert(smt_res == smt.result.SAT or smt_res == smt.result.UNKNOWN)
+
         local smt_snapshots = snapshots2smt(snaps_unopt, snaps_opt)
 
         cur_trace = cur_trace .. smt_snapshots .. '\n'
 
         traces_smtlib[traceno] = cur_trace
     end
-    return traces_smtlib
+    return traces_smtlib, rec_unopt, rec_opt
 end
 
 
@@ -253,23 +260,7 @@ end
 local function translate_to_smt(lua_code)
     assert(load(lj_unoptimized))()
     local traces_formulas = traces_to_smt(lua_code)
-
-    local traces_smtlib = [[
-(set-option :print-success false)
-(set-option :produce-models true)
-]]
-
-    -- Concatenate all traces
-    for _, tr_smt in pairs(traces_formulas) do
-        traces_smtlib = traces_smtlib .. tr_smt
-        -- Check current trace.
-        traces_smtlib = traces_smtlib .. '(check-sat)\n'
-        -- Print counterexample if found.
-        traces_smtlib = traces_smtlib .. '(get-model)\n'
-        -- Reset, so next snapshots will be independent.
-        traces_smtlib = traces_smtlib .. '(reset)\n'
-    end
-    return traces_smtlib
+    return traces_formulas
 end
 
 return {
