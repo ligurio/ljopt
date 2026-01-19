@@ -79,10 +79,13 @@ end
 
 
 -- Remember line where trace starts
-local function ljopt_init_trace_uid(tr, func, pc, what)
+local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "start" then
     dev_checks("number", "function", "number", "string")
-    traces_num[tr] = tonumber(string.match(fmtfunc(func, pc), ":(%d+)"))
+    local line_num = string.match(fmtfunc(func, pc), ":(%d+)")
+    traces_num[tr] = tostring(otr or "") .. "_" ..
+                     (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
+                     line_num
   end
 end
 

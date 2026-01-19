@@ -43,7 +43,7 @@ foo(-0.0)
     test:plan(2)
 
     local formulas = ljopt.ir.traces_to_smt(min_zero)
-    for i, formula in ipairs(formulas) do
+    for i, formula in pairs(formulas) do
         test_result_expected(test, i, smt_constants.LJOPT_SMTLIB .. formula)
     end
 end)
