@@ -96,6 +96,8 @@ test:test("IR arithmetic tests", function(test)
                         result = bit.bxor(124245235, 2), error = 1.},
         {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
                         result = 3, error = 2},
+        {node = create_node("int", "CONV", f2bv(3.0), "int.num"),
+                        result = 3, error = 2},
         {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
