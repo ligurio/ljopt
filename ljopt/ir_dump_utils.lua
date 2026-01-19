@@ -180,7 +180,12 @@ local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
   end
   local tr_id = get_trace_id(tr)
   local snap_id = get_snap_uid(tr, snapno)
-  exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
+  if exec_record[tr_id].snapshots[snap_id] == nil then
+    -- Do not overwrite (it means we're in a loop).
+    -- This is temporary solution to support first
+    -- iteration (and nothing else!) of loop verification.
+    exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
+  end
 end
 
 local function trim(s)
