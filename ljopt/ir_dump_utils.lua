@@ -34,10 +34,7 @@ local function float_to_smt_bv(x)
   dev_checks("number")
   local u = ffi.new("union { double d; uint64_t i; }")
   u.d = x
-  local bits = u.i
-  local hi = tonumber(bit.rshift(bits, 32))
-  local lo = tonumber(bit.band(bits, 0xFFFFFFFF))
-  return string.format("#x%08X%08X", hi, lo)
+  return string.format("#x%s", bit.tohex(u.i, 16))
 end
 
 local function ljopt_init_trace_state()
