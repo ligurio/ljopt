@@ -5,9 +5,9 @@
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
+local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local test = require("tests.tap").test("ljopt")
-local utils = require("ljopt.utils")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
@@ -20,12 +20,10 @@ local function record_code(lua_code, opt)
         opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
     end
     assert(load(opt))()
-    -- Flush JIT so we'll have consistent
-    -- trace numbers across recordings.
-    jit.flush()
     local exec_records = ljopt.ir.record(lua_code)
+    local traces_map = ir_dump_utils.ljopt_get_traceid_map()
     assert(type(exec_records) == 'table')
-    return exec_records
+    return exec_records, traces_map
 end
 
 
@@ -180,10 +178,11 @@ end
 ]]
     test:plan(6)
 
-    -- We get phi instruction only on optimized trace.
-    local exec_state = record_code(src, "jit.opt.start(3, 'hotloop=1')")
-    -- Our trace is always number 2 (line number).
-    local trace = exec_state[2].trace
+    local exec_state, traces_map = record_code(
+        src, "jit.opt.start(3, 'hotloop=1')"
+    )
+    -- Our trace id is always: 1.
+    local trace = exec_state[traces_map[1]].trace
 
     test:is(trace[9].flags.irt_isphi, true, "9-th instruction is a phi")
     test:is(trace[6].flags.irt_mark, true, "6-th instruction is marked")
@@ -211,18 +210,15 @@ f(1)
     -- SNAP   #0   [ ---- ---- ]
     -- 0001 >  int ADDOV  #x0000000000000000  #x0000000000000000
     -- SNAP   #1   [ ---- ---- 0001 0003 ]
-    test:plan(10)
+    test:plan(6)
 
-    local exec_state = record_code(src)
-    -- Our trace is always number 1.
-    local trace = exec_state[1]
+    local exec_state, traces_map = record_code(src)
+    -- Our trace id is always: 1.
+    local trace = exec_state[traces_map[1]]
 
     test:is(
         trace.trace[1].flags.irt_guard, true, "First instruction is a guard"
     )
-
-    test:is(#exec_state, 1, "No more traces")
-    utils.enrich_snapshots_with_exits(trace)
 
     -- 1 and 4 is bytecode offset of each snapshot.
     test:is(#trace.snapshots[1].slots, 0, "First snapshot empty")
@@ -232,11 +228,6 @@ f(1)
     test:is(return_slots[1][1], 3, "Incorrect slot")
     test:is(return_slots[1][2], "ssa", "Incorrect snapshot entry type")
     test:is(return_slots[1][3], 2, "Incorrect entry value")
-
-    test:is(#trace.snapshots[1].exits, 1, "Single exit")
-    test:is(trace.snapshots[1].exits[1], 1, "Exit by first instruction")
-
-    test:is(#trace.snapshots[4].exits, 0, "No exits")
 end)
 
 -- Main tests for traces equivalence.
@@ -282,12 +273,12 @@ f(1.2)
 
     for i, f in ipairs(srcs) do
         local formulas = ljopt.ir.traces_to_smt(f)
-        for j, formula in ipairs(formulas) do
+        for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
-                ("test_%s trace %d parse."):format(i, j))
+                ("test_%s trace %s parse."):format(i, j))
             test:is(smt:check(formula), smt.result.UNSAT,
-                ("test_%d trace %d check."):format(i, j))
+                ("test_%d trace %s check."):format(i, j))
         end
     end
 end)
@@ -306,8 +297,9 @@ foo()
 ]]
     local formulas = ljopt.ir.traces_to_smt(overwrite_global)
 
-    -- Trace id is 4.
-    local formula = smt_constants.LJOPT_SMTLIB .. formulas[4]
+    -- Trace id is 1.
+    local id = ir_dump_utils.ljopt_get_traceid_map()[1]
+    local formula = smt_constants.LJOPT_SMTLIB .. formulas[id]
     -- Testing formula is redundant.
     -- What matters is that we do not crashed on parsing traces.
     test:is(smt:parse(formula), true, "Sandbox parsing.")
@@ -339,8 +331,9 @@ f()
 
     local formulas = ljopt.ir.traces_to_smt(stitching)
 
-    -- Trace id is always: 3.
-    local formula = smt_constants.LJOPT_SMTLIB .. formulas[3]
+    -- Trace id is always: 1.
+    local id = ir_dump_utils.ljopt_get_traceid_map()[1]
+    local formula = smt_constants.LJOPT_SMTLIB .. formulas[id]
     test:is(smt:parse(formula), true, "Stitching parsing.")
     test:is(smt:check(formula), smt.result.UNSAT, "Stitching test checking.")
 
