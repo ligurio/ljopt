@@ -16,8 +16,13 @@ local smt_snapshot = require('ljopt.ir.SNAP')
 local utils = require('ljopt.utils')
 
 -- Documentation: https://luajit.org/running.html
-local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
-local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')"
+--
+-- We disable `narrow` because sometimes it changes behaviour
+-- of the trace, and we can't easily verify it.
+-- See issue for tracking `narrow` implementation progress:
+-- https://github.com/ligurio/ljopt/issues/34
+local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1', '-narrow')"
+local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')"
 
 local dev_trace_dump = function() end
 
@@ -135,7 +140,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     -- 3rd stage. Converting to SMT-LIB.
     for i = 1, table.getn(nodes) do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
-            .. (nodes[i]:get_flags() or '') .. ' '
+            .. (nodes[i]:get_flags().raw or '') .. ' '
             .. (nodes[i]:get_type() or '') .. ' '
             .. (nodes[i]:get_opcode() or '') .. ' '
             .. (nodes[i]:get_left_op() or '') .. ' '
@@ -270,8 +275,6 @@ local function translate_to_smt(lua_code)
         traces_smtlib = traces_smtlib .. SMT_PREAMBLE .. tr_smt
         -- Check current trace.
         traces_smtlib = traces_smtlib .. '(check-sat)\n'
-        -- Print counterexample if found.
-        traces_smtlib = traces_smtlib .. '(get-model)\n'
         -- Reset, so next snapshots will be independent.
         traces_smtlib = traces_smtlib .. '(reset)\n'
     end

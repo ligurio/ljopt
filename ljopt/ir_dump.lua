@@ -87,11 +87,11 @@ local active, out, dumpmode
 ------------------------------------------------------------------------------
 
 -- Debug mode.
-local debug = false
+local debug_mode = false
 
 local function write_out(...)
   assert(out)
-  if not debug then return end
+  if not debug_mode then return end
   out:write(...)
 end
 
@@ -689,7 +689,7 @@ local function dumpon(outfile)
   out = outfile or io.stderr
 end
 
-local function record(lua_code, debug_mode)
+local function record(lua_code, is_debug_mode)
   -- Lua treats any independent chunk as the body of an anonymous function.
   -- For instance, for the chunk "a = 1", loadstring returns the equivalent
   -- of `function () a = 1 end`, https://www.lua.org/pil/8.html
@@ -698,7 +698,7 @@ local function record(lua_code, debug_mode)
     error(("cannot load Lua code: %s"):format(err))
   end
 
-  debug = debug_mode or os.getenv("LJOPT_DEBUG")
+  debug_mode = is_debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
 
   dumpon()

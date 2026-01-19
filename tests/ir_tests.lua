@@ -43,9 +43,10 @@ local function create_node(irtype, irop, op1, op2, insn)
     insn = insn or 1
     local node = {
         num = insn,
-        flags = "",
-        irt_guard = nil,
-        irt_isphi = nil,
+        flags = {
+            irt_guard = nil,
+            irt_isphi = nil,
+        },
         irtype = irtype,
         irop = irop,
         op1 = op1,

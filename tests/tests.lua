@@ -166,16 +166,16 @@ end
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 3 (line number).
-    local trace = exec_state[3]
+    local trace = exec_state[3].trace
 
-    test:is(trace.trace[9].irt_isphi, true, "9-th instruction is a phi")
-    test:is(trace.trace[6].irt_mark, true, "6-th instruction is marked")
-    test:is(trace.trace[7].irt_guard, true, "7-th instruction is a guard")
+    test:is(trace[9].flags.irt_isphi, true, "9-th instruction is a phi")
+    test:is(trace[6].flags.irt_mark, true, "6-th instruction is marked")
+    test:is(trace[7].flags.irt_guard, true, "7-th instruction is a guard")
 
     -- Ensure sometimes these flags are false.
-    test:is(trace.trace[1].irt_isphi, false, "1-st instruction is not phi")
-    test:is(trace.trace[1].irt_mark, false, "1-st instruction is not marked")
-    test:is(trace.trace[1].irt_guard, false, "1-st instruction is not guard")
+    test:is(trace[1].flags.irt_isphi, false, "1-st instruction is not phi")
+    test:is(trace[1].flags.irt_mark, false, "1-st instruction is not marked")
+    test:is(trace[1].flags.irt_guard, false, "1-st instruction is not guard")
 end)
 
 -- Trace exits parsing tests.
@@ -201,7 +201,9 @@ f(1)
     -- Our trace is always number 2.
     local trace = exec_state[2]
 
-    test:is(trace.trace[1].irt_guard, true, "First instruction is a guard")
+    test:is(
+        trace.trace[1].flags.irt_guard, true, "First instruction is a guard"
+    )
 
     test:is(#exec_state, 2, "No more traces")
     utils.enrich_snapshots_with_exits(trace)
