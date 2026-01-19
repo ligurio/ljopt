@@ -33,9 +33,10 @@ function IRNodeCONV:to_smt_lib(ctx)
         end
         data = string.format('((_ to_fp 11 53) %s)', data)
     elseif parsed_right_op[1] == 'int.num' then
-        left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+        data = self:retrieve_num_op(self:get_left_op(), ctx)
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 32) %s)', left_op)
+        data = string.format('((_ to_fp 11 53) %s)', data)
+        data = string.format('((_ fp.to_sbv 64) RNE %s)', data)
     elseif parsed_right_op[1] == 'num.i64' then
         left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
         -- TODO recheck rounding behaviour.
