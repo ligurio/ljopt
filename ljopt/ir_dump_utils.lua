@@ -107,14 +107,12 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
     local src = fi and fi.source or "?"
     local linedefined = fi and fi.linedefined or "?"
     local linktype = info and info.linktype or "root"
-    local key_str = fnv1a_hash(src) .. "_" ..
-        tostring(linedefined) .. "_" ..
-        tostring(linktype) .. "_" ..
+    local key_str = fnv1a_hash(src) ..
         (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
         tostring(otr or "")
     traces_num[tr] = key_str
   elseif what == "stop" or what == "abort" then
-    traces_num[tr] = traces_num[tr] .. trace_bc_hash[tr]
+    traces_num[tr] = traces_num[tr] .. tostring(fnv1a_hash(trace_bc_hash[tr]))
   end
 end
 
