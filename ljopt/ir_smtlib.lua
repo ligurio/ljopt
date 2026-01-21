@@ -126,6 +126,11 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
         error('IR-dump is not a table')
     end
 
+    if ljopt_config.is_debug() then
+        io.stderr:write("Handle " .. tr_id .. '\n')
+    end
+
+
     if smt_suffix and type(smt_suffix) ~= 'string' then
         error('smt_suffix is not a string')
     end

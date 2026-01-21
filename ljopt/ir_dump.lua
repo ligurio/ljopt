@@ -507,6 +507,7 @@ local function dumpon(outfile)
   toggle_debug_hook()
   dumpmode = { t=true, b=true, i=true, m=false, s=true, r=false }
   jit.attach(dump_trace, "trace")
+  jit.attach(ir_dump_utils.ljopt_record_trace, "record")
   if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
   irtype = irtype_text

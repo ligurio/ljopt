@@ -23,6 +23,8 @@ local exec_record = {}
 -- table<id, line_number>
 local traces_num
 
+local trace_bc_hash
+
 local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
 
@@ -40,6 +42,7 @@ end
 local function ljopt_init_trace_state()
   exec_record = {}
   traces_num = {}
+  trace_bc_hash = {}
 end
 
 local function ljopt_get_execution_state()
@@ -78,14 +81,40 @@ local function fmtfunc(func, pc)
 end
 
 
+local function fnv1a_hash(str)
+  local hash = 2166136261
+  for i = 1, #str do
+    hash = bit.bxor(hash, string.byte(str, i))
+    hash = (hash * 16777619) % 2^32
+  end
+  return string.format("%08x", hash)
+end
+
+local function ljopt_record_trace(traceno, func, pt, fd)
+
+  if trace_bc_hash[traceno] then
+    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. (pt + 1)
+  end
+end
+
 -- Remember line where trace starts
 local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "start" then
+    trace_bc_hash[tr] = ""
     dev_checks("number", "function", "number", "string")
-    local line_num = string.match(fmtfunc(func, pc), ":(%d+)")
-    traces_num[tr] = tostring(otr or "") .. "_" ..
-                     (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
-                     line_num
+    local info = jutil.traceinfo(tr)
+    local fi = funcinfo(func)
+    local src = fi and fi.source or "?"
+    local linedefined = fi and fi.linedefined or "?"
+    local linktype = info and info.linktype or "root"
+    local key_str = fnv1a_hash(src) .. "_" ..
+        tostring(linedefined) .. "_" ..
+        tostring(linktype) .. "_" ..
+        (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
+        tostring(otr or "")
+    traces_num[tr] = key_str
+  elseif what == "stop" or what == "abort" then
+    traces_num[tr] = traces_num[tr] .. trace_bc_hash[tr]
   end
 end
 
@@ -229,6 +258,7 @@ return {
   ljopt_init_new_trace = ljopt_init_new_trace,
   ljopt_init_trace_uid = ljopt_init_trace_uid,
   ljopt_savesnap = ljopt_savesnap,
+  ljopt_record_trace = ljopt_record_trace,
   ljopt_savetrace = ljopt_savetrace,
   ljopt_formatsmt = ljopt_formatsmt,
 }
