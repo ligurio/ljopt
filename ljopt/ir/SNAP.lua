@@ -17,7 +17,7 @@ local ljopt_config = require("ljopt.config")
 -- https://ujit.readthedocs.io/en/latest/public/tut-snap.html
 -- @a snapshot output of ir_dump.
 -- In format: array<(slot, value, optional_value)>
-local function snap_to_smt_lib(ctx, snapshot, filtered_nodes)
+local function snap_to_smt_lib(trace, ctx, snapshot, filtered_nodes)
     local snap_data = {}
     -- Slot number -> SMT expression.
     local slot_values = {}
@@ -28,9 +28,13 @@ local function snap_to_smt_lib(ctx, snapshot, filtered_nodes)
         if value_type == "ssa" then
             -- Write only if this value is implemented.
             if filtered_nodes[value_data] == nil then
-                smt_expr = ctx.snap_stack:store(
-                    slot, type, ctx.op_stack:load(value_data, type)
-                )
+                local op_type = trace[value_data]:get_type()
+                local data = ctx.op_stack:load(value_data,op_type)
+                if op_type == "int" then
+                    data = string.format('((_ to_fp 11 53) %s)', data)
+                end
+                smt_expr = ctx.snap_stack:store(slot, type, data)
+                io.stderr:write(smt_expr .. '\n')
                 slot_values[slot] = ctx.snap_stack:load(slot, type)
             elseif ljopt_config.is_debug() then
                 io.stderr:write("Ignore snapshot\n")
