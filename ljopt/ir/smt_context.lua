@@ -302,7 +302,7 @@ function SnapStack.inc(self, exit_by_this_snap)
             self._cur_stack,
             smt_constants.MAXSNAP)
         self._exited_by_snap =
-            ('(bvand %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(
+            ('(bvor %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(
             self._exited_by_snap,
             exit_by_this_snap,
             masked,
