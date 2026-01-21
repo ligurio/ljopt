@@ -34,7 +34,6 @@ local function snap_to_smt_lib(trace, ctx, snapshot, filtered_nodes)
                     data = string.format('((_ to_fp 11 53) %s)', data)
                 end
                 smt_expr = ctx.snap_stack:store(slot, type, data)
-                io.stderr:write(smt_expr .. '\n')
                 slot_values[slot] = ctx.snap_stack:load(slot, type)
             elseif ljopt_config.is_debug() then
                 io.stderr:write("Ignore snapshot\n")

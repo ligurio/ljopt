@@ -179,7 +179,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
         utils.enrich_snapshots_with_exits(trace_record)
         for i, snap in pairs(trace_record.snapshots) do
             local cur_sn, slot_values =
-                smt_snapshot.snap_to_smt_lib(ctx_src, snap, filtered_nodes)
+                smt_snapshot.snap_to_smt_lib(nodes, ctx_src, snap, filtered_nodes)
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
             snap_nums[i] = slot_values
         end
