@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 -- LuaJIT compiler dump module.
 --
--- Copyright (C) 2005-2025 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2017 Mike Pall. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 --
@@ -11,10 +11,13 @@
 
 -- Cache some library functions and objects.
 local jit = require("jit")
+assert(jit.version_num == 20100, "LuaJIT core/library version mismatch")
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
 local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
 local traceinfo, traceir, tracek = jutil.traceinfo, jutil.traceir, jutil.tracek
+local tracemc, tracesnap = jutil.tracemc, jutil.tracesnap
+local traceexitstub, ircalladdr = jutil.traceexitstub, jutil.ircalladdr
 local tracesnap = jutil.tracesnap
 local bit = require("bit")
 local band, shr, tohex = bit.band, bit.rshift, bit.tohex
@@ -25,6 +28,7 @@ local type, tostring = type, tostring
 local ir_dump_utils = require('ljopt.ir_dump_utils')
 local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
 
+local stdout, stderr = io.stdout, io.stderr
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
 jit.off(true, true)
@@ -35,13 +39,86 @@ local bcline, disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
--- Debug mode.
-local debug_mode = false
+------------------------------------------------------------------------------
 
-local function write_out(...)
-  assert(out)
-  if not debug_mode then return end
-  out:write(...)
+local symtabmt = { __index = false }
+local symtab = {}
+local nexitsym = 0
+
+-- Fill nested symbol table with per-trace exit stub addresses.
+local function fillsymtab_tr(tr, nexit)
+  local t = {}
+  symtabmt.__index = t
+  if jit.arch:sub(1, 4) == "mips" then
+    t[traceexitstub(tr, 0)] = "exit"
+    return
+  end
+  for i=0,nexit-1 do
+    local addr = traceexitstub(tr, i)
+    if addr < 0 then addr = addr + 2^32 end
+    t[addr] = tostring(i)
+  end
+  local addr = traceexitstub(tr, nexit)
+  if addr then t[addr] = "stack_check" end
+end
+
+-- Fill symbol table with trace exit stub addresses.
+local function fillsymtab(tr, nexit)
+  local t = symtab
+  if nexitsym == 0 then
+    local ircall = vmdef.ircall
+    for i=0,#ircall do
+      local addr = ircalladdr(i)
+      if addr ~= 0 then
+	if addr < 0 then addr = addr + 2^32 end
+	t[addr] = ircall[i]
+      end
+    end
+  end
+  if nexitsym == 1000000 then -- Per-trace exit stubs.
+    fillsymtab_tr(tr, nexit)
+  elseif nexit > nexitsym then -- Shared exit stubs.
+    for i=nexitsym,nexit-1 do
+      local addr = traceexitstub(i)
+      if addr == nil then -- Fall back to per-trace exit stubs.
+	fillsymtab_tr(tr, nexit)
+	setmetatable(symtab, symtabmt)
+	nexit = 1000000
+	break
+      end
+      if addr < 0 then addr = addr + 2^32 end
+      t[addr] = tostring(i)
+    end
+    nexitsym = nexit
+  end
+  return t
+end
+
+local function dumpwrite(s)
+  write_out(s)
+end
+
+-- Disassemble machine code.
+local function dump_mcode(tr)
+  local info = traceinfo(tr)
+  if not info then return end
+  local mcode, addr, loop = tracemc(tr)
+  if not mcode then return end
+  if not disass then disass = require("jit.dis_"..jit.arch) end
+  if addr < 0 then addr = addr + 2^32 end
+  write_out("---- TRACE ", tr, " mcode ", #mcode, "\n")
+  local ctx = disass.create(mcode, addr, dumpwrite)
+  ctx.hexdump = 0
+  ctx.symtab = fillsymtab(tr, info.nexit)
+  if loop ~= 0 then
+    symtab[addr+loop] = "LOOP"
+    ctx:disass(0, loop)
+    write_out("->LOOP:\n")
+    ctx:disass(loop, #mcode-loop)
+    symtab[addr+loop] = nil
+  else
+    ctx:disass(0, #mcode)
+  end
 end
 
 ------------------------------------------------------------------------------
@@ -73,9 +150,76 @@ local irtype_text = {
   "sfp",
 }
 
+local colortype_ansi = {
+  [0] = "%s",
+  "%s",
+  "%s",
+  "\027[36m%s\027[m",
+  "\027[32m%s\027[m",
+  "%s",
+  "\027[1m%s\027[m",
+  "%s",
+  "\027[1m%s\027[m",
+  "%s",
+  "\027[33m%s\027[m",
+  "\027[31m%s\027[m",
+  "\027[36m%s\027[m",
+  "\027[34m%s\027[m",
+  "\027[34m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+  "\027[35m%s\027[m",
+}
+
 local function colorize_text(s)
   return s
 end
+
+local function colorize_ansi(s, t)
+  return format(colortype_ansi[t], s)
+end
+
+local irtype_ansi = setmetatable({},
+  { __index = function(tab, t)
+      local s = colorize_ansi(irtype_text[t], t); tab[t] = s; return s; end })
+
+local html_escape = { ["<"] = "&lt;", [">"] = "&gt;", ["&"] = "&amp;", }
+
+local function colorize_html(s, t)
+  s = gsub(s, "[<>&]", html_escape)
+  return format('<span class="irt_%s">%s</span>', irtype_text[t], s)
+end
+
+local irtype_html = setmetatable({},
+  { __index = function(tab, t)
+      local s = colorize_html(irtype_text[t], t); tab[t] = s; return s; end })
+
+local header_html = [[
+<style type="text/css">
+background { background: #ffffff; color: #000000; }
+pre.ljdump {
+font-size: 10pt;
+background: #f0f4ff;
+color: #000000;
+border: 1px solid #bfcfff;
+padding: 0.5em;
+margin-left: 2em;
+margin-right: 2em;
+}
+span.irt_str { color: #00a000; }
+span.irt_thr, span.irt_fun { color: #404040; font-weight: bold; }
+span.irt_tab { color: #c00000; }
+span.irt_udt, span.irt_lud { color: #00c0c0; }
+span.irt_num { color: #4040c0; }
+span.irt_int, span.irt_i8, span.irt_u8, span.irt_i16, span.irt_u16 { color: #b040b0; }
+</style>
+]]
 
 local colorize, irtype
 
@@ -89,7 +233,6 @@ local litname = {
     if band(mode, 8) ~= 0 then s = s.."C" end
     if band(mode, 16) ~= 0 then s = s.."R" end
     if band(mode, 32) ~= 0 then s = s.."I" end
-    if band(mode, 64) ~= 0 then s = s.."K" end
     t[mode] = s
     return s
   end}),
@@ -99,17 +242,14 @@ local litname = {
     s = irtype[band(shr(mode, 5), 31)].."."..s
     if band(mode, 0x800) ~= 0 then s = s.." sext" end
     local c = shr(mode, 12)
-    if c == 1 then s = s.." none"
-    elseif c == 2 then s = s.." index"
-    elseif c == 3 then s = s.." check" end
+    if c == 2 then s = s.." index" elseif c == 3 then s = s.." check" end
     t[mode] = s
     return s
   end}),
   ["FLOAD "] = vmdef.irfield,
   ["FREF  "] = vmdef.irfield,
   ["FPMATH"] = vmdef.irfpm,
-  ["TMPREF"] = { [0] = "", "IN", "OUT", "INOUT", "", "", "OUT2", "INOUT2" },
-  ["BUFHDR"] = { [0] = "RESET", "APPEND", "WRITE" },
+  ["BUFHDR"] = { [0] = "RESET", "APPEND" },
   ["TOSTR "] = { [0] = "INT", "NUM", "CHAR" },
 }
 
@@ -169,7 +309,7 @@ local function formatk(tr, idx, sn)
   else
     s = tostring(k) -- For primitives.
   end
-  s = colorize(format("%-4s", s), t, band(sn or 0, 0x100000) ~= 0)
+  s = colorize(format("%-4s", s), t)
   if slot then
     s = format("%s @%d", s, slot)
   end
@@ -188,7 +328,7 @@ local function printsnap(tr, snap)
       elseif band(sn, 0x80000) ~= 0 then -- SNAP_SOFTFPNUM
 	write_out(colorize(format("%04d/%04d", ref, ref+1), 14))
       else
-	local _, ot, _, _ = traceir(tr, ref)
+	local m, ot, op1, op2 = traceir(tr, ref)
 	write_out(colorize(format("%04d", ref), band(ot, 31)))
       end
       write_out(band(sn, 0x10000) == 0 and " " or "|") -- SNAP_FRAME
@@ -226,7 +366,7 @@ end
 local function dumpcallfunc(tr, ins)
   local ctype
   if ins > 0 then
-    local _, ot, op1, op2 = traceir(tr, ins)
+    local m, ot, op1, op2 = traceir(tr, ins)
     if band(ot, 31) == 0 then -- nil type means CARG(func, ctype).
       ins = op1
       ctype = formatk(tr, op2)
@@ -245,7 +385,7 @@ local function dumpcallargs(tr, ins)
   if ins < 0 then
     write_out(formatk(tr, ins))
   else
-    local _, ot, op1, op2 = traceir(tr, ins)
+    local m, ot, op1, op2 = traceir(tr, ins)
     local oidx = 6*shr(ot, 8)
     local op = sub(vmdef.irnames, oidx+1, oidx+6)
     if op == "CARG  " then
@@ -267,8 +407,6 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   if not info then return end
   local nins = info.nins
   write_out("---- TRACE ", tr, " IR\n")
-
-  ir_dump_utils.ljopt_init_new_trace(tr)
   local irnames = vmdef.irnames
   local snapref = 65536
   local snap, snapno
@@ -278,9 +416,6 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     snapno = 0
   end
   for ins=1,nins do
-    if ins >= snapref then
-      ir_dump_utils.ljopt_savesnap(tr, ins, snap, snapno, info.linktype)
-    end
     if ins >= snapref then
       if dumpreg then
 	write_out(format("....              SNAP   #%-3d [ ", snapno))
@@ -295,8 +430,6 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local m, ot, op1, op2, ridsp = traceir(tr, ins)
     local oidx, t = 6*shr(ot, 8), band(ot, 31)
     local op = sub(irnames, oidx+1, oidx+6)
-    local op1_txt, op2_txt
-    local rid
     if op == "LOOP  " then
       if dumpreg then
 	write_out(format("%04d ------------ LOOP ------------\n", ins))
@@ -305,7 +438,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       end
     elseif op ~= "NOP   " and op ~= "CARG  " and
 	   (dumpreg or op ~= "RENAME") then
-      rid = band(ridsp, 255)
+      local rid = band(ridsp, 255)
       if dumpreg then
 	write_out(format("%04d %-6s", ins, ridsp_name(ridsp, ins)))
       else
@@ -328,51 +461,34 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
-	write_out(op1_txt)
+	write_out(formatk(tr, op1))
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
-	  write_out(op1_txt)
+	  write_out(formatk(tr, op1))
 	else
-	  op1_txt = format(m1 == 0 and "%04d" or "#%-3d", op1)
-	  write_out(op1_txt)
+	  write_out(format(m1 == 0 and "%04d" or "#%-3d", op1))
 	end
 	if m2 ~= 3*4 then -- op2 != IRMnone
 	  if m2 == 1*4 then -- op2 == IRMlit
 	    local litn = litname[op]
 	    if litn and litn[op2] then
-	      op2_txt = litn[op2]
-	      write_out("  ", op2_txt)
+	      write_out("  ", litn[op2])
 	    elseif op == "UREFO " or op == "UREFC " then
-	      op2_txt = format("  #%-3d", shr(op2, 8))
-	      write_out(op2_txt)
+	      write_out(format("  #%-3d", shr(op2, 8)))
 	    else
-	      op2_txt = format("  #%-3d", op2)
-	      write_out(op2_txt)
+	      write_out(format("  #%-3d", op2))
 	    end
 	  elseif op2 < 0 then
-	    op2_txt = ir_dump_utils.ljopt_formatsmt(tr, op2)
-	    write_out("  ", op2_txt)
+	    write_out("  ", formatk(tr, op2))
 	  else
-	    op2_txt = format("  %04d", op2)
-	    write_out(op2_txt)
+	    write_out(format("  %04d", op2))
 	  end
 	end
       end
       write_out("\n")
     end
-
-    local flags = format("%s%s",
-		       (rid == 254 or rid == 253) and "}" or
-		       (band(ot, 128) == 0 and " " or ">"),
-		       band(ot, 64) == 0 and " " or "+")
-    ir_dump_utils.ljopt_savetrace(
-      tr, ins, flags, irtype[t], op, op1_txt, op2_txt
-    )
   end
   if snap then
-    ir_dump_utils.ljopt_savesnap(tr, nins, snap, snapno, info.linktype)
     if dumpreg then
       write_out(format("....              SNAP   #%-3d [ ", snapno))
     else
@@ -386,6 +502,7 @@ end
 
 local recprefix = ""
 local recdepth = 0
+
 -- Format trace error message.
 local function fmterr(err, info)
   if type(err) == "number" then
@@ -402,12 +519,13 @@ end
 
 -- Dump trace states.
 local function dump_trace(what, tr, func, pc, otr, oex)
-  ir_dump_utils.ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
+    if dumpmode.m then dump_mcode(tr) end
   end
   if what == "start" then
+    if dumpmode.H then write_out('<pre class="ljdump">\n') end
     write_out("---- TRACE ", tr, " ", what)
     if otr then write_out(" ", otr, "/", oex == -1 and "stitch" or oex) end
     write_out(" ", fmtfunc(func, pc), "\n")
@@ -426,14 +544,16 @@ local function dump_trace(what, tr, func, pc, otr, oex)
 	write_out(" -> ", link, " ", ltype, "\n")
       end
     end
+    if dumpmode.H then write_out("</pre>\n\n") else write_out("\n") end
   else
+    if what == "flush" then symtab, nexitsym = {}, 0 end
     write_out("---- TRACE ", what, "\n\n")
   end
   out:flush()
 end
 
 -- Dump recorded bytecode.
-local function dump_record(tr, func, pc, depth) -- luacheck: no unused
+local function dump_record(tr, func, pc, depth, callee)
   if depth ~= recdepth then
     recdepth = depth
     recprefix = rep(" .", depth)
@@ -441,63 +561,64 @@ local function dump_record(tr, func, pc, depth) -- luacheck: no unused
   local line
   if pc >= 0 then
     line = bcline(func, pc, recprefix)
+    if dumpmode.H then line = gsub(line, "[<>&]", html_escape) end
   else
     line = "0000 "..recprefix.." FUNCC      \n"
+    callee = func
   end
   if pc <= 0 then
-    out:write(sub(line, 1, -2), "         ; ", fmtfunc(func), "\n")
+    write_out(sub(line, 1, -2), "         ; ", fmtfunc(func), "\n")
   else
-    out:write(line)
+    write_out(line)
   end
   if pc >= 0 and band(funcbc(func, pc), 0xff) < 16 then -- ORDER BC
-    out:write(bcline(func, pc+1, recprefix)) -- Write JMP for cond.
+    write_out(bcline(func, pc+1, recprefix)) -- Write JMP for cond.
   end
 end
 
 ------------------------------------------------------------------------------
 
-local gpr64 = jit.arch:match("64")
-local fprmips32 = jit.arch == "mips" or jit.arch == "mipsel"
-
 -- Dump taken trace exits.
-local function dump_texit(tr, ex, ngpr, nfpr, ...) -- luacheck: no unused
-  out:write("---- TRACE ", tr, " exit ", ex, "\n")
+local function dump_texit(tr, ex, ngpr, nfpr, ...)
+  write_out("---- TRACE ", tr, " exit ", ex, "\n")
   if dumpmode.X then
     local regs = {...}
-    if gpr64 then
+    if jit.arch == "x64" then
       for i=1,ngpr do
-	out:write(format(" %016x", regs[i]))
-	if i % 4 == 0 then out:write("\n") end
+	write_out(format(" %016x", regs[i]))
+	if i % 4 == 0 then write_out("\n") end
       end
     else
       for i=1,ngpr do
-	out:write(" ", tohex(regs[i]))
-	if i % 8 == 0 then out:write("\n") end
+	write_out(" ", tohex(regs[i]))
+	if i % 8 == 0 then write_out("\n") end
       end
     end
-    if fprmips32 then
+    if jit.arch == "mips" or jit.arch == "mipsel" then
       for i=1,nfpr,2 do
-	out:write(format(" %+17.14g", regs[ngpr+i]))
-	if i % 8 == 7 then out:write("\n") end
+	write_out(format(" %+17.14g", regs[ngpr+i]))
+	if i % 8 == 7 then write_out("\n") end
       end
     else
       for i=1,nfpr do
-	out:write(format(" %+17.14g", regs[ngpr+i]))
-	if i % 4 == 0 then out:write("\n") end
+	write_out(format(" %+17.14g", regs[ngpr+i]))
+	if i % 4 == 0 then write_out("\n") end
       end
     end
   end
 end
 
 ------------------------------------------------------------------------------
+
 -- Detach dump handlers.
 local function dumpoff()
   if active then
     active = false
+    jit.attach(dump_texit)
+    jit.attach(dump_record)
     jit.attach(dump_trace)
-    if out then out:close() end
+    if out and out ~= stdout and out ~= stderr then out:close() end
     out = nil
-    toggle_debug_hook()
   end
 end
 
@@ -512,7 +633,6 @@ local function dumpon(outfile)
   colorize = colorize_text
   irtype = irtype_text
   active = true
-  out = outfile or io.stdout
 end
 
 local function record(lua_code, debug_m)
@@ -525,7 +645,7 @@ local function record(lua_code, debug_m)
   end
 
   debug_mode = debug_m or os.getenv("LJOPT_DEBUG")
-  ir_dump_utils.ljopt_init_trace_state()
+  -- ir_dump_utils.ljopt_init_trace_state()
 
   local mtt = getmetatable("string")
   dumpon()
@@ -533,7 +653,8 @@ local function record(lua_code, debug_m)
   dumpoff()
   debug.setmetatable('string', mtt)
 
-  return ir_dump_utils.ljopt_get_execution_state()
+  -- return ir_dump_utils.ljopt_get_execution_state()
+  return nil
 end
 
 return {
