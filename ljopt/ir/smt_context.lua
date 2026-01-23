@@ -120,6 +120,7 @@ end
 function OpStackBV.load(self, op_num, type)
     dev_checks('table', 'number', 'string')
 
+    assert(op_num >= 0)
     local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     local val = string.format('(select %s %d)', self._name, op_num)
     return string.format(conv, val)
@@ -128,6 +129,7 @@ end
 function OpStackBV.store(self, op_num, type, data)
     dev_checks('table', 'number', 'string', 'string')
 
+    assert(op_num >= 0)
     if data == '' then
         return ''
     end
@@ -293,13 +295,13 @@ end
 -- On each snapshot we will store at pos (1 << _cur_stack)
 -- an smt formula, which contains boolean value:
 -- `true` if exited by this snapshot.
-function SnapStack.inc(self, exit_by_this_snap)
+function SnapStack.inc(self, snap_id, exit_by_this_snap)
     dev_checks('table', '?string')
 
     if (exit_by_this_snap ~= nil) then
         local masked = ('(bvshl (_ bv1 %d) (_ bv%d %d))'):format(
             smt_constants.MAXSNAP,
-            self._cur_stack,
+            snap_id,
             smt_constants.MAXSNAP)
         self._exited_by_snap =
             ('(bvor %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(

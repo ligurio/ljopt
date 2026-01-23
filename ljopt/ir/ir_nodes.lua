@@ -2,8 +2,9 @@
 Provides mapping between IR node opcodes and their translators.
 ]]--
 
+local tonumber = _G.tonumber
+
 local dev_checks = require('ljopt.dev_checks')
-local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local ljopt_config = require('ljopt.config')
 
 local ir_node_ADD = require('ljopt.ir.ADD')
@@ -45,7 +46,7 @@ local opcodes_table = {
     ['UGT'] = require('ljopt.ir.UGT'),
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
-    ['ABC'] = ir_node_dummy,
+    ['ABC'] = false,
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
@@ -92,12 +93,12 @@ local opcodes_table = {
     ['FPM_COS'] = false,
     ['FPM_TAN'] = false,
     -- Memory References.
-    ['AREF'] = ir_node_dummy,
-    ['HREFK'] = ir_node_dummy,
+    ['AREF'] = false,
+    ['HREFK'] = false,
     ['HREF'] = false,
-    ['NEWREF'] = ir_node_dummy,
+    ['NEWREF'] = false,
     ['UREFO'] = false,
-    ['UREFC'] = ir_node_dummy,
+    ['UREFC'] = false,
     ['FREF'] = false,
     ['STRREF'] = false,
     -- Loads and Stores.
@@ -108,8 +109,8 @@ local opcodes_table = {
     ['XLOAD'] = false,
     ['SLOAD'] = ir_node_SLOAD,
     ['VLOAD'] = false,
-    ['ASTORE'] = ir_node_dummy,
-    ['HSTORE'] = ir_node_dummy,
+    ['ASTORE'] = false,
+    ['HSTORE'] = false,
     ['USTORE'] = false,
     ['FSTORE'] = false,
     ['XSTORE'] = false,
@@ -119,7 +120,7 @@ local opcodes_table = {
     ['TNEW'] = false,
     ['TDUP'] = false,
     ['CNEW'] = false,
-    ['CNEWI'] = ir_node_dummy,
+    ['CNEWI'] = false,
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,
@@ -136,15 +137,15 @@ local opcodes_table = {
     ['CALLXS'] = false,
     ['CARG'] = false,
     -- Miscellaneous Ops.
-    ['SNAP'] = ir_node_dummy,
+    ['SNAP'] = false,
     ['NOP'] = ir_node_NOP,
     ['BASE'] = false,
     ['PVAL'] = false,
     ['GCSTEP'] = false,
     ['HIOP'] = false,
-    ['LOOP'] = ir_node_dummy,
+    ['LOOP'] = false,
     ['USE'] = false,
-    ['PHI'] = ir_node_dummy,
+    ['PHI'] = false,
     ['RENAME'] = false,
 }
 

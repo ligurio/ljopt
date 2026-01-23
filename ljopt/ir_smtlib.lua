@@ -17,8 +17,8 @@ local smt_snapshot = require('ljopt.ir.SNAP')
 local utils = require('ljopt.utils')
 
 -- Documentation: https://luajit.org/running.html
-local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
-local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')"
+local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1', '-narrow')"
+local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')"
 
 local dev_trace_dump = function() end
 
@@ -59,7 +59,7 @@ local function construct_nodes(trace)
         if filter_nodes[i] == nil then
             table.insert(nodes_table, ir_node.instance(
                 string.format("%04d", node.num),
-                node.flags,
+                node.irt_guard,
                 node.irtype,
                 node.irop,
                 node.op1,
@@ -68,7 +68,7 @@ local function construct_nodes(trace)
         else
             table.insert(nodes_table, ir_node_dummy.instance(
                 string.format("%04d", node.num),
-                node.flags,
+                false,
                 node.irtype,
                 node.irop,
                 node.op1,
@@ -176,12 +176,12 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
     if trace_record.snapshots ~= nil then
-        utils.enrich_snapshots_with_exits(trace_record)
-        for i, snap in pairs(trace_record.snapshots) do
+        utils.enrich_snapshots_with_exits(nodes, trace_record)
+        for snap_id, snap in pairs(trace_record.snapshots) do
             local cur_sn, slot_values =
-                smt_snapshot.snap_to_smt_lib(nodes, ctx_src, snap, filtered_nodes)
+                smt_snapshot.snap_to_smt_lib(nodes, ctx_src, snap_id, snap, filtered_nodes)
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
-            snap_nums[i] = slot_values
+            snap_nums[snap_id] = slot_values
         end
         smtlib_buf = smtlib_buf .. ctx_src.snap_stack:finalize()
     end

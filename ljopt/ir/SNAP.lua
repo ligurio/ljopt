@@ -17,7 +17,7 @@ local ljopt_config = require("ljopt.config")
 -- https://ujit.readthedocs.io/en/latest/public/tut-snap.html
 -- @a snapshot output of ir_dump.
 -- In format: array<(slot, value, optional_value)>
-local function snap_to_smt_lib(trace, ctx, snapshot, filtered_nodes)
+local function snap_to_smt_lib(trace, ctx, snap_id, snapshot, filtered_nodes)
     local snap_data = {}
     -- Slot number -> SMT expression.
     local slot_values = {}
@@ -73,7 +73,7 @@ local function snap_to_smt_lib(trace, ctx, snapshot, filtered_nodes)
             e = ('(or %s %s)'):format(ctx.te_stack:load(b), e)
         end
     end
-    ctx.snap_stack:inc(e)
+    ctx.snap_stack:inc(snap_id, e)
     return table.concat(snap_data, "\n"), slot_values
 end
 

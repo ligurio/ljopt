@@ -31,7 +31,7 @@ end
 -- We need to add to every snapshot number of instructions with
 -- guard. The function sorts snapshots by nins, and walks over
 -- a trace adding guard to the last snapshot.
-local function enrich_snapshots_with_exits(trace_record)
+local function enrich_snapshots_with_exits(nodes, trace_record)
     local ins2snap = {}
     for uid, ins_snap in pairs(trace_record.snapshots) do
         trace_record.snapshots[uid].exits = {}
@@ -42,8 +42,8 @@ local function enrich_snapshots_with_exits(trace_record)
         return a.nins < b.nins
     end)
     local cur_snap_id = 1
-    for ir_id, ir_node in pairs(trace_record.trace) do
-        if (ir_node ~= nil and ir_node.irt_guard) then
+    for ir_id, ir_node in pairs(nodes) do
+        if (ir_node ~= nil and ir_node:get_flags()) then
             -- Search for associated snapshot.
             while (#ins2snap >= cur_snap_id + 1 and
                    ins2snap[cur_snap_id + 1].nins <= ir_id) do
@@ -54,8 +54,8 @@ local function enrich_snapshots_with_exits(trace_record)
                 table.insert(trace_record.snapshots[snap_uid].exits, ir_id)
                 if ljopt_config.is_debug() then
                     io.stderr:write(
-                        ("Snapshot %d depends on %d\n"):format(
-                            ins2snap[cur_snap_id].nins, ir_id
+                        ("Snapshot %d %d depends on %d\n"):format(
+                            ins2snap[cur_snap_id].nins, snap_uid, ir_id
                         )
                     )
                 end
