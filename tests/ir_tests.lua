@@ -343,7 +343,6 @@ test:test("CONV (num.int (int.num))", function(test)
         conv_smt1 ..
         ("\n(assert (= %s #x0000000000000005))"):format(
                ctx_src.op_stack:load(conv_slot, "int"), f2bv(5))
-    print(expect_sat1)
     test:is(smt:check(expect_sat1), smt.result.SAT,
         "SMT-LIB checking CONV is SAT1"
     )

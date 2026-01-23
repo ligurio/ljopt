@@ -110,7 +110,6 @@ local function retrieve_int_op(operand, ctx, type)
     dev_checks('table', 'string', 'table')
 
     local op_type = parse_op(operand)
-    print(op_type)
     if op_type == 'op' then
         -- Result of self may be num, but operand
         -- should be loaded as int.
