@@ -10,7 +10,7 @@ impls.IRNodeABSInt = {}
 ir_node.extended(impls.IRNodeABSInt, ir_node.ir_node_base)
 
 function impls.IRNodeABSInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
     local data = ('(ite (bvslt %s (_ bv0 64)) (bvneg %s) %s)'):format(
         left_op, left_op, left_op
     )

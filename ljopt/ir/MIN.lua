@@ -10,8 +10,8 @@ impls.IRNodeMINInt = {}
 ir_node.extended(impls.IRNodeMINInt, bin_op.BinOpInt)
 
 function impls.IRNodeMINInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_int_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(ite (bvsle %s %s) %s %s)',
         left_op, right_op, left_op, right_op
     )
@@ -22,8 +22,8 @@ impls.IRNodeMINI64 = {}
 ir_node.extended(impls.IRNodeMINI64, bin_op.BinOpI64)
 
 function impls.IRNodeMINI64:to_smt_lib(ctx)
-    local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_i64_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_i64_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(ite (bvsle %s %s) %s %s))',
         left_op, right_op, left_op, right_op
     )

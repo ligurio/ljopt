@@ -25,6 +25,7 @@ local function snap_to_smt_lib(trace, ctx, snapshot, filtered_nodes)
         local slot, value_type, value_data = pair[1], pair[2], pair[3]
         local smt_expr
         local type = "num"
+        print("SLOOOOT IS ", slot)
         if value_type == "ssa" then
             -- Write only if this value is implemented.
             if filtered_nodes[value_data] == nil then

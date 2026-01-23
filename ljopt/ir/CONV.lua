@@ -16,11 +16,11 @@ function IRNodeCONV:to_smt_lib(ctx)
     -- TODO: Support other conversions.
     if parsed_right_op[1] == 'num.int' then
         left_op = self:get_left_op()
-        data = self:retrieve_int_op(left_op, ctx)
+        data = ir_node.retrieve_int_op(left_op, ctx, self:get_type())
         -- We optimize useless conversion fp -> int -> fp
         -- in case of num.
         -- Make actual conversion only if it's not 'num'.
-        if self:parse_op(left_op) ~= 'num' then
+        -- if ir_node.parse_op(left_op) ~= 'num' then
             -- LuaJIT follows C semantic when converting
             -- num -> int.
             -- And in C it's RTZ as stated in standard 6.3.1.4:
@@ -30,19 +30,18 @@ function IRNodeCONV:to_smt_lib(ctx)
             data = ('RTZ ((_ sign_extend 32) ((_ extract 31 0) %s)) '):format(
                 data
             )
-        end
+        -- end
         data = string.format('((_ to_fp 11 53) %s)', data)
     elseif parsed_right_op[1] == 'int.num' then
-        data = self:retrieve_num_op(self:get_left_op(), ctx)
+        data = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ to_fp 11 53) %s)', data)
         data = string.format('((_ fp.to_sbv 64) RNE %s)', data)
     elseif parsed_right_op[1] == 'num.i64' then
-        left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
         -- TODO recheck rounding behaviour.
         data = string.format('((_ to_fp 11 53) %s)', left_op)
     elseif parsed_right_op[1] == 'i64.num' then
-        left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
         -- TODO handle inputs that are out of range.
         data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
     else

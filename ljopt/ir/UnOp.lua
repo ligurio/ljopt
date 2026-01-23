@@ -13,19 +13,19 @@ local IRNodeUnOpI64 = {}
 ir_node.extended(IRNodeUnOpI64, IRNodeUnOpBase)
 
 function IRNodeUnOpNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 function IRNodeUnOpInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 function IRNodeUnOpI64:to_smt_lib(ctx)
-    local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
@@ -40,19 +40,19 @@ local IRNodeUnOpGuardI64 = {}
 ir_node.extended(IRNodeUnOpGuardI64, IRNodeUnOpBase)
 
 function IRNodeUnOpGuardNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 
 function IRNodeUnOpGuardInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 
 function IRNodeUnOpGuardI64:to_smt_lib(ctx)
-    local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
     local data = string.format('(%s %s)', self.op_str, left_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end

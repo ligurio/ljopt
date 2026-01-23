@@ -27,7 +27,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(3)
+test:plan(4)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -315,6 +315,50 @@ test:test("CONV from op", function(test)
                ctx_src.op_stack:load(conv_slot, "num"), f2bv(5))
     test:is(smt:check(expect_sat), smt.result.SAT,
         "SMT-LIB checking CONV is SAT"
+    )
+end)
+
+test:test("CONV (num.int (int.num))", function(test)
+    -- 0001 >  num ADD  #x4000000000000000  #x4008000000000000
+    -- 0002    num CONV   0001  int.num
+
+    test:plan(2)
+
+    local conv_slot = 2
+    local conv_slot2 = 3
+    local addov_node = create_node("num", "ADD", f2bv(2), f2bv(3), 1)
+    local conv_node = create_node("int", "CONV", "0001", "int.num", conv_slot)
+    local conv_node2 = create_node("num", "CONV", "0002", "num.int", conv_slot2)
+
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+
+    local conv_smt1 = translate.translate(
+        {trace={addov_node, conv_node}}, ctx_src, nil, nil
+    )
+
+    local expect_sat1 =
+        op_init ..
+        conv_smt1 ..
+        ("\n(assert (= %s #x0000000000000005))"):format(
+               ctx_src.op_stack:load(conv_slot, "int"), f2bv(5))
+    print(expect_sat1)
+    test:is(smt:check(expect_sat1), smt.result.SAT,
+        "SMT-LIB checking CONV is SAT1"
+    )
+
+    local conv_smt2 = translate.translate(
+        {trace={addov_node, conv_node, conv_node2}}, ctx_src, nil, nil
+    )
+
+    local expect_sat2 =
+        op_init ..
+        conv_smt2 ..
+        ("\n(assert (= %s ((_ to_fp 11 53) %s)))"):format(
+               ctx_src.op_stack:load(conv_slot2, "num"), f2bv(5))
+    test:is(smt:check(expect_sat2), smt.result.SAT,
+        "SMT-LIB checking CONV is SAT2"
     )
 end)
 

@@ -12,9 +12,11 @@ ir_node.extended(IRNodeBinOpInt, IRNodeBinOpBase)
 local IRNodeBinOpI64 = {}
 ir_node.extended(IRNodeBinOpI64, IRNodeBinOpBase)
 
+-- Implements any binary operation
+-- with `num` as left and right argument
 function IRNodeBinOpNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_num_op(self:get_right_op(), ctx, self:get_type())
     local maybe_round = 'RNE'
     if self.ignore_rounding then
         maybe_round = ''
@@ -26,15 +28,15 @@ function IRNodeBinOpNum:to_smt_lib(ctx)
 end
 
 function IRNodeBinOpInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_int_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 function IRNodeBinOpI64:to_smt_lib(ctx)
-    local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_i64_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_i64_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
@@ -50,22 +52,22 @@ local IRNodeBinOpGuardI64 = {}
 ir_node.extended(IRNodeBinOpGuardI64, IRNodeBinOpBase)
 
 function IRNodeBinOpGuardNum:to_smt_lib(ctx)
-    local left_op = self:retrieve_num_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_num_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_num_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 
 function IRNodeBinOpGuardInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_int_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_int_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 
 function IRNodeBinOpGuardI64:to_smt_lib(ctx)
-    local left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
-    local right_op = self:retrieve_i64_op(self:get_right_op(), ctx)
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_i64_op(self:get_right_op(), ctx, self:get_type())
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end

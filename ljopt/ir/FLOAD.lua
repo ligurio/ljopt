@@ -24,9 +24,9 @@ function impls.IRNodeFLOADNum:to_smt_lib(ctx)
         -- constants appear only in asm.
         if ffi.abi('gc64') then
             if right_op == '#306' then
-                data = self:retrieve_num_op('#x8000000000000000', ctx)
+                data = ir_node.retrieve_num_op('#x8000000000000000', ctx, self:get_type())
             elseif right_op == '#302' then
-                data = self:retrieve_num_op('#x7fffffffffffffff', ctx)
+                data = ir_node.retrieve_num_op('#x7fffffffffffffff', ctx, self:get_type())
             else
                 assert(false,
                     'Unreachable. Other constants should not be here.'
@@ -34,9 +34,9 @@ function impls.IRNodeFLOADNum:to_smt_lib(ctx)
             end
         else
             if right_op == '#226' then
-                data = self:retrieve_num_op('#x8000000000000000', ctx)
+                data = ir_node.retrieve_num_op('#x8000000000000000', ctx, self:get_type())
             elseif right_op == '#222' then
-                data = self:retrieve_num_op('#x7fffffffffffffff', ctx)
+                data = ir_node.retrieve_num_op('#x7fffffffffffffff', ctx, self:get_type())
             else
                 assert(false,
                     'Unreachable. Other constants should not be here.'
@@ -45,7 +45,7 @@ function impls.IRNodeFLOADNum:to_smt_lib(ctx)
         end
     end
     if right_op == 'cdata.int64' then
-        left_op = self:retrieve_i64_op(self:get_left_op(), ctx)
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, self:get_type())
         data = left_op
     end
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)

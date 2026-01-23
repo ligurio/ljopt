@@ -41,7 +41,7 @@ local function get_right_op(self)
     return self._right_op
 end
 
-local function parse_op(self, operand, maxrecord)
+local function parse_op(operand, maxrecord)
     dev_checks('table', 'string', '?number')
 
     -- Maximum number of recorded IR instructions in LuaJIT.
@@ -51,29 +51,33 @@ local function parse_op(self, operand, maxrecord)
     -- TODO: Add integer OPs, right now we support only floats,
     -- represented as #x0123456.
     if operand:sub(1, 2) == '#x' then
-        assert(self:get_type() == 'num' or self:get_type() == 'int' or
-            self:get_type() == 'i64' or self:get_type() == 'u64')
-        return self:get_type()
+        -- We represent as a constant only numbers.
+        -- They should
+        return 'num'
     elseif operand == 'false' or operand == 'true' then
+        assert('Unreachable?')
         return 'bool'
     elseif string.len(operand) == string.len(tostring(maxrecord)) then
         return 'op'
     end
+    assert('Unknown type')
     return self:get_type()
 end
 
-local function retrieve_slot_op(self, operand)
+local function retrieve_slot_op(operand)
     dev_checks('table', 'string')
 
     return tonumber(operand:sub(2))
 end
 
-local function retrieve_num_op(self, operand, ctx)
+-- Loads number from stack.
+-- 
+local function retrieve_num_op(operand, ctx, type)
     dev_checks('table', 'string', 'table')
 
-    local op_type = self:parse_op(operand)
+    local op_type = parse_op(operand)
     if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), self:get_type())
+        operand = ctx.op_stack:load(tonumber(operand), type)
     elseif op_type == 'num' then
         local conv = '((_ to_fp 11 53) %s)'
         operand = string.format(conv, operand)
@@ -102,10 +106,11 @@ local function hex_double_to_i64_hex(hex_str)
 end
 
 
-local function retrieve_int_op(self, operand, ctx)
+local function retrieve_int_op(operand, ctx, type)
     dev_checks('table', 'string', 'table')
 
-    local op_type = self:parse_op(operand)
+    local op_type = parse_op(operand)
+    print(op_type)
     if op_type == 'op' then
         -- Result of self may be num, but operand
         -- should be loaded as int.
@@ -120,8 +125,12 @@ local function retrieve_int_op(self, operand, ctx)
             assert(false)
         end
     elseif op_type == 'num' then
-        -- Let's not convert num back and forth.
-        return operand
+        if string.sub(operand, 1, 2) == '#x' then
+            return hex_double_to_i64_hex(operand)
+        else
+            -- Unreachable?
+            assert(false)
+        end
     end
     assert(false, 'op_type ' .. op_type .. ' is not supported yet')
 end
@@ -129,7 +138,7 @@ end
 local function retrieve_i64_op(self, operand, ctx)
     dev_checks('table', 'string', 'table')
 
-    local op_type = self:parse_op(operand)
+    local op_type = parse_op(operand)
     if op_type == 'op' then
         operand = ctx.op_stack:load(tonumber(operand), self:get_type())
     elseif op_type == 'i64' then
@@ -165,11 +174,6 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
         get_opcode = get_opcode,
         get_left_op = get_left_op,
         get_right_op = get_right_op,
-        parse_op = parse_op,
-        retrieve_slot_op = retrieve_slot_op,
-        retrieve_num_op = retrieve_num_op,
-        retrieve_int_op = retrieve_int_op,
-        retrieve_i64_op = retrieve_i64_op
     }
 
     -- This method should be overridden in child classes.
@@ -189,5 +193,10 @@ end
 
 return {
     ir_node_base = ir_node_base,
-    extended = extended
+    extended = extended,
+    retrieve_slot_op = retrieve_slot_op,
+    retrieve_num_op = retrieve_num_op,
+    retrieve_int_op = retrieve_int_op,
+    retrieve_i64_op = retrieve_i64_op,
+    parse_op = parse_op,
 }
