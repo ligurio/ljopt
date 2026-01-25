@@ -8,6 +8,8 @@ local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
 local byte = string.byte
 
+local tonumber = _G.tonumber
+
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
 jit.off(true, true)
@@ -59,7 +61,7 @@ end
 local function ljopt_init_new_trace(tr)
   dev_checks("number")
   local tr_id = get_trace_id(tr)
-  assert(exec_record[tr_id] == nil)
+  assert(exec_record[tr_id] == nil, "Trace with exactly this bytecode already exists.")
   exec_record[tr_id] = {}
   exec_record[tr_id].trace = {}
   exec_record[tr_id].snapshots = {}
@@ -105,12 +107,12 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
     local info = jutil.traceinfo(tr)
     local fi = funcinfo(func)
     local src = fi and fi.source or "?"
-    local linedefined = fi and fi.linedefined or "?"
+    local linedefined = tonumber(string.match(fmtfunc(func, pc), ":(%d+)"))
     local linktype = info and info.linktype or "root"
     local key_str = fnv1a_hash(src) ..
         (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
         tostring(otr or "")
-    traces_num[tr] = key_str
+    traces_num[tr] = key_str .. '_' .. linedefined .. '_'
   elseif what == "stop" or what == "abort" then
     traces_num[tr] = traces_num[tr] .. tostring(fnv1a_hash(trace_bc_hash[tr]))
   end
@@ -211,7 +213,14 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
   local tr_id = get_trace_id(tr)
   local snap_id = get_snap_uid(tr, snapno)
   assert(snap_id >= 0)
-  exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
+  if exec_record[tr_id].snapshots[snap_id] == nil then
+    -- Do not overwrite (it means we're in a loop).
+    -- This is temporary solution to support first
+    -- iteration (and nothing else!) of loop verification.
+    exec_record[tr_id].snapshots[snap_id] = {nins = {nins}, slots = snapshot}
+  else
+    table.insert(exec_record[tr_id].snapshots[snap_id].nins, nins)
+  end
 end
 
 local function trim(s)
