@@ -48,7 +48,11 @@ function IRNodeCONV:to_smt_lib(ctx)
         assert(false, 'Unsupported type conversion: '..right_op)
     end
 
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+    local te = ""
+    if self:get_flags() == true then
+        te = ctx.te_stack:store(self:get_ssa_reference(), 'true') .. '\n'
+    end
+    return te .. ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
 local function instance(_node_str)
