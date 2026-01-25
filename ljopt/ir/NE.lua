@@ -5,8 +5,19 @@ local impls = {}
 
 impls.IRNodeNEInt = { op_str = 'distinct' }
 ir_node.extended(impls.IRNodeNEInt, bin_op.BinOpGuardInt)
-impls.IRNodeNENum = { op_str = 'distinct' }
-ir_node.extended(impls.IRNodeNENum, bin_op.BinOpGuardNum)
+
+
+impls.IRNodeNENum = {}
+ir_node.extended(impls.IRNodeNENum, ir_node.ir_node_base)
+
+function impls.IRNodeNENum:to_smt_lib(ctx)
+    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, self:get_type())
+    local right_op = ir_node.retrieve_num_op(self:get_right_op(), ctx, self:get_type())
+    local data = string.format('(not (fp.eq %s %s))',
+        left_op, right_op
+    )
+    return ctx.te_stack:store(self:get_ssa_reference(), data)
+end
 
 local function instance(node_str)
     return impls[node_str]
