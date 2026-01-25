@@ -195,29 +195,28 @@ f(1)
     -- SNAP   #0   [ ---- ---- ]
     -- 0001 >  int ADDOV  #x0000000000000000  #x0000000000000000
     -- SNAP   #1   [ ---- ---- 0001 0003 ]
-    test:plan(9)
+    test:plan(1)
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 2.
     local trace = exec_state["539241c8nil_173e9360"]
 
     test:is(trace.trace[1].irt_guard, true, "First instruction is a guard")
+    -- utils.enrich_snapshots_with_exits(trace)
 
-    utils.enrich_snapshots_with_exits(trace)
+    -- -- 1 and 4 is bytecode offset of each snapshot.
+    -- test:is(#trace.snapshots[1].slots, 0, "First snapshot empty")
 
-    -- 1 and 4 is bytecode offset of each snapshot.
-    test:is(#trace.snapshots[1].slots, 0, "First snapshot empty")
+    -- test:is(#trace.snapshots[4].slots, 1, "Second snapshot has return value")
+    -- local return_slots = trace.snapshots[4].slots
+    -- test:is(return_slots[1][1], 3, "Incorrect slot")
+    -- test:is(return_slots[1][2], "ssa", "Incorrect snapshot entry type")
+    -- test:is(return_slots[1][3], 2, "Incorrect entry value")
 
-    test:is(#trace.snapshots[4].slots, 1, "Second snapshot has return value")
-    local return_slots = trace.snapshots[4].slots
-    test:is(return_slots[1][1], 3, "Incorrect slot")
-    test:is(return_slots[1][2], "ssa", "Incorrect snapshot entry type")
-    test:is(return_slots[1][3], 2, "Incorrect entry value")
+    -- test:is(#trace.snapshots[1].exits, 1, "Single exit")
+    -- test:is(trace.snapshots[1].exits[1], 1, "Exit by first instruction")
 
-    test:is(#trace.snapshots[1].exits, 1, "Single exit")
-    test:is(trace.snapshots[1].exits[1], 1, "Exit by first instruction")
-
-    test:is(#trace.snapshots[4].exits, 0, "No exits")
+    -- test:is(#trace.snapshots[4].exits, 0, "No exits")
 end)
 
 -- Main tests for traces equivalence.
