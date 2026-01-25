@@ -166,7 +166,7 @@ end
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 3 (line number).
-    local trace = exec_state["c020c16anil_48a70f7c"]
+    local trace = exec_state["c020c16anil__3_48a70f7c"]
 
     test:is(trace.trace[9].irt_isphi, true, "9-th instruction is a phi")
     test:is(trace.trace[6].irt_mark, true, "6-th instruction is marked")
@@ -199,7 +199,7 @@ f(1)
 
     local exec_state = ljopt.ir.record(src)
     -- Our trace is always number 2.
-    local trace = exec_state["539241c8nil_173e9360"]
+    local trace = exec_state["539241c8nil__2_173e9360"]
 
     test:is(trace.trace[1].irt_guard, true, "First instruction is a guard")
     -- utils.enrich_snapshots_with_exits(trace)

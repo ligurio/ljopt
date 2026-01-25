@@ -172,10 +172,8 @@ test:test("IR arithmetic tests", function(test)
                test_case.node.irtype == "int" then
             -- To not convert op_stack from 64 bytes to 32 and
 			-- back - just use 64 here.
-            expected = string.format("#x%.8x%s", 0,
-                bit.tohex(bit.band(test_case.result, 0xFFFFFFFF), 8))
-            unexpected = string.format("#x%.8x%s", 0,
-                bit.tohex(bit.band(test_case.error, 0xFFFFFFFF), 8))
+            expected = string.format("#x%016x", test_case.result)
+            unexpected = string.format("#x%016x", test_case.error)
         else
             assert(false, "Unsupported " .. test_case.node.irtype)
         end

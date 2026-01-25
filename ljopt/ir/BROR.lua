@@ -10,7 +10,7 @@ function impls.IRNodeBRORInt:to_smt_lib(ctx)
     local right_op = ir_node.retrieve_int_op(self:get_right_op(), ctx, self:get_type())
     local left_i32 = ('((_ extract 31 0) %s)'):format(left_op)
     local right_i32 = ('((_ extract 31 0) %s)'):format(right_op)
-    local data = ('(concat #x00000000 (ext_rotate_right %s %s))'):format(
+    local data = ('((_ sign_extend 32) (ext_rotate_right %s %s))'):format(
         left_i32, right_i32
     )
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
