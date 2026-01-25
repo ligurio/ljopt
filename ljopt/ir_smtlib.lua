@@ -164,7 +164,6 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     -- 3rd stage. Converting to SMT-LIB.
     for i = 1, table.getn(nodes) do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
-            .. (nodes[i]:get_flags() or '') .. ' '
             .. (nodes[i]:get_type() or '') .. ' '
             .. (nodes[i]:get_opcode() or '') .. ' '
             .. (nodes[i]:get_left_op() or '') .. ' '
@@ -177,9 +176,20 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     local snap_nums = {}
     if trace_record.snapshots ~= nil then
         utils.enrich_snapshots_with_exits(nodes, trace_record)
-        for snap_id, snap in pairs(trace_record.snapshots) do
+
+        local ordered_snaps = {}
+        for uid, ins_snap in pairs(trace_record.snapshots) do
+            local nins = ins_snap.nins
+            table.insert(ordered_snaps, {nins = nins, uid = uid})
+        end
+        table.sort(ordered_snaps, function(a, b)
+            return a.nins < b.nins
+        end)
+        for i, uid in ipairs(ordered_snaps) do
+            local snap_id = uid.uid
+            local snap = trace_record.snapshots[snap_id]
             local cur_sn, slot_values =
-                smt_snapshot.snap_to_smt_lib(nodes, ctx_src, snap_id, snap, filtered_nodes)
+                smt_snapshot.snap_to_smt_lib(nodes, ctx_src, tr_id, snap_id, snap, filtered_nodes)
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
             snap_nums[snap_id] = slot_values
         end
@@ -317,4 +327,5 @@ return {
     translate_to_smt = translate_to_smt,
     translate = translate,
     traces_to_smt = traces_to_smt,
+    construct_nodes = construct_nodes,
 }

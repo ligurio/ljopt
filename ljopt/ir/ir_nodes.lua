@@ -226,9 +226,11 @@ end
 -- dependencies
 local function get_nyi_nodes(nodes)
     local nyi_nodes = {}
+    local in_loop = false
     for i = 1, table.getn(nodes) do
+        in_loop = in_loop or nodes[i].irop == "LOOP"
         local node = get_node(nodes[i].irop, nodes[i].irtype)
-        if node == nil then
+        if node == nil or in_loop then
             nyi_nodes[i] = true
             if ljopt_config.is_debug() then
                 local node_str = 'IRNode' .. nodes[i].irop

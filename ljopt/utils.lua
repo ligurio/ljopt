@@ -41,6 +41,16 @@ local function enrich_snapshots_with_exits(nodes, trace_record)
     table.sort(ins2snap, function(a, b)
         return a.nins < b.nins
     end)
+    if ljopt_config.is_debug() then
+        for id, snap in pairs(ins2snap) do
+            io.stderr:write(
+                ("Snapshot %d %d\n"):format(
+                    snap.nins, snap.uid
+                )
+            )
+        end
+    end
+
     local cur_snap_id = 1
     for ir_id, ir_node in pairs(nodes) do
         if (ir_node ~= nil and ir_node:get_flags()) then

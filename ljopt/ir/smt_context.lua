@@ -295,13 +295,24 @@ end
 -- On each snapshot we will store at pos (1 << _cur_stack)
 -- an smt formula, which contains boolean value:
 -- `true` if exited by this snapshot.
-function SnapStack.inc(self, snap_id, exit_by_this_snap)
+function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
     dev_checks('table', '?string')
 
     if (exit_by_this_snap ~= nil) then
+        local id = -1
+        if ctx.snap_mapping.map[tr_id .. snap_id] then
+            -- print("old_ ", tr_id .. "_" .. snap_id, ctx.snap_mapping.map[tr_id .. snap_id])
+            id = ctx.snap_mapping.map[tr_id .. snap_id]
+        else
+            -- print("new_ ", tr_id .. "_" .. snap_id, ctx.snap_mapping.cur_id)
+            ctx.snap_mapping.map[tr_id .. snap_id] = ctx.snap_mapping.cur_id
+            ctx.snap_mapping.cur_id = ctx.snap_mapping.cur_id + 1
+            id = ctx.snap_mapping.map[tr_id .. snap_id]
+        end
+
         local masked = ('(bvshl (_ bv1 %d) (_ bv%d %d))'):format(
             smt_constants.MAXSNAP,
-            snap_id,
+            id,
             smt_constants.MAXSNAP)
         self._exited_by_snap =
             ('(bvor %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(
@@ -332,6 +343,7 @@ function SMTContext:new(vm_stack_type, op_stack_type)
 
     self.te_stack = TEStackBV:new()
     self.snap_stack = SnapStack:new()
+    self.snap_mapping = { cur_id = 0, map = {} }
 
     return self
 end

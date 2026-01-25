@@ -210,9 +210,7 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
   end
   local tr_id = get_trace_id(tr)
   local snap_id = get_snap_uid(tr, snapno)
-  if (snap_id < 0) then
-    return
-  end
+  assert(snap_id >= 0)
   if exec_record[tr_id].snapshots[snap_id] == nil then
     -- Do not overwrite (it means we're in a loop).
     -- This is temporary solution to support first
