@@ -5,6 +5,7 @@
 -- luacheck: pop
 
 local jit = require('jit')
+local type = type
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
@@ -180,7 +181,11 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
         local ordered_snaps = {}
         for uid, ins_snap in pairs(trace_record.snapshots) do
             local nins = ins_snap.nins
-            table.insert(ordered_snaps, {nins = nins, uid = uid})
+            local min_ins = nins[1]
+            for i, nins in ipairs(ins_snap.nins) do
+                if nins < min_ins then min_ins = nins end
+            end
+            table.insert(ordered_snaps, {nins = min_ins, uid = uid})
         end
         table.sort(ordered_snaps, function(a, b)
             return a.nins < b.nins
@@ -238,7 +243,7 @@ local function record_code(lua_code, opt)
     -- trace numbers across recordings.
     jit.flush()
     local exec_records = dump_ir.record(lua_code, ljopt_config.is_debug())
-    assert(type(exec_records) == 'table')
+    assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
     return exec_records
 end
 
