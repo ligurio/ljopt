@@ -26,10 +26,6 @@ if not lua_code or
   os.exit(exit_codes.critical)
 end
 
-if ljopt_config.is_debug() then
-  io.stdout:write(("Lua code: %s\n"):format(lua_code))
-end
-
 local result = ljopt.ir.translate_to_smt(lua_code, true)
 io.stdout:write(result)
 os.exit(exit_codes.ok)
