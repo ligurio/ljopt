@@ -61,7 +61,7 @@ end
 local function ljopt_init_new_trace(tr)
   dev_checks("number")
   local tr_id = get_trace_id(tr)
-  assert(exec_record[tr_id] == nil, "Trace with exactly this bytecode already exists.")
+  assert(exec_record[tr_id] == nil, "Trace with exactly this bytecode already exists " .. tr_id)
   exec_record[tr_id] = {}
   exec_record[tr_id].trace = {}
   exec_record[tr_id].snapshots = {}
