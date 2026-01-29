@@ -3,6 +3,7 @@ local vmdef = require("jit.vmdef")
 local jit = require("jit")
 local funcinfo = jutil.funcinfo
 local tracek = jutil.tracek
+local ljopt_config = require('ljopt.config')
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
@@ -95,7 +96,7 @@ end
 local function ljopt_record_trace(traceno, func, pt, fd)
 
   if trace_bc_hash[traceno] then
-    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. (pt + 1)
+    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. ' ' .. (pt + 1)
   end
 end
 
@@ -112,9 +113,22 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
     local key_str = fnv1a_hash(src) ..
         (oex == -1 and "stitch" or tostring(oex)) .. "_" ..
         tostring(otr or "")
-    traces_num[tr] = key_str .. '_' .. linedefined .. '_'
+    local copy = "_" .. tostring(otr or "")
+    traces_num[tr] = ""
+    if otr then
+      traces_num[tr] = traces_num[tonumber(otr)]
+      if oex then
+        traces_num[tr] = traces_num[tr] .. "_" .. get_snap_uid(tonumber(otr), tonumber(oex))
+      end
+    end
   elseif what == "stop" or what == "abort" then
-    traces_num[tr] = traces_num[tr] .. tostring(fnv1a_hash(trace_bc_hash[tr]))
+    if ljopt_config.is_debug() then
+      print("Parent trace id: " .. traces_num[tr] .. " Trace hash: " .. trace_bc_hash[tr])
+    end
+    traces_num[tr] = traces_num[tr] .. "_" .. tostring(fnv1a_hash(trace_bc_hash[tr]))
+    if ljopt_config.is_debug() then
+      print("Cur trace id: " .. traces_num[tr])
+    end
   end
 end
 
@@ -213,13 +227,17 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
   local tr_id = get_trace_id(tr)
   local snap_id = get_snap_uid(tr, snapno)
   assert(snap_id >= 0)
+  if ljopt_config.is_debug() then
+    print("Snap offset: " .. snap_id)
+  end
   if exec_record[tr_id].snapshots[snap_id] == nil then
-    -- Do not overwrite (it means we're in a loop).
-    -- This is temporary solution to support first
-    -- iteration (and nothing else!) of loop verification.
-    exec_record[tr_id].snapshots[snap_id] = {nins = {nins}, slots = snapshot}
-  else
-    table.insert(exec_record[tr_id].snapshots[snap_id].nins, nins)
+    -- Do not support yet traces with more than 1
+    -- snapshot with same offset. 
+    -- More details: https://github.com/ligurio/ljopt/issues/30
+    exec_record[tr_id].snapshots[snap_id] = {nins = nins, slots = snapshot}
+  elseif exec_record[tr_id] ~= nil then
+    io.stderr:write("Abort trace " .. tr_id .. '\n')
+    exec_record[tr_id] = nil
   end
 end
 
@@ -252,7 +270,11 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
     op1 = trim(op1),
     op2 = trim(op2),
   }
-  table.insert(exec_record[get_trace_id(tr)].trace, irins)
+  if exec_record[get_trace_id(tr)] ~= nil then
+    -- Otherwise this trace was removed due to Snapshot
+    -- duplication.
+    table.insert(exec_record[get_trace_id(tr)].trace, irins)
+  end
 end
 
 return {

@@ -181,11 +181,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
         local ordered_snaps = {}
         for uid, ins_snap in pairs(trace_record.snapshots) do
             local nins = ins_snap.nins
-            local min_ins = nins[1]
-            for i, nins in ipairs(ins_snap.nins) do
-                if nins < min_ins then min_ins = nins end
-            end
-            table.insert(ordered_snaps, {nins = min_ins, uid = uid})
+            table.insert(ordered_snaps, {nins = nins, uid = uid})
         end
         table.sort(ordered_snaps, function(a, b)
             return a.nins < b.nins

@@ -1,7 +1,7 @@
 From 13cce7e2b0b91a59491289901f654d1af6cef2d1 Mon Sep 17 00:00:00 2001
 From: Churkin Aleksey <lekhachurkin@gmail.com>
 Date: Wed, 28 Jan 2026 23:16:15 +0300
-Subject: [PATCH]  [PATCH] patch some internal to expose snapshot pc in
+Subject: [PATCH] patch some internal to expose snapshot pc in
  bytecode
 
 ---
