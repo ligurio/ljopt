@@ -526,8 +526,19 @@ local function record(lua_code, is_debug_mode)
   debug_mode = is_debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
 
+  -- This solution is not complete, issue for tracking progress
+  -- on isolation: https://github.com/ligurio/ljopt/issues/35
+  -- Lua chunk can override globals. Make a copy.
+  local env = setmetatable({}, {__index = _G})
+  local mt = getmetatable("string")
+  setfenv(fn, env)
   dumpon()
   pcall(fn)
+
+  -- Set metatable for strings before `dumpoff`, so coverage
+  -- will have valid string metatable, otherwise
+  -- coverage will fail.
+  debug.setmetatable("", mt)
   dumpoff()
 
   return ir_dump_utils.ljopt_get_execution_state()
