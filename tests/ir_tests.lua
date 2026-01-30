@@ -153,9 +153,9 @@ test:test("IR arithmetic tests", function(test)
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.
-    for _i, test_case in ipairs(nodes_to_test) do
+    for i, test_case in ipairs(nodes_to_test) do
         local res = op_init .. "\n" .. translate.translate(
-            { trace = { test_case.node } }, ctx_src, nil, nil
+            { trace = { test_case.node } }, ctx_src, nil, i
         )
 
         -- Test SMT-LIB parsing
