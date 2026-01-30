@@ -120,6 +120,7 @@ local function ljopt_formatsmt(tr, idx, sn)
   local k, t, slot = tracek(tr, idx)
   local tn = type(k)
   local s
+  local is_const_supported = false
   if tn == "number" then
     if t < 12 then
       s = k == 0 and "NULL" or format("[0x%08x]", k)
@@ -132,6 +133,7 @@ local function ljopt_formatsmt(tr, idx, sn)
       -- s = format(0 < k and k < 0x1p-1026 and "%+a" or "%+.14g", k)
       -- luacheck: pop
       s = float_to_smt_bv(k)
+      is_const_supported = true
     end
   elseif tn == "string" then
     s = format(#k > 20 and '"%.20s"~' or '"%s"', gsub(k, "%c", ctlsub))
@@ -158,16 +160,14 @@ local function ljopt_formatsmt(tr, idx, sn)
   if slot then
     s = format("%s @%d", s, slot)
   end
-  return s
+  -- Return whether this constant supported in Snapshot.
+  -- Currently only num works.
+  -- https://github.com/ligurio/ljopt/issues/36
+  return s, is_const_supported
 end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>
-local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
-  if (linktype == "stitch") then
-    -- stitch is not supported yet
-    return
-  end
-
+local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
   local snapshot = {}
   local n = 2
   for s=0,snap[1]-1 do
@@ -177,7 +177,10 @@ local function ljopt_savesnap(tr, nins, snap, snapno, linktype)
       local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
       if ref < 0 then
         -- Type 1: Constant.
-        table.insert(snapshot, {s, "const", ljopt_formatsmt(tr, ref, sn)})
+        local const_str, is_supported = ljopt_formatsmt(tr, ref, sn)
+        if is_supported then
+          table.insert(snapshot, {s, "const", const_str})
+        end
       elseif band(sn, 0x80000) ~= 0 then
         -- Type 2: Soft-float number (needs two SSA slots).
         table.insert(snapshot, {s, "softfp", ref, ref+1})

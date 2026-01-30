@@ -3,6 +3,7 @@
 -- and has an output as a SMT formula.
 
 local ljopt = require("ljopt")
+local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
 local smt_constants = require("ljopt.smt_constants")
 local test = require("tests.tap").test("ljopt")
@@ -28,7 +29,7 @@ local function record_code(lua_code, opt)
 end
 
 
-test:plan(12)
+test:plan(13)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -310,6 +311,40 @@ foo()
     -- Testing formula is redundant.
     -- What matters is that we do not crashed on parsing traces.
     test:is(smt:parse(formula), true, "Sandbox parsing.")
+end)
+
+test:test("Stitching test", function(test)
+    -- Stitching sometimes generates 2 traces, that's why it
+    -- separated from the tests above. Only main trace have
+    -- interesting `Snapshot`, so we need to test only main trace.
+    test:plan(2)
+    local stitching = [[
+-- This example needed to ensure stitching works correctly.
+local math = require("math")
+local function f()
+    local x = 123
+    -- Causes stitching.
+    math.modf(x)
+    return x
+end
+
+f()
+f()
+f()
+]]
+    -- Disable strict mode. Stitching uses `print`, which
+    -- translates to `IRNodeSLOADFun` which is not implemented.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+
+    local formulas = ljopt.ir.traces_to_smt(stitching)
+
+    -- Trace id is always: 3.
+    local formula = smt_constants.LJOPT_SMTLIB .. formulas[3]
+    test:is(smt:parse(formula), true, "Stitching parsing.")
+    test:is(smt:check(formula), smt.result.UNSAT, "Stitching test checking.")
+
+    ljopt_config.set_strict_mode(strict_mode)
 end)
 
 test:test("bc_smtlib", function(_test)
