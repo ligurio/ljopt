@@ -3,6 +3,7 @@ Provides different types of stacks for IR. Data stored in stacks
 is used for checking if two IR traces are equivalent.
 ]]--
 
+local utils = require('ljopt.utils')
 local smt_constants = require('ljopt.smt_constants')
 
 local dev_checks = require('ljopt.dev_checks')
@@ -295,16 +296,34 @@ end
 -- On each snapshot we will store at pos (1 << _cur_stack)
 -- an smt formula, which contains boolean value:
 -- `true` if exited by this snapshot.
-function SnapStack.inc(self, exit_by_this_snap)
-    dev_checks('table', '?string')
+function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
+    dev_checks('table', 'number', 'string', '?string', 'table')
 
     if (exit_by_this_snap ~= nil) then
+        local id
+        local key = tr_id .. "_" .. snap_id
+        -- Snapshots should be ordered, matching by ID
+        -- is not enough.
+        -- E.g. A_0 B and A_1 B, if we first
+        -- compare B then A it's possible we exited by B,
+        -- but A_0 and A_1 are different,
+        -- so solver will give SAT.
+        if ctx.snap_mapping.map[key] then
+            utils.debug_msg("old: " .. key .. ctx.snap_mapping.map[key])
+            id = ctx.snap_mapping.map[key]
+        else
+            utils.debug_msg("new: " .. key .. ctx.snap_mapping.cur_id)
+            ctx.snap_mapping.map[key] = ctx.snap_mapping.cur_id
+            ctx.snap_mapping.cur_id = ctx.snap_mapping.cur_id + 1
+            id = ctx.snap_mapping.map[key]
+        end
+
         local masked = ('(bvshl (_ bv1 %d) (_ bv%d %d))'):format(
             smt_constants.MAXSNAP,
-            self._cur_stack,
+            id,
             smt_constants.MAXSNAP)
         self._exited_by_snap =
-            ('(bvand %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(
+            ('(bvor %s\n    (ite (not %s) %s (_ bv0 %d)))'):format(
             self._exited_by_snap,
             exit_by_this_snap,
             masked,
@@ -332,6 +351,7 @@ function SMTContext:new(vm_stack_type, op_stack_type)
 
     self.te_stack = TEStackBV:new()
     self.snap_stack = SnapStack:new()
+    self.snap_mapping = { cur_id = 0, map = {} }
 
     return self
 end

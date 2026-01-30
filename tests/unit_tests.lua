@@ -81,13 +81,21 @@ test:test("Trace exit merge snapshots", function(test)
     snapshots[1] = {nins={1}}
     snapshots[3] = {nins={3}}
     local nodes = {}
-    nodes[1] = {flags={irt_guard = true}}
-    nodes[2] = {flags={irt_guard = true}}
-    nodes[3] = {flags={irt_guard = true}}
-    nodes[4] = {flags={irt_guard = true}}
+    nodes[1] = {get_flags = function(self)
+        return {irt_guard = true}
+    end}
+    nodes[2] = {get_flags = function(self)
+        return {irt_guard = true}
+    end}
+    nodes[3] = {get_flags = function(self)
+        return {irt_guard = true}
+    end}
+    nodes[4] = {get_flags = function(self)
+        return {irt_guard = true}
+    end}
 
-    local all_trace = {trace=nodes, snapshots=snapshots}
-    utils.enrich_snapshots_with_exits(all_trace)
+    local all_trace = {snapshots=snapshots}
+    utils.enrich_snapshots_with_exits(nodes, all_trace)
     local snaps = all_trace.snapshots
     test:is(snaps[1].exits[1], 1, "1 guard matched with 1 snapshot")
     test:is(snaps[1].exits[2], 2, "2 guard matched with 1 snapshot")
