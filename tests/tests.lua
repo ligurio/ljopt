@@ -11,7 +11,24 @@ local utils = require("ljopt.utils")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(11)
+-- Apparently functions sandboxed by `setfenv` could
+-- not call `jit.opt.*`, that's why we should wrap
+-- call to `record` with manual presetting JIT options.
+local function record_code(lua_code, opt)
+    if opt == nil then
+        opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+    end
+    assert(load(opt))()
+    -- Flush JIT so we'll have consistent
+    -- trace numbers across recordings.
+    jit.flush()
+    local exec_records = ljopt.ir.record(lua_code)
+    assert(type(exec_records) == 'table')
+    return exec_records
+end
+
+
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -120,7 +137,6 @@ end)
 -- Snapshot parsing tests
 test:test("Snapshot tests", function(test)
     local src = [[
-jit.opt.start(0, 'hotloop=1', 'hotexit=1');
 local function f(y)
   return y, y + 1
 end
@@ -132,7 +148,7 @@ f(1)
     -- SNAP   #0   [ ---- ---- ]
     -- SNAP   #1   [ ---- ---- 0001 0003 ]
     test:plan(6)
-    local exec_state = ljopt.ir.record(src)
+    local exec_state = record_code(src)
     for _k, trace in pairs(exec_state) do
         for _snapno, snap in pairs(trace.snapshots) do
             if (table.getn(snap.slots) ~= 0) then
@@ -155,7 +171,6 @@ end)
 -- IR flags parsing tests.
 test:test("IR flags parsing tests.", function(test)
     local src = [[
-jit.opt.start(3, 'hotloop=1');
 local LOOP_LIMIT=2
 for idx = 1, 4 do
     local tab = { idx }
@@ -164,9 +179,10 @@ end
 ]]
     test:plan(6)
 
-    local exec_state = ljopt.ir.record(src)
-    -- Our trace is always number 3 (line number).
-    local trace = exec_state[3].trace
+    -- We get phi instruction only on optimized trace.
+    local exec_state = record_code(src, "jit.opt.start(3, 'hotloop=1')")
+    -- Our trace is always number 2 (line number).
+    local trace = exec_state[2].trace
 
     test:is(trace[9].flags.irt_isphi, true, "9-th instruction is a phi")
     test:is(trace[6].flags.irt_mark, true, "6-th instruction is marked")
@@ -181,7 +197,6 @@ end)
 -- Trace exits parsing tests.
 test:test("Trace exit tests", function(test)
     local src = [[
-jit.opt.start(0, 'hotloop=1', 'hotexit=1');
 local function f()
   local x = 0
   local y = 0
@@ -197,15 +212,15 @@ f(1)
     -- SNAP   #1   [ ---- ---- 0001 0003 ]
     test:plan(10)
 
-    local exec_state = ljopt.ir.record(src)
-    -- Our trace is always number 2.
-    local trace = exec_state[2]
+    local exec_state = record_code(src)
+    -- Our trace is always number 1.
+    local trace = exec_state[1]
 
     test:is(
         trace.trace[1].flags.irt_guard, true, "First instruction is a guard"
     )
 
-    test:is(#exec_state, 2, "No more traces")
+    test:is(#exec_state, 1, "No more traces")
     utils.enrich_snapshots_with_exits(trace)
 
     -- 1 and 4 is bytecode offset of each snapshot.
@@ -274,6 +289,27 @@ f(1.2)
                 ("test_%d trace %d check."):format(i, j))
         end
     end
+end)
+
+test:test("Sandbox Lua chunk", function(test)
+    test:plan(1)
+    local overwrite_global = [[
+-- Ensure Lua chunk sandboxed.
+type = nil
+debug.setmetatable("string", nil)
+local function foo()
+    return 1
+end
+foo()
+foo()
+]]
+    local formulas = ljopt.ir.traces_to_smt(overwrite_global)
+
+    -- Trace id is 4.
+    local formula = smt_constants.LJOPT_SMTLIB .. formulas[4]
+    -- Testing formula is redundant.
+    -- What matters is that we do not crashed on parsing traces.
+    test:is(smt:parse(formula), true, "Sandbox parsing.")
 end)
 
 test:test("bc_smtlib", function(_test)
