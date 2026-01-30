@@ -701,9 +701,11 @@ local function record(lua_code, is_debug_mode)
   debug_mode = is_debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
 
+  local mt = getmetatable("string")
   dumpon()
   pcall(fn)
   dumpoff()
+  debug.setmetatable("string", mt)
 
   return ir_dump_utils.ljopt_get_execution_state()
 end

@@ -5,6 +5,7 @@
 -- luacheck: pop
 
 local jit = require('jit')
+local type = type
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')

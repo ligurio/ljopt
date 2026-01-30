@@ -5,6 +5,8 @@ translators.
 
 local dev_checks = require('ljopt.dev_checks')
 
+local tonumber = _G.tonumber
+
 local function get_ssa_reference(self)
     dev_checks('table')
 

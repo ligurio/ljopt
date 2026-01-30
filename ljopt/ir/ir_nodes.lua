@@ -6,6 +6,8 @@ local dev_checks = require('ljopt.dev_checks')
 local ljopt_config = require('ljopt.config')
 local utils = require('ljopt.utils')
 
+local tonumber = _G.tonumber
+
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
 local ir_node_BROL = require('ljopt.ir.BROL')

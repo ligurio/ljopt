@@ -182,7 +182,7 @@ end
 
 local function trim(s)
   if s == nil then return end
-  local ss, _ = s:gsub('^%s*(.-)%s*$', '%1')
+  local ss, _ = gsub(s, '^%s*(.-)%s*$', '%1')
   return ss
 end
 
@@ -191,13 +191,13 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
   -- The symbol ">" indicates the instruction of the
   -- guard's location
   -- (leading to possible side exits from the trace).
-  local irt_guard = flags:sub(1, 1) == ">"
+  local irt_guard = string.sub(flags, 1, 1) == ">"
   -- The symbol "+" indicates the instruction is a
   -- left or right PHI operand.
   -- (i.e. referred to in some PHI instruction).
-  local irt_isphi = flags:sub(2, 2) == "+"
+  local irt_isphi = string.sub(flags, 2, 2) == "+"
   -- As stated in LuaJIT comment: `Marker for misc. purposes`.
-  local irt_mark = flags:sub(1, 1) == "}"
+  local irt_mark = string.sub(flags, 1, 1) == "}"
   local irins = {
     num = ins,
     flags = {
