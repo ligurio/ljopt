@@ -74,10 +74,10 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
         e = ctx.te_stack:load(snapshot.exits[1])
         for i = 2, #snapshot.exits do
             local b = snapshot.exits[i]
-            e = ('(or %s %s)'):format(ctx.te_stack:load(b), e)
+            e = ('(and %s %s)'):format(ctx.te_stack:load(b), e)
         end
     end
-    ctx.snap_stack:inc(e)
+    ctx.snap_stack:inc(snap_id, tr_id, e, ctx)
     return table.concat(snap_data, "\n"), slot_values
 end
 

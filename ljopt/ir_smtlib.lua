@@ -178,28 +178,46 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     end
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
+    local failed = false
     if trace_record.snapshots ~= nil then
-        utils.enrich_snapshots_with_exits(trace_record)
-        for i, snap in pairs(trace_record.snapshots) do
+        local is_ok = utils.enrich_snapshots_with_exits(nodes, trace_record)
+        if not is_ok then
+            return smtlib_buf, {slots = {}, te = ""}, true
+        end
+        local ordered_snaps = {}
+        for uid, ins_snap in pairs(trace_record.snapshots) do
+            table.insert(ordered_snaps,
+                {nins = ins_snap.nins[1], uid = uid}
+            )
+        end
+        table.sort(ordered_snaps, function(a, b)
+            return a.nins < b.nins
+        end)
+        for _, uid in ipairs(ordered_snaps) do
+            local snap_id = uid.uid
+            local snap = trace_record.snapshots[snap_id]
             local cur_sn, slot_values = smt_snapshot.snap_to_smt_lib(
-                nodes, ctx_src, tr_id, i, snap, filtered_nodes
+                nodes, ctx_src, tr_id, snap_id, snap, filtered_nodes
             )
             smtlib_buf = smtlib_buf .. cur_sn .. '\n'
-            snap_nums[i] = slot_values
+            snap_nums[snap_id] = slot_values
         end
         smtlib_buf = smtlib_buf .. ctx_src.snap_stack:finalize()
     end
 
-    return smtlib_buf, { slots = snap_nums, te = ctx_src.snap_stack:load_te() }
+    return smtlib_buf, {
+        slots = snap_nums, te = ctx_src.snap_stack:load_te()
+    }, failed
 end
 
 local function trace2smt(trace, ctx, suffix, traceno)
-    local tr_smtlib_unopt, snap_unopt = translate(trace, ctx, suffix, traceno)
+    local tr_smtlib_unopt, snap_unopt, failed =
+        translate(trace, ctx, suffix, traceno)
     if (not tr_smtlib_unopt or #tr_smtlib_unopt == 0) then
         assert(not tr_smtlib_unopt or #tr_smtlib_unopt == 0,
             "Translation of trace failed, it shouldn't happen.")
     end
-    return tr_smtlib_unopt, snap_unopt
+    return tr_smtlib_unopt, snap_unopt, failed
 end
 
 local function snapshots2smt(snapshots1, snapshots2)
@@ -232,7 +250,7 @@ local function record_code(lua_code, opt)
     -- trace numbers across recordings.
     jit.flush()
     local exec_records = dump_ir.record(lua_code, ljopt_config.is_debug_mode())
-    assert(type(exec_records) == 'table')
+    assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
     return exec_records
 end
 
@@ -274,10 +292,15 @@ local function traces_to_smt(lua_code)
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         local cur_trace =
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
-        local trace_unopt, snaps_unopt =
+        local trace_unopt, snaps_unopt, failed1 =
             trace2smt(rec_unopt[traceno], ctx_src, 'unopt', traceno)
-        local trace_opt, snaps_opt =
+        local trace_opt, snaps_opt, failed2 =
             trace2smt(rec_opt[traceno], ctx_src, 'opt', traceno)
+
+        if failed1 or failed2 then
+            io.stderr:write('Skip trace ' .. traceno .. '.\n')
+            goto continue
+        end
 
         cur_trace = cur_trace .. trace_unopt .. '\n'
         cur_trace = cur_trace .. trace_opt .. '\n'
@@ -324,4 +347,5 @@ return {
     translate_to_smt = translate_to_smt,
     translate = translate,
     traces_to_smt = traces_to_smt,
+    construct_nodes = construct_nodes,
 }
