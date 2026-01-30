@@ -6,7 +6,9 @@ impls.IRNodeBSWAPInt = {}
 ir_node.extended(impls.IRNodeBSWAPInt, ir_node.ir_node_base)
 
 function impls.IRNodeBSWAPInt:to_smt_lib(ctx)
-    local left_op = self:retrieve_int_op(self:get_left_op(), ctx)
+    local left_op = ir_node.retrieve_int_op(
+        self:get_left_op(), ctx, self:get_type()
+    )
     -- Swaps bytes 0 1 2 3 -> 3 2 1 0 in 32-bit bitvector.
     local bswap = [[
 (concat
