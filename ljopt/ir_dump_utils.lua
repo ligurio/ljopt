@@ -126,9 +126,18 @@ local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
     if otr then
       if traces_num[otr] ~= nil then
         -- Set parent <trace_id>_<snap_id>
-        traces_num[tr] = traces_num[otr]
+        local parent_trace_id = get_trace_id(otr)
+        traces_num[tr] = parent_trace_id
         if oex >= 0 then
-          traces_num[tr] = traces_num[tr] .. "_" .. get_snap_uid(otr, oex)
+          local snap_id = get_snap_uid(otr, oex)
+          if #(exec_record[parent_trace_id].snapshots[snap_id].nins) == 1 then
+            traces_num[tr] = traces_num[tr] .. "_" .. snap_id
+          else
+            -- Duplicated snapshot in parent.
+            -- Ignore side traces.
+            -- See: https://github.com/ligurio/ljopt/issues/30.
+            traces_num[tr] = nil
+          end
         end
       else
         -- Parent trace was removed, remove all children as well.
@@ -285,6 +294,15 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
   local irt_isphi = string.sub(flags, 2, 2) == "+"
   -- As stated in LuaJIT comment: `Marker for misc. purposes`.
   local irt_mark = string.sub(flags, 1, 1) == "}"
+
+  if op1 ~= nil and (#op1 ~= 4 or (#op1 == 4 and string.sub(1, 1) == "0")) and string.match(op1, "^%-?%d+$") ~= nil then
+    op1 = float_to_smt_bv(tonumber(op1))
+  end
+
+  if op2 ~= nil and (#op2 ~= 4 or (#op2 == 4 and string.sub(1, 1) == "0")) and string.match(op2, "^%-?%d+$") ~= nil then
+    op2 = float_to_smt_bv(tonumber(op2))
+  end
+
   local irins = {
     num = ins,
     flags = {

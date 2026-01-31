@@ -61,6 +61,24 @@ function impls.IRNodeFLOADNum:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+impls.IRNodeFLOADInt = {}
+ir_node.extended(impls.IRNodeFLOADInt, ir_node.ir_node_base)
+
+function impls.IRNodeFLOADInt:to_smt_lib(ctx)
+    local right_op = self:get_right_op()
+    -- Dirty way to check if argument is a string.
+    if right_op == 'str.len' and str ~= nil and string.sub(str, 1, 1) == '"' and string.sub(str, -1) == '"' then
+        local left_op = self:get_left_op()
+        assert(type(left_op) == 'string')
+        local len = #left_op - 2
+        data = string.format("#x%s", bit.tohex(len, 16))
+    else
+        -- Not implemented, hope it will not give SAT somehow.
+        data = string.format("#x%s", bit.tohex(0, 16))
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
