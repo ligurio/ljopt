@@ -109,6 +109,8 @@ test:test("IR arithmetic tests", function(test)
                         result = -0.0, error = 0.0},
         {node = create_node("num", "FLOAD", 'nil', '#222'),
                         result = 0/0, error = 0},
+        {node = create_node("int", "FLOAD", '"test_str"', 'str.len'),
+                        result = #"test_str", error = 1},
         {node = create_node("num", "FPMATH", f2bv(23.3), "floor"),
 		                result = math.floor(23.3), error = true},
         {node = create_node("num", "FPMATH", f2bv(-23.3), "floor"),

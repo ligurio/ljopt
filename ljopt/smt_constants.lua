@@ -18,7 +18,14 @@ local LJOPT_SMTLIB = ([[
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 
+-- We need to prefix field table access
+-- names (`tab.hmask`, `tab.asize`)
+-- with some string, to reduce probability
+-- of interfering with user keys.
+local FIELD_TAB_PREFIX = '```'
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
+    FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
 }

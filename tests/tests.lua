@@ -268,6 +268,21 @@ f(2.3)
             {type = "num", name = "DIV"},
             {type = "num", name = "MUL"},
         },
+    }, {
+        code = [[
+-- str.len test.
+local function foo()
+    return #"123"
+end
+foo()
+foo()
+foo()
+foo()
+]],
+        ins = {
+            -- int FLOAD str.len
+            {type = "int", name = "FLOAD"}
+        },
     }}
     test:plan(3 * #srcs)
 
