@@ -369,6 +369,7 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
   local irt_isphi = string.sub(flags, 2, 2) == "+"
   -- As stated in LuaJIT comment: `Marker for misc. purposes`.
   local irt_mark = string.sub(flags, 1, 1) == "}"
+
   local irins = {
     num = ins,
     flags = {

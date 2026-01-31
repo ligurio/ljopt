@@ -291,6 +291,14 @@ f(1.3)
 f(1.3)
 f(2.3)
 f(2.3)
+]], [[
+local function foo()
+    return #"123"
+end
+foo()
+foo()
+foo()
+foo()
 ]]}
     test:plan(2 * #srcs)
 

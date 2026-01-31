@@ -131,12 +131,12 @@ local function retrieve_int_op(operand, ctx, _type)
     assert(false, 'op_type ' .. op_type .. ' is not supported yet')
 end
 
-local function retrieve_i64_op(self, operand, ctx)
-    dev_checks('table', 'string', 'table')
+local function retrieve_i64_op(operand, ctx, type)
+    dev_checks('string', 'table', 'string')
 
     local op_type = parse_op(operand)
     if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), self:get_type())
+        operand = ctx.op_stack:load(tonumber(operand), type)
     elseif op_type == 'i64' then
         if operand:sub(-1, -1) == 'L' then
             operand = operand:sub(1, -2)
