@@ -14,7 +14,14 @@ local LJOPT_SMTLIB = ([[
   ((as const (Array Int Int)) 0))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 
+-- We need to prefix field table access
+-- names (`tab.hmask`, `tab.asize`)
+-- with some string, to reduce probability
+-- of interfering with user keys.
+local FIELD_TAB_PREFIX = '```'
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
+    FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
 }

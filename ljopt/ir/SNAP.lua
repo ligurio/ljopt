@@ -42,8 +42,8 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 -- Op stack stores only `num`.
                 data = arith_utils.smt_int_to_fp(data)
             end
-            smt_expr = ctx.snap_stack:store(slot, type, data)
-            slot_values[slot] = ctx.snap_stack:load(slot, type)
+            smt_expr = ctx.snap_stack:store(slot, op_type, data)
+            slot_values[slot] = ctx.snap_stack:load(slot, op_type)
         elseif value_type == "const" then
             if value_data == 'true' then
                 -- 1.0 as float
