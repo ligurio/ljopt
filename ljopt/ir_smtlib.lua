@@ -169,6 +169,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     nodes = transform_nodes(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
+    ctx_src.cur_nodes = nodes
     for i = 1, table.getn(nodes) do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
             .. (nodes[i]:get_flags().raw or '') .. ' '
