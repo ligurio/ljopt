@@ -25,9 +25,17 @@ local function snap_to_smt_lib(ctx, snapshot)
         local type = "num"
         if value_type == "ssa" then
             smt_expr = ctx.snap_stack:store(
-                slot, type, ctx.op_stack:load(value_data, type))
+                slot, type, ctx.op_stack:load(value_data, type)
+            )
             slot_values[slot] = ctx.snap_stack:load(slot, type)
         elseif value_type == "const" then
+            if value_data == 'true' then
+                -- 1.0 as float
+                value_data = '#x3FF0000000000000'
+            elseif value_data == 'false' then
+                -- 0.0 as float
+                value_data = '#x0000000000000000'
+            end
             local cnst = ('((_ to_fp 11 53) %s)'):format(value_data)
             cnst = cnst:gsub('+', '')
             -- Convert constant to SMT.

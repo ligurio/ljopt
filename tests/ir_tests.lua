@@ -63,18 +63,26 @@ test:test("IR arithmetic tests", function(test)
     local op_id = 1
 
     local nodes_to_test = {
-        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
-                        result = 5, error = 1.},
         {node = create_node("num", "ADD", f2bv(2.3), f2bv(3.4)),
                         result = 2.3 + 3.4, error = 1.},
         {node = create_node("int", "ADD", f2bv(2.), f2bv(3.0)),
                         result = 5, error = 1.},
+        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
+                        result = 5, error = 1.},
         {node = create_node("int", "BAND", f2bv(124245235.), f2bv(824124435.)),
                         result = bit.band(124245235, 824124435), error = 1.},
-        {node = create_node("i64", "BAND", "124245235", "824124435"),
-                        result = bit.band(124245235, 824124435), error = 1.},
-        {node = create_node("i64", "BROL", "124245235", "2"),
-                        result = bit.rol(124245235, 2), error = 1.},
+        {node = create_node("int", "BNOT", f2bv(124245235)),
+                        result = bit.bnot(124245235), error = 1.},
+        {node = create_node("int", "BOR", f2bv(124245235), f2bv(824124435)),
+                        result = bit.bor(124245235, 824124435), error = 1.},
+        {node = create_node("int", "BSAR", f2bv(124245235), f2bv(2)),
+                        result = bit.rshift(124245235, 2), error = 1.},
+        {node = create_node("int", "BSHL", f2bv(124245235), f2bv(2)),
+                        result = bit.lshift(124245235, 2), error = 1.},
+        {node = create_node("int", "BSHR", f2bv(124245235), f2bv(2)),
+                        result = bit.rshift(124245235, 2), error = 1.},
+        {node = create_node("int", "BXOR", f2bv(124245235), f2bv(2)),
+                        result = bit.bxor(124245235, 2), error = 1.},
         {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
                         result = 3, error = 2},
         {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
@@ -122,8 +130,8 @@ test:test("IR arithmetic tests", function(test)
 			-- back - just use 64 here.
             expected = string.format("#x%.8x%s", 0,
                 bit.tohex(bit.band(test_case.result, 0xFFFFFFFF), 8))
-            unexpected = string.format("#x%.8x%.8x", 0,
-			    tonumber(ffi.cast("int32_t", test_case.error)))
+            unexpected = string.format("#x%.8x%s", 0,
+                bit.tohex(bit.band(test_case.error, 0xFFFFFFFF), 8))
         else
             assert(false, "Unsupported " .. test_case.node.irtype)
         end
@@ -155,18 +163,46 @@ test:test("IR guards tests", function(test)
     local nodes_to_test = {
         {node = create_node("int", "ADDOV", f2bv(2.), f2bv(3.0)),
                         result = "true", error = "false"},
+        {node = create_node("int", "ADDOV",
+                        f2bv(2147483647), f2bv(2147483647)),
+                        result = "false", error = "true"},
+        {node = create_node("int", "EQ", f2bv(23.), f2bv(23.)),
+		                result = true, error = false, te=true},
         {node = create_node("num", "EQ", f2bv(2), f2bv(2)),
                         result = "true", error = "false"},
         {node = create_node("num", "EQ", f2bv(2), f2bv(2.5)),
                         result = "false", error = "true"},
+        {node = create_node("int", "GE", f2bv(23.), f2bv(4.)),
+		                result = true, error = false},
+        {node = create_node("int", "GT", f2bv(24.), f2bv(23.)),
+		                result = true, error = false},
         {node = create_node("num", "LE", f2bv(2.3), f2bv(3.4)),
                         result = "true", error = "false"},
+        {node = create_node("int", "LE", f2bv(23.), f2bv(4.)),
+		                result = false, error = true},
+        {node = create_node("int", "LT", f2bv(22.), f2bv(23.)),
+		                result = true, error = false},
         {node = create_node("num", "NE", f2bv(2), f2bv(2)),
                         result = "false", error = "true"},
         {node = create_node("num", "NE", f2bv(2), f2bv(2.5)),
                         result = "true", error = "false"},
-        {node = create_node("int", "ULE", f2bv(2.3), f2bv(3.4)),
+
+        {node = create_node("int", "UGE", f2bv(3), f2bv(3)),
                         result = "true", error = "false"},
+        {node = create_node("int", "UGE", f2bv(2), f2bv(3)),
+                        result = "false", error = "true"},
+        {node = create_node("int", "UGT", f2bv(3), f2bv(2)),
+                        result = "true", error = "false"},
+        {node = create_node("int", "UGT", f2bv(3), f2bv(3)),
+                        result = "false", error = "true"},
+        {node = create_node("int", "ULE", f2bv(2), f2bv(2)),
+                        result = "true", error = "false"},
+        {node = create_node("int", "ULE", f2bv(3), f2bv(2)),
+                        result = "false", error = "true"},
+        {node = create_node("int", "ULT", f2bv(2), f2bv(3)),
+                        result = "true", error = "false"},
+        {node = create_node("int", "ULT", f2bv(3), f2bv(3)),
+                        result = "false", error = "true"},
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.
