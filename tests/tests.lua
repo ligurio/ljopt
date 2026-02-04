@@ -241,7 +241,26 @@ end
 f(0)
 f(1)
 f(1)
+]],
+[[
+local function f(x)
+  return x + 0.23, x > 0.23, x < 0.23, x >= 0.23, x <= 0.23, x - 0.23, x / 0.23, x * 0.23
+end
+f(0.1)
+f(1.2)
+f(1.2)
 ]]}
+-- -- Add when PR never-fail merged andSnapshot
+-- -- matching is not strict.
+-- -- https://github.com/ligurio/ljopt/issues/32
+-- local function foo(c)
+--   c = c + 1.1;
+--   -- UGE num test
+--   if c > 5 then return c end
+--   return 0
+-- end
+-- foo(1.1)
+-- foo(1.2)
     test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do

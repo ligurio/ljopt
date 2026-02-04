@@ -5,7 +5,6 @@ Provides mapping between IR node opcodes and their translators.
 local dev_checks = require('ljopt.dev_checks')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 
-local ir_node_ADDOV = require('ljopt.ir.ADDOV')
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
 local ir_node_BROL = require('ljopt.ir.BROL')
@@ -49,7 +48,7 @@ local opcodes_table = {
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
-    ['BSWAP'] = false,
+    ['BSWAP'] = require('ljopt.ir.BSWAP'),
     ['BAND'] = ir_node_BAND,
     ['BOR'] = require('ljopt.ir.BOR'),
     ['BXOR'] = require('ljopt.ir.BXOR'),
@@ -57,7 +56,7 @@ local opcodes_table = {
     ['BSHR'] = require('ljopt.ir.BSHR'),
     ['BSAR'] = require('ljopt.ir.BSAR'),
     ['BROL'] = ir_node_BROL,
-    ['BROR'] = false,
+    ['BROR'] = require('ljopt.ir.BROR'),
     -- Arithmetic Ops.
     -- Not all arithmetic operations have native support in SMT.
     -- Some of them can be easily implemented manually (MAX, MIN)
@@ -67,18 +66,18 @@ local opcodes_table = {
     ['SUB'] = ir_node_SUB,
     ['MUL'] = ir_node_MUL,
     ['DIV'] = ir_node_DIV,
-    ['MOD'] = false,
+    ['MOD'] = require('ljopt.ir.MOD'),
     ['POW'] = false,
     ['NEG'] = ir_node_NEG,
-    ['ABS'] = false,
+    ['ABS'] = require('ljopt.ir.ABS'),
     ['ATAN2'] = false,
     ['LDEXP'] = false,
-    ['MIN'] = false,
-    ['MAX'] = false,
+    ['MIN'] = require('ljopt.ir.MIN'),
+    ['MAX'] = require('ljopt.ir.MAX'),
     ['FPMATH'] = false,
-    ['ADDOV'] = ir_node_ADDOV,
-    ['SUBOV'] = false,
-    ['MULOV'] = false,
+    ['ADDOV'] = require('ljopt.ir.ADDOV'),
+    ['SUBOV'] = require('ljopt.ir.SUBOV'),
+    ['MULOV'] = require('ljopt.ir.MULOV'),
     ['FPM_FLOOR'] = false,
     ['FPM_CEIL'] = false,
     ['FPM_TRUNC'] = false,
