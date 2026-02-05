@@ -31,11 +31,11 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
             if filtered_nodes[value_data] == nil then
                 local op_type = trace[value_data]:get_type()
                 local data = ctx.op_stack:load(value_data,op_type)
-                if op_type == "int" then
-                    data = string.format("((_ to_fp 11 53) %s)", data)
-                end
-                smt_expr = ctx.snap_stack:store(slot, type, data)
-                slot_values[slot] = ctx.snap_stack:load(slot, type)
+                -- if op_type == "int" then
+                --     data = string.format("((_ to_fp 11 53) %s)", data)
+                -- end
+                smt_expr = ctx.snap_stack:store(slot, op_type, data)
+                slot_values[slot] = ctx.snap_stack:load(slot, op_type)
             else
                 utils.debug_msg(
                     ("Ignore snapshot %s %s"):format(tr_id, snap_id)

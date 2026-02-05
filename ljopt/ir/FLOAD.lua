@@ -126,6 +126,17 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+
+function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op)
+    if right_op == 'tab.amask' or
+       right_op == 'tab.hmask' or
+       right_op == 'str.len' then
+        return true
+    end
+    return false
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
