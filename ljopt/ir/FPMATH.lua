@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -23,33 +24,36 @@ function impls.IRNodeFPMATHNum:to_smt_lib(ctx)
     elseif right_op == 'sqrt' then
         local data = ('(fp.sqrt RNE %s)'):format(left_op)
         return ctx.op_stack:store(ssa_ref, type, data)
-    -- SMT can't handle most of the nonlinear functions.
-    -- It can be implemented in future using uninterpreted
-    -- functions theory and axioms/properties of each function.
-    -- In this way all possible optimizations will be handled.
-    elseif right_op == 'exp' then
-        assert(false, 'No simple way to implement exp.')
-    elseif right_op == 'exp2' then
-        assert(false, 'No simple way to implement exp2.')
-    elseif right_op == 'log' then
-        assert(false, 'No simple way to implement log.')
-    elseif right_op == 'log2' then
-        assert(false, 'No simple way to implement log2.')
-    elseif right_op == 'log10' then
-        assert(false, 'No simple way to implement log10.')
-    elseif right_op == 'sin' then
-        assert(false, 'No simple way to implement sin.')
-    elseif right_op == 'cos' then
-        assert(false, 'No simple way to implement cos.')
-    elseif right_op == 'tan' then
-        assert(false, 'No simple way to implement tan.')
     else
-        assert("This OP is not supported in ljopt: " .. right_op)
+        utils.unreachable('It should have been marked as NYI: ' .. right_op)
     end
 end
 
 local function instance(node_str)
     return impls[node_str]
+end
+
+function impls.IRNodeFPMATHNum.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op)
+    local nyi_table = {
+        'cos',
+        'exp',
+        'exp2',
+        'log',
+        'log10',
+        'log2',
+        'sin',
+    }
+    -- SMT can't handle most of the nonlinear functions.
+    -- It can be implemented in future using uninterpreted
+    -- functions theory and axioms/properties of each function.
+    -- In this way all possible optimizations will be handled.
+    for _, value in ipairs(nyi_table) do
+        if value == right_op then
+            return false
+        end
+    end
+    return true
 end
 
 return {

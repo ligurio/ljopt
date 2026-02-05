@@ -227,21 +227,29 @@ local function get_nyi_nodes(nodes)
     local nyi_nodes = {}
     local in_loop = false
     for i = 1, table.getn(nodes) do
-        in_loop = in_loop or nodes[i].irop == "LOOP"
-        local node = get_node(nodes[i].irop, nodes[i].irtype)
+        local lua_node = nodes[i]
+        in_loop = in_loop or lua_node.irop == "LOOP"
+        local node = get_node(lua_node.irop, lua_node.irtype)
         if node == nil or in_loop then
             nyi_nodes[i] = true
             utils.debug_msg(('%d: NYI node %s'):format(
-                i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+                i, 'IRNode' .. lua_node.irop .. lua_node.irtype
             ))
-        elseif nyi_nodes[tonumber(nodes[i].op1)] ~= nil or
-               nyi_nodes[tonumber(nodes[i].op2)] ~= nil then
+        elseif nyi_nodes[tonumber(lua_node.op1)] ~= nil or
+               nyi_nodes[tonumber(lua_node.op2)] ~= nil then
             nyi_nodes[i] = true
             utils.debug_msg(
                 ('%d: NYI one of the arguments for %s'):format(
-                    i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+                    i, 'IRNode' .. lua_node.irop .. lua_node.irtype
                 )
             )
+        elseif node.is_implemented(lua_node.flags, lua_node.irtype,
+                                   lua_node.irop, lua_node.op1,
+                                   lua_node.op2) == false then
+            nyi_nodes[i] = true
+            utils.debug_msg(('%d: NYI part of node %s'):format(
+                i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+            ))
         end
     end
     return nyi_nodes

@@ -182,6 +182,14 @@ function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     return public
 end
 
+-- Child nodes can override it, by default assume all nodes
+-- are implemented. If node is not implemented it means we'll
+-- skip this IR and all its' dependencies.
+function ir_node_base:is_implemented(_flags, _type, _opcode,
+                                     _left_op, _right_op)
+    return true
+end
+
 local function extended(child, parent)
     dev_checks('table', 'table')
     setmetatable(child, { __index = parent })
