@@ -174,6 +174,24 @@ local function ctlsub(c)
   end
 end
 
+local function estimate_hmask(t)
+  -- Count hash entries
+  local hash_count = 0
+  for k, _ in pairs(t) do
+    if type(k) ~= "number" or k < 1 or k > #t then
+      hash_count = hash_count + 1
+    end
+  end
+  
+  -- LuaJIT's hash table sizes are powers of 2
+  -- Find next power of 2 >= hash_count
+  local size = 1
+  while size < hash_count do
+    size = size * 2
+  end
+  -- hmask = size - 1
+  return size
+end
 
 -- Everything same as formatk except float conversion.
 local function ljopt_formatsmt(tr, idx, sn)
@@ -198,7 +216,9 @@ local function ljopt_formatsmt(tr, idx, sn)
   elseif tn == "function" then
     s = fmtfunc(k)
   elseif tn == "table" then
-    s = format("{%p}", k)
+    -- TODO: const value should be printed and parsed
+    -- later as well. For now only asize and hmask are supported.
+    s = format("{%p:%d:%d}", k, #k, estimate_hmask(k))
   elseif tn == "userdata" then
     if t == 12 then
       s = format("userdata:%p", k)

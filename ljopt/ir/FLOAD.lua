@@ -86,6 +86,7 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         end
     elseif right_op:sub(1, 3) == 'tab' then
         local idx = utils.tabfield_to_subslot(right_op)
+        assert(tonumber(left_op) ~= nil, left_op)
         local tab_left = ctx.tab_info[tonumber(left_op)].mem_ref
         data = ctx.mem_stack:load_index(tonumber(tab_left), idx)
     else
@@ -164,10 +165,14 @@ end
 
 
 function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
-                                              _left_op, right_op)
-    if right_op == 'tab.amask' or
-       right_op == 'tab.hmask' or
-       right_op == 'str.len' then
+                                              left_op, right_op)
+    if right_op == 'str.len' then
+        return true
+    end
+    -- Ignore such tables for now:
+    -- int FLOAD {0x405f0400} tab.hmask
+    if (right_op == 'tab.amask' or
+       right_op == 'tab.hmask') and tonumber(left_op) ~= nil then
         return true
     end
     return false
