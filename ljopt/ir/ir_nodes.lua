@@ -118,7 +118,7 @@ local opcodes_table = {
     -- Allocations.
     ['SNEW'] = false,
     ['XSNEW'] = false,
-    ['TNEW'] = false,
+    ['TNEW'] = require('ljopt.ir.TNEW'),
     ['TDUP'] = false,
     ['CNEW'] = false,
     ['CNEWI'] = false,

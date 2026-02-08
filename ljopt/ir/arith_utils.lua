@@ -1,3 +1,5 @@
+local bit = require('bit')
+
 local MAX_INT32 = 2^31
 
 -- x >= INT_MIN && x <= INT_MAX
@@ -15,6 +17,11 @@ local function i32_overflow_check(value)
     return overflow_check
 end
 
+local function const_to_smt_bv(cv)
+    return string.format("#x%s", bit.tohex(cv, 16))
+end
+
 return {
     i32_overflow_check = i32_overflow_check,
+    const_to_smt_bv = const_to_smt_bv,
 }

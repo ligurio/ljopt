@@ -3,6 +3,7 @@ local ffi = require('ffi')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local utils = require('ljopt.utils')
+local arith_utils = require('ljopt.ir.arith_utils')
 local smt_constants = require('ljopt.smt_constants')
 
 local impls = {}
@@ -79,7 +80,7 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
             assert(string.sub(str, -1) == '"')
             assert(type(left_op) == 'string')
             local len = #left_op - 2
-            data = string.format("#x%s", bit.tohex(len, 16))
+            data = arith_utils.const_to_smt_bv(len)
         else
             assert(false)
         end
