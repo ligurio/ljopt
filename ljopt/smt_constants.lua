@@ -8,7 +8,18 @@ local LJOPT_SMTLIB = ([[
 (define-fun lsb ((x (_ BitVec %d))) (_ BitVec %d) (ite (not (= x (_ bv0 %d))) (_ bv1 %d) (_ bv0 %d)))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 
+local TAB_OFFSETS = {
+    meta = 0,
+    array = 1,
+    node = 2,
+    asize = 3,
+    hmask = 4,
+    nomm = 5, 
+    OFFSETS_SIZE = 6
+}
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
+    TAB_OFFSETS = TAB_OFFSETS,
 }

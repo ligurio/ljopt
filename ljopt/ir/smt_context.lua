@@ -25,6 +25,7 @@ local type2bv = {
     ['int'] = '%s',
     ['u64'] = '%s',
     ['i64'] = '%s',
+    ['p32'] = '%s',
     ['num'] = '(fp.to_ieee_bv %s)',
 }
 
@@ -39,6 +40,7 @@ local bv2type = {
     ['int'] = '%s',
     ['u64'] = '%s',
     ['i64'] = '%s',
+    ['p32'] = '%s',
     ['num'] = '((_ to_fp 11 53) %s)',
 }
 
@@ -333,6 +335,104 @@ function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
     self._cur_stack = self._cur_stack + 1
 end
 
+-- We model memory as 3D array, [pointer [version [array itself]]]
+-- When we want to modify array we increase version.
+-- All reads happen from the latest version.
+local MemoryStack = {}
+extended(MemoryStack, StackBase)
+
+-- Idea is that we have:
+--          main_stack
+--       /             \
+--      /               \
+--  optimized_stack     unoptimized_stack
+-- At 0 version they are equal. On every store we up version of
+-- the slot. Each `memory` instruction should store 
+function MemoryStack.init_smt(self, name, base_stack)
+    dev_checks('table', 'string')
+
+    self._name = name
+    self.base_stack = base_stack
+    self.next_free = 0
+    self.versions = {}
+    -- [Slot [Version [Data]]]
+    local mutable_memory = string.format(
+        '(declare-fun %s () (Array Int (Array Int (Array Int (_ BitVec 64)))))', self._name
+    )
+    -- [Slot [Data]]
+    local input_shared_memory = string.format(
+        '(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', self._name
+    )
+    return mutable_memory
+end
+
+-- id is optional.
+function MemoryStack.allocate(self, id)
+    dev_checks('table', 'number', 'string')
+
+    local result = ''
+    local current_slot = self.next_free
+    self.versions[current_slot] = 0
+    self.next_free = self.next_free + 1
+    if id ~= nil then
+        assert(self.base_stack ~= nil)
+        result = ('(assert (= %s %s))'):format(
+            self.base_stack:load(id, 0), self:load(current_slot)
+        )
+    end
+    return current_slot, result
+end
+
+-- Read data from op_num at current version.
+function MemoryStack.load(self, op_num)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    val = string.format('(select %s %d)', val, self.versions[op_num] or 0)
+    return val
+end
+
+-- Read data from op_num at current version.
+function MemoryStack.load_index(self, op_num, idx)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    val = string.format('(select %s %d)', val, self.versions[op_num] or 0)
+    val = string.format('(select %s %d)', val, idx)
+    return val
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function MemoryStack.store(self, op_num, data)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    self.versions[op_num] = (self.versions[op_num] or 0) + 1
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    local new_stack = string.format('(select %s %d)', val, self.versions[op_num] or 0)
+    return string.format('(assert (= %s %s))', new_stack, data)
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function MemoryStack.store_index(self, op_num, index, data)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    local old_stack = ('(select %s %d)'):format(val, self.versions[op_num] or 0)
+
+    local updated_stack = ('(store %s %d %s)'):format(old_stack, index, data)
+
+    self.versions[op_num] = (self.versions[op_num] or 0) + 1
+    local new_stack = string.format('(select %s %d)', val, self.versions[op_num])
+    return string.format('(assert (= %s %s))', new_stack, updated_stack)
+end
+
 local SMTContext = {}
 function SMTContext:new(vm_stack_type, op_stack_type)
     dev_checks('table', 'string', 'string')
@@ -350,12 +450,31 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     end
 
     self.te_stack = TEStackBV:new()
+    self.mem_stack = MemoryStack:new(base_mem)
     self.snap_stack = SnapStack:new()
     self.snap_mapping = { cur_id = 0, map = {} }
+
+    self.fref_map = {}
+    -- map from ssa_ref to metatable index
+    -- mem_ref,  mt_ref
+    -- ssa_ref -> tab_id
+    self.tab_info = {}
+    -- tab_id -> mt_id
+    self.metatab_info = {}
 
     return self
 end
 
+function SMTContext:restart()
+    -- map from ssa_ref to metatable index
+    -- mem_ref,  mt_ref
+    -- ssa_ref -> tab_id
+    self.tab_info = {}
+    -- tab_id -> mt_id
+    self.metatab_info = {}
+end
+
 return {
-    SMTContext = SMTContext
+    SMTContext = SMTContext,
+    MemoryStack = MemoryStack,
 }

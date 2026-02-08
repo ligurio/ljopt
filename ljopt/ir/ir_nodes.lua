@@ -100,7 +100,7 @@ local opcodes_table = {
     ['NEWREF'] = false,
     ['UREFO'] = false,
     ['UREFC'] = false,
-    ['FREF'] = false,
+    ['FREF'] = require('ljopt.ir.FREF'),
     ['STRREF'] = false,
     -- Loads and Stores.
     ['ALOAD'] = false,
@@ -113,7 +113,7 @@ local opcodes_table = {
     ['ASTORE'] = false,
     ['HSTORE'] = false,
     ['USTORE'] = false,
-    ['FSTORE'] = false,
+    ['FSTORE'] = require('ljopt.ir.FSTORE'),
     ['XSTORE'] = false,
     -- Allocations.
     ['SNEW'] = false,

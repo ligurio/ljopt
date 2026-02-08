@@ -1,4 +1,5 @@
 local ljopt_config = require("ljopt.config")
+local smt_constants = require("ljopt.smt_constants")
 
 local function debug_msg(s)
     if ljopt_config.is_debug_mode() then
@@ -87,9 +88,28 @@ local function enrich_snapshots_with_exits(nodes, trace_record)
     return true
 end
 
+local function tabfield_to_subslot(fldname)
+    if fldname == 'tab.meta' then
+        return smt_constants.TAB_OFFSETS.meta
+    elseif fldname == 'tab.array' then
+        return smt_constants.TAB_OFFSETS.array
+    elseif fldname == 'tab.node' then
+        return smt_constants.TAB_OFFSETS.node
+    elseif fldname == 'tab.asize' then
+        return smt_constants.TAB_OFFSETS.asize
+    elseif fldname == 'tab.hmask' then
+        return smt_constants.TAB_OFFSETS.hmask
+    elseif fldname == 'tab.nomm' then
+        return smt_constants.TAB_OFFSETS.nomm
+    else
+        return -1
+    end
+end
+
 return {
     debug_msg = debug_msg,
     merge_tables = merge_tables,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     unreachable = unreachable,
+    tabfield_to_subslot = tabfield_to_subslot,
 }

@@ -2,6 +2,9 @@ local ffi = require('ffi')
 
 local ir_node = require('ljopt.ir.ir_node_base')
 
+local utils = require('ljopt.utils')
+local smt_constants = require('ljopt.smt_constants')
+
 local impls = {}
 
 impls.IRNodeFLOADNum = {}
@@ -71,60 +74,92 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     -- Dirty way to check if argument is a string.
     local is_new = ctx.cur_trace
 
-    -- We can't say anything, never-fail will be refactored and
-    -- we'll be able to mark not implemented parts of node.
-    -- Finally when everything is implemented this case
-    -- will be eliminated. 
-    data = string.format("#x%s", bit.tohex(0, 16))
-
     if right_op == 'str.len' then
         if left_op ~= nil and string.sub(left_op, 1, 1) == '"' then
             assert(string.sub(str, -1) == '"')
             assert(type(left_op) == 'string')
             local len = #left_op - 2
             data = string.format("#x%s", bit.tohex(len, 16))
-        end
-    elseif right_op == 'tab.hmask' then
-        if left_type == 'op' then
-            local left_node = ctx.cur_nodes[tonumber(left_op)]
-            if left_node:get_opcode() == 'SLOAD' then
-                data = ir_node.retrieve_i64_op(
-                    left_op, ctx, self:get_type()
-                )
-                data = "(bvand " .. data .. " #x0000000011111111)"
-            elseif left_node:get_opcode() == 'TNEW' then
-                assert(false)
-            elseif left_node:get_opcode() == 'TDUP' then
-                assert(false)
-            else 
-                assert(false)
-            end
-        else
-            assert(false)
-        end        
-    elseif right_op == 'tab.amask' then
-        if left_type == 'op' then
-            local left_node = ctx.cur_nodes[tonumber(left_op)]
-            if left_node:get_opcode() == 'SLOAD' then
-                local data = ir_node.retrieve_i64_op(
-                    left_op, ctx, self:get_type()
-                )
-                data = "(bvashr " .. data .. " 4)"
-            elseif left_node:get_opcode() == 'TNEW' then
-                assert(false)
-            elseif left_node:get_opcode() == 'TDUP' then
-                assert(false)
-            else
-                assert(false)
-            end
         else
             assert(false)
         end
+    elseif right_op:sub(1, 3) == 'tab' then
+        local idx = utils.tabfield_to_subslot(right_op)
+        local tab_left = ctx.tab_info[tonumber(left_op)].mem_ref
+        data = ctx.mem_stack:load_index(tonumber(tab_left), idx)
     else
-        assert(false)
+        assert(false, right_op)
     end
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
+
+
+impls.IRNodeFLOADTab = {}
+ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)
+
+function impls.IRNodeFLOADTab:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local left_type = ir_node.parse_op(left_op)
+    local right_op = self:get_right_op()
+    -- Dirty way to check if argument is a string.
+    local is_new = ctx.cur_trace
+
+    local ssa_ref = self:get_ssa_reference()
+    if right_op == 'tab.meta' then
+        -- Left operand contains table, load it.
+        local left_slot = tonumber(left_op)
+        local base_table = ctx.tab_info[left_slot]
+        assert(base_table.mem_ref ~= nil)
+        ctx.tab_info[ssa_ref] = {}
+        local formula = '; Nothing to do'
+        if ctx.metatab_info[base_table.mem_ref] == nil then
+            local metatable = nil
+            if base_table.shared_base ~= nil then
+                local alloc_slot = base_table.shared_base + 500 * (1 + base_table.shared_depth)
+                metatable, formula = ctx.mem_stack:allocate(alloc_slot)
+            else
+                metatable = ctx.mem_stack:allocate()
+            end
+            ctx.metatab_info[base_table.mem_ref] = {mt_ref = metatable}
+        end
+        local metatable = ctx.metatab_info[base_table.mem_ref].mt_ref
+        ctx.tab_info[ssa_ref].mem_ref =
+            ctx.metatab_info[base_table.mem_ref].mt_ref
+        ctx.tab_info[ssa_ref].shared_base = base_table.shared_base
+        ctx.tab_info[ssa_ref].shared_depth = base_table.shared_depth + 1
+        return formula
+    else
+        assert(false, right_op)
+    end
+end
+
+-- local function impls.IRNodeFLOADP32:to_smt_lib(ctx)
+--     if right_op == 'tab.meta' then
+--         data = ir_node.retrieve_table_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.meta
+--         )
+--     elseif right_op == 'tab.array' then
+--         data = ir_node.retrieve_i64_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.array
+--         )
+--     elseif right_op == 'tab.node' then
+--         data = ir_node.retrieve_i64_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.node
+--         )
+--     elseif right_op == 'tab.asize' then
+--         data = ir_node.retrieve_i64_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.asize
+--         )
+--     elseif right_op == 'tab.hmask' then
+--         data = ir_node.retrieve_i64_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.hmask
+--         )
+--     elseif right_op == 'tab.nomm' then
+--         data = ir_node.retrieve_i64_op(
+--             left_op, ctx, self:get_type(), smt_constants.TAB_OFFSETS.nomm
+--         )
+--     else
+-- end
 
 
 function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
@@ -132,6 +167,14 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
     if right_op == 'tab.amask' or
        right_op == 'tab.hmask' or
        right_op == 'str.len' then
+        return true
+    end
+    return false
+end
+
+function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op)
+    if right_op == 'tab.meta' then
         return true
     end
     return false

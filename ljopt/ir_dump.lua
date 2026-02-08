@@ -610,6 +610,7 @@ end
 
 -- Dump recorded bytecode.
 local function dump_record(tr, func, pc, depth, callee)
+  ir_dump_utils.ljopt_record_trace(tr, func, pc, depth, callee)
   if depth ~= recdepth then
     recdepth = depth
     recprefix = rep(" .", depth)
@@ -623,12 +624,12 @@ local function dump_record(tr, func, pc, depth, callee)
     callee = func
   end
   if pc <= 0 then
-    out:write(sub(line, 1, -2), "         ; ", fmtfunc(func), "\n")
+    write_out(sub(line, 1, -2), "         ; ", fmtfunc(func), "\n")
   else
-    out:write(line)
+    write_out(line)
   end
   if pc >= 0 and band(funcbc(func, pc), 0xff) < 16 then -- ORDER BC
-    out:write(bcline(func, pc+1, recprefix)) -- Write JMP for cond.
+    write_out(bcline(func, pc+1, recprefix)) -- Write JMP for cond.
   end
 end
 
@@ -670,6 +671,7 @@ local function dumpoff()
   if active then
     active = false
     jit.attach(dump_trace)
+    jit.attach(dump_record)
     if out then out:close() end
     out = nil
     toggle_debug_hook()
@@ -682,7 +684,7 @@ local function dumpon(outfile)
   toggle_debug_hook()
   dumpmode = { t=true, b=true, i=true, m=false, s=true, r=false }
   jit.attach(dump_trace, "trace")
-  jit.attach(ir_dump_utils.ljopt_record_trace, "record")
+  jit.attach(dump_record, "record")
   if not bcline then bcline = require("jit.bc").line end
   colorize = colorize_text
   irtype = irtype_text

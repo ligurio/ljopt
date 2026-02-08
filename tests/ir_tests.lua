@@ -27,7 +27,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(4)
+test:plan(6)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -380,6 +380,143 @@ test:test("CONV (num.int (int.num))", function(test)
     test:is(smt:check(expect_sat2), smt.result.SAT,
         "SMT-LIB checking CONV is SAT2"
     )
+end)
+
+local function join_strings(string_array)
+    local joined = ""
+    for _, formula in ipairs(string_array) do
+        joined = joined .. "\n" .. formula
+    end
+    return joined
+end
+
+test:test("Single memory stack", function(test)
+    test:plan(8)
+    local mem_stack = smt_context.MemoryStack:new()
+    local init_smt = mem_stack:init_smt("stack2")
+    local pointer = 2
+    local copy_ptr = 3
+    local rewrite_slot = 1
+    local const_slot = 2
+
+    local first_value = "#x0000000000000005"
+    local second_value = "#x0000000000000015"
+
+    local final_formula = join_strings({
+        mem_stack:init_smt("stack2"),
+        mem_stack:store_index(pointer, rewrite_slot, first_value),
+        mem_stack:store_index(pointer, const_slot, first_value),
+    })
+    local check_1 = ("(assert (not (= %s %s)))"):format(
+        first_value, mem_stack:load_index(pointer, rewrite_slot)
+    )
+    test:is(smt:parse(final_formula .. check_1), true, "parse read after write")
+    test:is(smt:check(final_formula .. check_1), smt.result.UNSAT, "check read after write")
+
+    final_formula = final_formula .. join_strings({
+        mem_stack:store_index(pointer, rewrite_slot, second_value),
+    })
+    local check_2 = ("(assert (not (= %s %s)))"):format(
+        second_value, mem_stack:load_index(pointer, rewrite_slot)
+    )
+    test:is(smt:parse(final_formula .. check_2), true, "parse read after rewrite")
+    test:is(smt:check(final_formula .. check_2), smt.result.UNSAT, "check read after rewrite")
+
+    final_formula = final_formula .. join_strings({
+        mem_stack:store(copy_ptr, mem_stack:load(pointer)),
+    })
+        -- 3 and 4-th checks, we copy correctly.
+    local check3 = ("(assert (not (= %s %s)))"):format(second_value, mem_stack:load_index(copy_ptr, rewrite_slot))
+    test:is(smt:parse(final_formula .. check3), true, "parse whole copy rewrite")
+    test:is(smt:check(final_formula .. check3), smt.result.UNSAT, "check whole copy rewrite")
+    local check4 = ("(assert (not (= %s %s)))"):format(first_value, mem_stack:load_index(copy_ptr, const_slot))
+    test:is(smt:parse(final_formula .. check4), true, "parse whole copy write once")
+    test:is(smt:check(final_formula .. check4), smt.result.UNSAT, "parse whole copy write once")
+end)
+
+
+-- In this stack we check that shared memory is indeed shared,
+-- both child stack should be equal to their base,
+-- if not rewritten.
+test:test("Shared memory stack", function(test)
+    test:plan(8)
+    do
+        local no_base_stack1 = smt_context.MemoryStack:new()
+        local no_base_stack2 = smt_context.MemoryStack:new()
+
+        local no_base_formula = join_strings({
+            no_base_stack1:init_smt("no_base1"),
+            no_base_stack2:init_smt("no_base2"),
+            ("(assert (not (= %s %s)))"):format(no_base_stack1:load(1), no_base_stack2:load(1)),
+        })
+        -- If no base stack => unequal.
+        test:is(smt:parse(no_base_formula), true, "parsing no base equality")
+        test:is(smt:check(no_base_formula), smt.result.SAT, "checking SAT for not shared memory")
+    end
+    do
+        local base_stack1 = smt_context.MemoryStack:new()
+        local has_base_stack1 = smt_context.MemoryStack:new()
+        local has_base_stack2 = smt_context.MemoryStack:new()
+
+        local has_base_formula = join_strings({
+            base_stack1:init_smt("base_stack1"),
+            has_base_stack1:init_smt("has_base_stack1", base_stack1),
+            has_base_stack2:init_smt("has_base_stack2", base_stack1),
+        })
+        local st1, clone1 = has_base_stack1:allocate(1)
+        local st2, clone2 = has_base_stack2:allocate(1)
+        has_base_formula = has_base_formula .. join_strings({
+            clone1,
+            clone2,
+            ("(assert (not (= %s %s)))"):format(has_base_stack1:load(st1), has_base_stack2:load(st2)),
+        })
+
+        -- If base stack => equal.
+        test:is(smt:parse(has_base_formula), true, "parsing shared memory")
+        test:is(smt:check(has_base_formula), smt.result.UNSAT, "checking UNSAT in shared memory")
+    end
+    do
+        local base_stack = smt_context.MemoryStack:new()
+
+        local mem_stack1 = smt_context.MemoryStack:new()
+        local mem_stack2 = smt_context.MemoryStack:new()
+
+        local slot1 = 1
+        local first_value = "#x0000000000000005"
+        local second_value = "#x0000000000000015"
+
+        local final_formula = join_strings({
+            base_stack:init_smt("base_stack"),
+            mem_stack1:init_smt("mem_stack1", base_stack),
+            mem_stack2:init_smt("mem_stack2", base_stack),
+        })
+        local st1, clone1 = mem_stack1:allocate(1)
+        local st2, clone2 = mem_stack2:allocate(1)
+        final_formula = final_formula .. join_strings({
+            clone1,
+            clone2,
+            ("(assert (not (= %s %s)))"):format(mem_stack1:load(st1), mem_stack2:load(st2)),
+        })
+
+        local final_formula = final_formula .. join_strings({
+            mem_stack1:store_index(st1, slot1, first_value),
+            mem_stack2:store_index(st2, slot1, second_value),
+            ("(assert (= %s %s))"):format(
+                mem_stack1:load(st1), mem_stack2:load(st2)
+            ),
+        })
+        test:is(smt:parse(final_formula), true, "parse different values")
+        test:is(smt:check(final_formula), smt.result.UNSAT, "check different values")
+
+        final_formula = final_formula .. join_strings({
+            mem_stack2:store_index(st2, slot1, first_value),
+            ("(assert (not (= %s %s)))"):format(
+                mem_stack1:load(st1), mem_stack2:load(st1)
+            ),
+        })
+        test:is(smt:parse(final_formula), true, "parse same values")
+        test:is(smt:check(final_formula), smt.result.UNSAT, "check same values")
+    end
 end)
 
 require("tests.coverage").shutdown()

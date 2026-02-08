@@ -28,7 +28,7 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
         local type = "num"
         if value_type == "ssa" then
             -- Write only if this value is implemented.
-            if filtered_nodes[value_data] == nil then
+            if filtered_nodes[value_data] == nil and trace[value_data]:get_type() ~= 'tab' then
                 local op_type = trace[value_data]:get_type()
                 local data = ctx.op_stack:load(value_data,op_type)
                 -- if op_type == "int" then
