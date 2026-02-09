@@ -1,13 +1,14 @@
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
 local jit = require("jit")
-local funcinfo = jutil.funcinfo
+local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
+local bcline = require("jit.bc").line
 local tracek = jutil.tracek
 local ljopt_config = require("ljopt.config")
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
-local byte = string.byte
+local byte, rep = string.byte, string.rep
 
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
@@ -96,9 +97,25 @@ local function fnv1a_hash(str)
   return string.format("%08x", hash)
 end
 
-local function ljopt_record_trace(traceno, _func, pt, _fd)
+local function ljopt_record_trace(traceno, func, pc, depth, callee)
+  if depth ~= recdepth then
+    recdepth = depth
+    recprefix = rep(" .", depth)
+  end
+  local line
+  if pc >= 0 then
+    line = bcline(func, pc, recprefix)
+  else
+    line = "0000 "..recprefix.." FUNCC      \n"
+  end
+  if pc <= 0 then
+    local line = sub(line, 1, -2).. "         ; ".. fmtfunc(func).. "\n"
+  end
+  if pc >= 0 and band(funcbc(func, pc), 0xff) < 16 then
+    line = line .. bcline(func, pc+1, recprefix)
+  end
   if trace_bc_hash[traceno] then
-    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. ' ' .. (pt + 1)
+    trace_bc_hash[traceno] = trace_bc_hash[traceno] ..  ' ' .. line
   end
 end
 
@@ -143,13 +160,10 @@ local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
         -- Parent trace was removed, remove all children as well.
         traces_num[tr] = nil
       end
+      -- Disable child traces.
+      traces_num[tr] = nil
     end
   elseif what == "stop" or what == "abort" then
-    if ljopt_config.is_debug_mode() then
-      io.stderr:write(("Parent trace id: %s Trace hash: %s"):format(
-        tostring(traces_num[tr]), trace_bc_hash[tr]
-      ))
-    end
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
       traces_num[tr] = traces_num[tr] .. "_" .. bc_hash
@@ -174,23 +188,10 @@ local function ctlsub(c)
   end
 end
 
-local function estimate_hmask(t)
+local function get_hmask(t)
   -- Count hash entries
-  local hash_count = 0
-  for k, _ in pairs(t) do
-    if type(k) ~= "number" or k < 1 or k > #t then
-      hash_count = hash_count + 1
-    end
-  end
-  
-  -- LuaJIT's hash table sizes are powers of 2
-  -- Find next power of 2 >= hash_count
-  local size = 1
-  while size < hash_count do
-    size = size * 2
-  end
-  -- hmask = size - 1
-  return size
+  local hmask, asize = jutil.tablesize(t)
+  return hmask, asize
 end
 
 -- Everything same as formatk except float conversion.
@@ -218,7 +219,8 @@ local function ljopt_formatsmt(tr, idx, sn)
   elseif tn == "table" then
     -- TODO: const value should be printed and parsed
     -- later as well. For now only asize and hmask are supported.
-    s = format("{%p:%d:%d}", k, #k, estimate_hmask(k))
+    local hmask, asize = get_hmask(k)
+    s = format("{%p:%d:%d}", k, asize, hmask)
   elseif tn == "userdata" then
     if t == 12 then
       s = format("userdata:%p", k)
@@ -241,7 +243,7 @@ local function ljopt_formatsmt(tr, idx, sn)
   -- Return whether this constant supported in Snapshot.
   -- Currently only num works.
   -- https://github.com/ligurio/ljopt/issues/36
-  local is_const_supported = tn == "number"
+  local is_const_supported = tn == "number" and t > 12
   return s, is_const_supported
 end
 

@@ -88,7 +88,7 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         local idx = utils.tabfield_to_subslot(right_op)
         assert(tonumber(left_op) ~= nil, left_op)
         local tab_left = ctx.tab_info[tonumber(left_op)].mem_ref
-        data = ctx.mem_stack:load_index(tonumber(tab_left), idx)
+        data = ctx.mem_stack:load_index(tonumber(tab_left), idx + 500 * ctx.tab_info[tonumber(left_op)].shared_depth)
     else
         assert(false, right_op)
     end
@@ -103,8 +103,6 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local left_type = ir_node.parse_op(left_op)
     local right_op = self:get_right_op()
-    -- Dirty way to check if argument is a string.
-    local is_new = ctx.cur_trace
 
     local ssa_ref = self:get_ssa_reference()
     if right_op == 'tab.meta' then
@@ -112,23 +110,8 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
         local left_slot = tonumber(left_op)
         local base_table = ctx.tab_info[left_slot]
         assert(base_table.mem_ref ~= nil)
-        ctx.tab_info[ssa_ref] = {}
+        ctx.tab_info[ssa_ref] = {mem_ref = base_table.mem_ref, shared_depth = base_table.shared_depth + 1}
         local formula = '; Nothing to do'
-        if ctx.metatab_info[base_table.mem_ref] == nil then
-            local metatable = nil
-            if base_table.shared_base ~= nil then
-                local alloc_slot = base_table.shared_base + 500 * (1 + base_table.shared_depth)
-                metatable, formula = ctx.mem_stack:allocate(alloc_slot)
-            else
-                metatable = ctx.mem_stack:allocate()
-            end
-            ctx.metatab_info[base_table.mem_ref] = {mt_ref = metatable}
-        end
-        local metatable = ctx.metatab_info[base_table.mem_ref].mt_ref
-        ctx.tab_info[ssa_ref].mem_ref =
-            ctx.metatab_info[base_table.mem_ref].mt_ref
-        ctx.tab_info[ssa_ref].shared_base = base_table.shared_base
-        ctx.tab_info[ssa_ref].shared_depth = base_table.shared_depth + 1
         return formula
     else
         assert(false, right_op)

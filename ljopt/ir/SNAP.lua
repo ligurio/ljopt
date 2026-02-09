@@ -50,7 +50,6 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 value_data = '#x0000000000000000'
             end
             local cnst = ('((_ to_fp 11 53) %s)'):format(value_data)
-            cnst = cnst:gsub('+', '')
             -- Convert constant to SMT.
             smt_expr = ctx.snap_stack:store(slot, type, cnst)
             slot_values[slot] = ctx.snap_stack:load(slot, type)
