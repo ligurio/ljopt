@@ -60,10 +60,11 @@ end
 
 function export.enable()
     if ljopt_config.is_coverage_mode() then
-        io.stdout:write('code coverage is enabled\n')
         if not has_luacov then
-            io.stdout:write('luacov is not available\n')
+            io.stderr:write('luacov is not available\n')
+            os.exit(0)
         end
+        io.stdout:write('code coverage is enabled\n')
         coverage_enable()
     end
 end
