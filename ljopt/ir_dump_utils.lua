@@ -265,7 +265,7 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
     end
   end
   local snap_id = get_snap_uid(tr, snapno)
-  assert(snap_id >= 0)
+  assert(snap_id >= 0, "Snapshot ID must be positive")
   if ljopt_config.is_debug_mode() then
     io.stderr:write("Snap offset: " .. snap_id .. "\n")
   end
