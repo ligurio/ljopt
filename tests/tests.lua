@@ -3,6 +3,7 @@
 -- and has an output as a SMT formula.
 
 local ljopt = require("ljopt")
+local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
 local smt_constants = require("ljopt.smt_constants")
 local test = require("tests.tap").test("ljopt")
@@ -10,7 +11,7 @@ local test = require("tests.tap").test("ljopt")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(11)
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -242,17 +243,6 @@ f(0.1)
 f(1.2)
 f(1.2)
 ]]}
--- -- Add when PR never-fail merged andSnapshot
--- -- matching is not strict.
--- -- https://github.com/ligurio/ljopt/issues/32
--- local function foo(c)
---   c = c + 1.1;
---   -- UGE num test
---   if c > 5 then return c end
---   return 0
--- end
--- foo(1.1)
--- foo(1.2)
     test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do
@@ -266,6 +256,40 @@ f(1.2)
         end
     end
 end)
+
+-- Same as before, but any code can be placed here.
+test:test("Tests for traces equivalence in relaxed mode", function(test)
+
+    -- Disable strict mode.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(true)
+
+    local srcs = { [[
+local function foo(c)
+  c = c + 1.1;
+  -- UGE num test
+  if c > 5 then return c end
+  return 0
+end
+foo(1.1)
+foo(1.2)
+]]}
+    test:plan(2 * #srcs)
+
+    for i, f in ipairs(srcs) do
+        local formulas = ljopt.ir.traces_to_smt(f)
+        for j, formula in pairs(formulas) do
+            formula = smt_constants.LJOPT_SMTLIB .. formula
+            test:is(smt:parse(formula), true,
+                ("test_%s trace %s parse."):format(i, j))
+            test:is(smt:check(formula), smt.result.UNSAT,
+                ("test_%d trace %s check."):format(i, j))
+        end
+    end
+    -- Restore strict mode.
+    ljopt_config.set_strict_mode(strict_mode)
+end)
+
 
 test:test("bc_smtlib", function(_test)
     -- Empty.
