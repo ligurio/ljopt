@@ -27,7 +27,7 @@ local function record_code(lua_code, opt)
 end
 
 
-test:plan(13)
+test:plan(14)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -258,17 +258,6 @@ f(0.1)
 f(1.2)
 f(1.2)
 ]]}
--- -- Add when PR never-fail merged andSnapshot
--- -- matching is not strict.
--- -- https://github.com/ligurio/ljopt/issues/32
--- local function foo(c)
---   c = c + 1.1;
---   -- UGE num test
---   if c > 5 then return c end
---   return 0
--- end
--- foo(1.1)
--- foo(1.2)
     test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do
@@ -337,6 +326,41 @@ f()
     test:is(smt:parse(formula), true, "Stitching parsing.")
     test:is(smt:check(formula), smt.result.UNSAT, "Stitching test checking.")
 
+    ljopt_config.set_strict_mode(strict_mode)
+end)
+
+-- Relaxed mode tests, which means any code or
+-- instructions can be placed here, we will ignore unimplemented
+-- ones.
+test:test("Tests for traces equivalence in relaxed mode", function(test)
+
+    -- Disable strict mode.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+
+    local srcs = { [[
+local function foo(c)
+  c = c + 1.1;
+  -- UGE num test
+  if c > 5 then return c end
+  return 0
+end
+foo(1.1)
+foo(1.2)
+]]}
+    test:plan(2 * #srcs)
+
+    for i, f in ipairs(srcs) do
+        local formulas = ljopt.ir.traces_to_smt(f)
+        for j, formula in pairs(formulas) do
+            formula = smt_constants.LJOPT_SMTLIB .. formula
+            test:is(smt:parse(formula), true,
+                ("test_%s trace %s parse."):format(i, j))
+            test:is(smt:check(formula), smt.result.UNSAT,
+                ("test_%d trace %s check."):format(i, j))
+        end
+    end
+    -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
 end)
 
