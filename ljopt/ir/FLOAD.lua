@@ -88,7 +88,7 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         local idx = utils.tabfield_to_subslot(right_op)
         assert(tonumber(left_op) ~= nil, left_op)
         local tab_left = ctx.tab_info[tonumber(left_op)].mem_ref
-        data = ctx.mem_stack:load_index(tonumber(tab_left), idx + 500 * ctx.tab_info[tonumber(left_op)].shared_depth)
+        data = ctx.mem_stack:load_index(tonumber(tab_left), idx)
     else
         assert(false, right_op)
     end
@@ -108,11 +108,39 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     if right_op == 'tab.meta' then
         -- Left operand contains table, load it.
         local left_slot = tonumber(left_op)
-        local base_table = ctx.tab_info[left_slot]
-        assert(base_table.mem_ref ~= nil)
-        ctx.tab_info[ssa_ref] = {mem_ref = base_table.mem_ref, shared_depth = base_table.shared_depth + 1}
-        local formula = '; Nothing to do'
-        return formula
+        local table_info = ctx.tab_info[left_slot]
+        assert(table_info.mem_ref ~= nil)
+        local result = nil
+        if table_info.meta == nil then
+            table_info.meta, result = ctx.mem_stack:allocate_child(table_info.mem_ref, "__metatable")
+        end
+        ctx.tab_info[ssa_ref] = {
+            mem_ref = table_info.meta,
+            meta = nil,
+        }
+        if result then
+            return result
+        else
+            return '; ' .. table_info.mem_ref .. ' to ' .. table_info.meta
+        end
+    else
+        assert(false, right_op)
+    end
+end
+
+impls.IRNodeFLOADP32 = {}
+ir_node.extended(impls.IRNodeFLOADP32, ir_node.ir_node_base)
+
+function impls.IRNodeFLOADP32:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local left_type = ir_node.parse_op(left_op)
+    local right_op = self:get_right_op()
+
+    local ssa_ref = self:get_ssa_reference()
+    if right_op == 'tab.node' then
+        -- Forward id of table
+        ctx.tab_info[self:get_ssa_reference()] = ctx.tab_info[tonumber(left_op)]
+        return '; Nothing to do '
     else
         assert(false, right_op)
     end
@@ -152,18 +180,26 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
     if right_op == 'str.len' then
         return true
     end
-    -- Ignore such tables for now:
-    -- int FLOAD {0x405f0400} tab.hmask
-    if (right_op == 'tab.amask' or
-       right_op == 'tab.hmask') and tonumber(left_op) ~= nil then
-        return true
-    end
+    -- -- Ignore such tables for now:
+    -- -- int FLOAD {0x405f0400} tab.hmask
+    -- if (right_op == 'tab.amask' or
+    --    right_op == 'tab.hmask') and tonumber(left_op) ~= nil then
+    --     return true
+    -- end
     return false
 end
 
 function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
                                               _left_op, right_op)
     if right_op == 'tab.meta' then
+        return true
+    end
+    return false
+end
+
+function impls.IRNodeFLOADP32.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op)
+    if right_op == 'tab.node' then
         return true
     end
     return false

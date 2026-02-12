@@ -12,14 +12,32 @@ function impls.IRNodeFREFP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
     if right_op == 'tab.meta' then
-        local metatable = ctx.metatab_info[ctx.tab_info[tonumber(left_op)].mem_ref].mt_ref
+        local table_info = ctx.tab_info[tonumber(left_op)]
+        local result = nil
+        if table_info.meta == nil then
+            table_info.meta, result = ctx.mem_stack:allocate_child(table_info.mem_ref, "__metatable")
+        end
         ctx.tab_info[self:get_ssa_reference()] = {
-            mem_ref = metatable
+            mem_ref = table_info.meta,
+            meta = "NO META for P32!",
         }
+        if result then
+            return result
+        else
+            return '; ' .. table_info.mem_ref .. ' to ' .. table_info.meta
+        end
     else
         assert(false, right_op)
     end
     return '; Nothing to do'
+end
+
+function impls.IRNodeFREFP32.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op)
+    if right_op == 'tab.meta' then
+        return true
+    end
+    return false
 end
 
 local function instance(node_str)

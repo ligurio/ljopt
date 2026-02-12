@@ -234,7 +234,7 @@ local function trace2smt(trace, ctx, suffix, traceno, shared_stacks)
     return tr_smtlib_unopt, snap_unopt, failed
 end
 
-local function snapshots2smt(snapshots1, snapshots2)
+local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Trick to extract lowest set bit. (x & -x) reset
     -- all bits except the lowest one. If they are equal
@@ -251,6 +251,23 @@ local function snapshots2smt(snapshots1, snapshots2)
                 smt_result =
                     ('%s    (not (= %s %s))\n'):format(smt_result, val1, val2)
             end
+        end
+    end
+    smt_result = smt_result .. '    ; Memory part\n'
+    for slot_id, info in pairs(stack1.slot_info) do
+        if info.base_slot ~= nil and stack1:slot_version(slot_id) > 0 then
+            smt_result = ('%s    (not (= %s %s))\n'):format(
+                smt_result, stack1:load(slot_id), stack2:load(slot_id)
+            )
+        end
+    end
+    for slot_id, info in pairs(stack2.slot_info) do
+        local should_compare = info.base_slot ~= nil and stack2:slot_version(slot_id) > 0
+        local should_cmp_prev = stack1.slot_info[slot_id] == nil or stack1:slot_version(slot_id) == 0
+        if should_compare and should_cmp_prev then
+            smt_result = ('%s    (assert(not (= %s %s)))\n'):format(
+                smt_result, stack1:load(slot_id), stack2:load(slot_id)
+            )
         end
     end
     smt_result = smt_result .. '))\n'
@@ -308,9 +325,14 @@ local function traces_to_smt(lua_code)
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
         local trace_unopt, snaps_unopt, failed1 =
             trace2smt(rec_unopt[traceno], ctx_src, 'unopt', traceno, {mem_stack=shared_mem_stack})
+        -- Out ctx design is incorrect. We shouldn't
+        -- share context between launches.
+        local unopt_mem_stack = ctx_src.mem_stack
+        ctx_src.mem_stack = smt_context.MemoryStack:new()
         ctx_src:restart()
         local trace_opt, snaps_opt, failed2 =
             trace2smt(rec_opt[traceno], ctx_src, 'opt', traceno, {mem_stack=shared_mem_stack})
+        local opt_mem_stack = ctx_src.mem_stack
 
         if failed1 or failed2 then
             io.stderr:write('Skip trace ' .. traceno .. '.\n')
@@ -320,7 +342,7 @@ local function traces_to_smt(lua_code)
         cur_trace = cur_trace .. trace_unopt .. '\n'
         cur_trace = cur_trace .. trace_opt .. '\n'
 
-        local smt_snapshots = snapshots2smt(snaps_unopt, snaps_opt)
+        local smt_snapshots = snapshots2smt(snaps_unopt, snaps_opt, unopt_mem_stack, opt_mem_stack)
 
         cur_trace = cur_trace .. smt_snapshots .. '\n'
 

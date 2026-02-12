@@ -353,17 +353,61 @@ function MemoryStack.init_smt(self, name, base_stack)
 
     self._name = name
     self.base_stack = base_stack
+    self.keys_lookup = {}
+    self.next_free_key = 0
     self.next_free = 0
-    self.versions = {}
+    -- slot -> { version, base_slot }
+    self.slot_info = {}
     -- [Slot [Version [Data]]]
     local mutable_memory = string.format(
         '(declare-fun %s () (Array Int (Array Int (Array Int (_ BitVec 64)))))', self._name
     )
     -- [Slot [Data]]
-    local input_shared_memory = string.format(
-        '(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', self._name
-    )
+    -- We may initialize children as well
+    -- (it will have zero effect).
+    -- But for some reason 2 assert forall is too much for Z3
+    -- and it never finishes.
     return mutable_memory
+end
+
+
+function MemoryStack.alloc_slot(self)
+    local current_slot = self.next_free
+    self.next_free = self.next_free + 1
+    return current_slot
+end
+
+-- Only for base stack.
+-- Used to handle metatables equivalence
+function MemoryStack.get_key_id(self, key)
+    assert(self.base_stack == nil)
+    if self.keys_lookup[key] == nil then
+        self.keys_lookup[key] = self:alloc_slot()
+    end
+    return self.keys_lookup[key]
+end
+
+-- Takes as input 0001 aka op num or
+-- "string" and returns unique id which will
+-- always be associated with this key in all
+-- memory operations on this stack.
+--
+-- Consider it like hash, but without holes.
+function MemoryStack.key_id(self, key)
+    -- todo: Add some prefix, like type
+    -- to maintain correctness.
+    if self.keys_lookup[key] == nil then
+        self.keys_lookup[key] = self:alloc_slot()
+    end
+    return self.keys_lookup[key]
+end
+
+function MemoryStack.slot_version(self, slot)
+    if self.slot_info[slot] ~= nil then
+        return self.slot_info[slot].version
+    else
+        return 0
+    end
 end
 
 -- id is optional.
@@ -371,15 +415,28 @@ function MemoryStack.allocate(self, id)
     dev_checks('table', 'number', 'string')
 
     local result = ''
-    local current_slot = self.next_free
-    self.versions[current_slot] = 0
-    self.next_free = self.next_free + 1
+    local current_slot = self:alloc_slot()
     if id ~= nil then
         assert(self.base_stack ~= nil)
         result = ('(assert (= %s %s))'):format(
-            self.base_stack:load(id, 0), self:load(current_slot)
+            self.base_stack:load(id), self:load(current_slot)
         )
+    else
+        result = ('\n(assert (= (select (select %s %d) 0) zero_pointer))'):format(self._name, current_slot)
     end
+    self.slot_info[current_slot] = { version = 0, base_slot = id }
+    return current_slot, result
+end
+
+function MemoryStack.allocate_child(self, id, key)
+    assert(self.base_stack:get_key_id(key) < 100, "Increase constant")
+    assert(id < 100, "Increase constant")
+    local unique_key = (id + 1) * 100 + self.base_stack:get_key_id(key)
+    local current_slot = self:alloc_slot()
+    result = ('(assert (= %s %s))'):format(
+        self.base_stack:load(unique_key), self:load(current_slot)
+    )
+    self.slot_info[current_slot] = { version = 0, base_slot = unique_key }
     return current_slot, result
 end
 
@@ -389,7 +446,7 @@ function MemoryStack.load(self, op_num)
     assert(op_num >= 0, 'Index is negative, something weird happening...')
 
     local val = string.format('(select %s %d)', self._name, op_num)
-    val = string.format('(select %s %d)', val, self.versions[op_num] or 0)
+    val = string.format('(select %s %d)', val, self:slot_version(op_num) or 0)
     return val
 end
 
@@ -399,8 +456,8 @@ function MemoryStack.load_index(self, op_num, idx)
     assert(op_num >= 0, 'Index is negative, something weird happening...')
 
     local val = string.format('(select %s %d)', self._name, op_num)
-    val = string.format('(select %s %d)', val, self.versions[op_num] or 0)
-    val = string.format('(select %s %d)', val, idx)
+    val = string.format('(select %s %d)', val, self:slot_version(op_num) or 0)
+    val = string.format('(select %s %s)', val, idx)
     return val
 end
 
@@ -410,10 +467,10 @@ function MemoryStack.store(self, op_num, data)
     dev_checks('table', 'number', 'string')
     assert(op_num >= 0, 'Index is negative, something weird happening...')
 
-    self.versions[op_num] = (self.versions[op_num] or 0) + 1
+    self.slot_info[op_num].version = (self:slot_version(op_num) or 0) + 1
 
     local val = string.format('(select %s %d)', self._name, op_num)
-    local new_stack = string.format('(select %s %d)', val, self.versions[op_num] or 0)
+    local new_stack = string.format('(select %s %d)', val, self:slot_version(op_num) or 0)
     return string.format('(assert (= %s %s))', new_stack, data)
 end
 
@@ -424,12 +481,13 @@ function MemoryStack.store_index(self, op_num, index, data)
     assert(op_num >= 0, 'Index is negative, something weird happening...')
 
     local val = string.format('(select %s %d)', self._name, op_num)
-    local old_stack = ('(select %s %d)'):format(val, self.versions[op_num] or 0)
+    local old_stack = ('(select %s %d)'):format(val, self:slot_version(op_num) or 0)
 
-    local updated_stack = ('(store %s %d %s)'):format(old_stack, index, data)
+    
+    local updated_stack = ('(store %s %s %s)'):format(old_stack, index, data)
 
-    self.versions[op_num] = (self.versions[op_num] or 0) + 1
-    local new_stack = string.format('(select %s %d)', val, self.versions[op_num])
+    self.slot_info[op_num].version = (self:slot_version(op_num) or 0) + 1
+    local new_stack = string.format('(select %s %d)', val, self:slot_version(op_num))
     return string.format('(assert (= %s %s))', new_stack, updated_stack)
 end
 
@@ -450,17 +508,16 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     end
 
     self.te_stack = TEStackBV:new()
-    self.mem_stack = MemoryStack:new(base_mem)
+    self.mem_stack = MemoryStack:new()
     self.snap_stack = SnapStack:new()
     self.snap_mapping = { cur_id = 0, map = {} }
 
-    self.fref_map = {}
+    self.ref_info = {}
     -- map from ssa_ref to metatable index
     -- mem_ref,  mt_ref
     -- ssa_ref -> tab_id
     self.tab_info = {}
     -- tab_id -> mt_id
-    self.metatab_info = {}
 
     return self
 end
@@ -471,7 +528,6 @@ function SMTContext:restart()
     -- ssa_ref -> tab_id
     self.tab_info = {}
     -- tab_id -> mt_id
-    self.metatab_info = {}
 end
 
 return {

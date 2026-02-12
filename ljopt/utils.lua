@@ -37,6 +37,17 @@ local function merge_tables(t1, t2)
     return merged
 end
 
+
+local function fnv1a_hash(str)
+  local hash = 2166136261
+  for i = 1, #str do
+    hash = bit.bxor(hash, string.byte(str, i))
+    hash = (hash * 16777619) % 2^32
+  end
+  return hash
+end
+
+
 -- Takes as input snapshots and exits.
 -- Snapshot table is uid -> Snapshot.
 -- We need to add to every snapshot number of instructions with
@@ -108,6 +119,7 @@ end
 
 return {
     debug_msg = debug_msg,
+    hash = fnv1a_hash,
     merge_tables = merge_tables,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     unreachable = unreachable,
