@@ -22,6 +22,21 @@ if not lua_code or
   utils.fatal_msg("Lua chunk is empty.", exit_codes.ERR_BAD_LUA_CHUNK)
 end
 
+local ok, res = pcall(load, lua_code)
+if not ok then
+  utils.fatal_msg("Syntax error in Lua chunk: " .. res,
+    exit_codes.ERR_BAD_LUA_CHUNK)
+end
+
+local err
+ok, err = pcall(res)
+if not ok then
+  utils.fatal_msg("Runtime error: " .. err, exit_codes.ERR_BAD_LUA_CHUNK)
+end
+-- Check for runtime errors above may trigger trace recording,
+-- flush traces before proceeding.
+jit.flush()
+
 local result = ljopt.ir.translate_to_smt(lua_code, true)
 io.stdout:write(result)
 os.exit(exit_codes.OK)
