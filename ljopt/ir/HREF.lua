@@ -6,19 +6,17 @@ local utils = require('ljopt.utils')
 
 local impls = {}
 
-impls.IRNodeHREFKP32 = {}
-ir_node.extended(impls.IRNodeHREFKP32, ir_node.ir_node_base)
+impls.IRNodeHREFP32 = {}
+ir_node.extended(impls.IRNodeHREFP32, ir_node.ir_node_base)
 
-function impls.IRNodeHREFKP32:to_smt_lib(ctx)
+function impls.IRNodeHREFP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
     local id = 0
-    local constant, _slot = right_op:match("^(%S+)%s+(%S+)")
-    if string.sub(constant, 1, 1) == '"' then
-        id = arith_utils.const_to_smt_bv(tonumber(utils.hash(constant)))
-    elseif string.sub(constant, 1, 1) == '#' then
-        -- Already SMT format
-        id = constant
+    if right_op ~= nil and string.sub(right_op, 1, 1) == '"' then
+        -- Drop @0 etc
+        local s = right_op:gsub('^([^"]*"[^"]*").*', '%1')
+        id = arith_utils.const_to_smt_bv(tonumber(utils.hash(s)))
     else
         id = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
     end

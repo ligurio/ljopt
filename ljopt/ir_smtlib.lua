@@ -255,14 +255,14 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     end
     smt_result = smt_result .. '    ; Memory part\n'
     for slot_id, info in pairs(stack1.slot_info) do
-        if info.base_slot ~= nil and stack1:slot_version(slot_id) > 0 then
+        if info.base_slot ~= nil and info.base_slot < 100 and stack1:slot_version(slot_id) > 0 then
             smt_result = ('%s    (not (= %s %s))\n'):format(
                 smt_result, stack1:load(slot_id), stack2:load(slot_id)
             )
         end
     end
     for slot_id, info in pairs(stack2.slot_info) do
-        local should_compare = info.base_slot ~= nil and stack2:slot_version(slot_id) > 0
+        local should_compare = info.base_slot ~= nil and info.base_slot < 100 and stack2:slot_version(slot_id) > 0
         local should_cmp_prev = stack1.slot_info[slot_id] == nil or stack1:slot_version(slot_id) == 0
         if should_compare and should_cmp_prev then
             smt_result = ('%s    (assert(not (= %s %s)))\n'):format(

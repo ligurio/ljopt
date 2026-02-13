@@ -26,6 +26,7 @@ local exec_record = {}
 local traces_num
 
 local trace_bc_hash
+local aborted_traces
 
 local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
@@ -45,6 +46,7 @@ local function ljopt_init_trace_state()
   exec_record = {}
   traces_num = {}
   trace_bc_hash = {}
+  aborted_traces = {}
 end
 
 local function ljopt_get_execution_state()
@@ -135,7 +137,7 @@ end
 -- (except for cases, when there's multiple snapshots
 --  with same ID, we'll ignore them for now).
 local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
-  if what == "start" then
+  if what == "start" and aborted_traces[tr] == nil then
     trace_bc_hash[tr] = ""
     dev_checks("number", "function", "number", "string")
 
@@ -164,6 +166,9 @@ local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
       traces_num[tr] = nil
     end
   elseif what == "stop" or what == "abort" then
+    if what == "abort" then
+      aborted_traces[tr] = true
+    end
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
       traces_num[tr] = traces_num[tr] .. "_" .. bc_hash

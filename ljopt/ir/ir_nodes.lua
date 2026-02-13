@@ -96,7 +96,7 @@ local opcodes_table = {
     -- Memory References.
     ['AREF'] = false,
     ['HREFK'] = require('ljopt.ir.HREFK'),
-    ['HREF'] = false,
+    ['HREF'] = require('ljopt.ir.HREF'),
     ['NEWREF'] = require('ljopt.ir.NEWREF'),
     ['UREFO'] = false,
     ['UREFC'] = false,

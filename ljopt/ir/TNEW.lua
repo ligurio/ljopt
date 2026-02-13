@@ -19,14 +19,16 @@ function impls.IRNodeTNEWTab:to_smt_lib(ctx)
     local hmask_idx = constants.TAB_OFFSETS.hmask
     local hsize_idx = constants.TAB_OFFSETS.hsize
 
+    local ssa_ref = self:get_ssa_reference()
     local idx, init = ctx.mem_stack:allocate()
-    ctx.tab_info[self:get_ssa_reference()] = {mem_ref = idx, meta = nil}
-    return ('%s\n%s\n%s\n%s\n%s'):format(
-        ctx.te_stack:store(self:get_ssa_reference(), 'true'),
+    ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
+    return ('%s\n%s\n%s\n%s\n%s\n%s'):format(
+        ctx.te_stack:store(ssa_ref, 'true'),
         init,
         ctx.mem_stack:store_index(idx, asize_idx, arith_utils.const_to_smt_bv(asize)),
         ctx.mem_stack:store_index(idx, hmask_idx, arith_utils.const_to_smt_bv(hsize)),
-        ctx.mem_stack:store_index(idx, hsize_idx, arith_utils.const_to_smt_bv(0))
+        ctx.mem_stack:store_index(idx, hsize_idx, arith_utils.const_to_smt_bv(0)),
+        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_to_smt_bv(idx))
     )
 end
 

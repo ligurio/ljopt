@@ -28,14 +28,22 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
         local type = "num"
         if value_type == "ssa" then
             -- Write only if this value is implemented.
-            if filtered_nodes[value_data] == nil and trace[value_data]:get_type() ~= 'tab' then
+            if filtered_nodes[value_data] == nil then
                 local op_type = trace[value_data]:get_type()
-                local data = ctx.op_stack:load(value_data,op_type)
-                -- if op_type == "int" then
-                --     data = string.format("((_ to_fp 11 53) %s)", data)
-                -- end
-                smt_expr = ctx.snap_stack:store(slot, op_type, data)
-                slot_values[slot] = ctx.snap_stack:load(slot, op_type)
+                if op_type == 'tab' then
+                    local tab_left = ctx.tab_info[value_data].mem_ref
+                    local tab = ctx.mem_stack:load(tab_left)
+                    smt_expr = "; Table, use directly " .. tab
+                    slot_values[slot] = tab
+                else
+                    local data = ctx.op_stack:load(value_data,op_type)
+                    -- if op_type == "int" then
+                    --     data = string.format("((_ to_fp 11 53) %s)", data)
+                    -- end
+                    smt_expr = ctx.snap_stack:store(slot, op_type, data)
+                    slot_values[slot] = ctx.snap_stack:load(slot, op_type)
+
+                end
             else
                 utils.debug_msg(
                     ("Ignore snapshot %s %s"):format(tr_id, snap_id)

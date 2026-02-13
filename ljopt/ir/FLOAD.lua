@@ -133,6 +133,9 @@ ir_node.extended(impls.IRNodeFLOADP32, ir_node.ir_node_base)
 
 function impls.IRNodeFLOADP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
+    if left_op:sub(1, 1) == "{" then
+        assert(false, 'not supported yet')
+    end
     local left_type = ir_node.parse_op(left_op)
     local right_op = self:get_right_op()
 

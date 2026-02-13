@@ -22,7 +22,8 @@ function impls.IRNodeHSTOREStr:to_smt_lib(ctx)
     local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
     idx_left = ('(bv2int %s)'):format(idx_left)
     if right_op ~= nil and string.sub(right_op, 1, 1) == '"' then
-        value = arith_utils.const_to_smt_bv(tonumber(utils.hash(right_op)))
+        value = arith_utils.const_to_smt_bv(0)
+        -- value = arith_utils.const_to_smt_bv(tonumber(utils.hash(right_op)))
     else
         value = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
     end
