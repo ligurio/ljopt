@@ -100,11 +100,22 @@ local function trim(str)
   return res
 end
 
+-- The function checks that the file exists at the path passed to
+-- the function. Returns true and file handle if file exists and
+-- false otherwise.
+local function file_exists(path)
+    local ok, fh = pcall(io.open, path, "r")
+    if ok and fh ~= nil then
+        return true, fh
+    end
+    return false
+end
+
 return {
     debug_msg = debug_msg,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     fatal_msg = fatal_msg,
-    merge_tables = merge_tables,
+    file_exists = file_exists,
     merge_tables = merge_tables,
     trim = trim,
     unreachable = unreachable,
