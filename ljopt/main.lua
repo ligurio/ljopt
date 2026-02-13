@@ -1,6 +1,6 @@
-local ljopt = require("ljopt")
 local jit = require("jit")
 local utils = require("ljopt.utils")
+local ljopt = require("ljopt")
 
 local exit_codes = {
   OK = 0,
@@ -8,17 +8,40 @@ local exit_codes = {
   ERR_BAD_LUA_CHUNK = 2,
 }
 
+local USAGE_MESSAGE = [[
+Usage: ljopt [options] [script]
+
+Options:
+   -                          Process stdin.
+]]
+
 if jit == nil then
   utils.fatal_msg("Unsupported Lua runtime.", exit_codes.ERR_BAD_LUA_RUNTIME)
 end
 
-local lua_code = arg[1]
-if lua_code == "-" then
-  lua_code = io.stdin:read("*a") -- read the complete stdin
+local script = arg[1]
+if script == "-" then
+  -- Read the complete stdin.
+  script = io.stdin:read("*a")
+end
+
+if not script then
+  io.stderr:write(USAGE_MESSAGE)
+  os.exit(exit_codes.OK)
+end
+
+local lua_code
+local is_exist, fh = utils.file_exists(script)
+if is_exist then
+  lua_code = fh:read("*a")
+  fh:close()
+else
+  utils.fatal_msg("File not found.", exit_codes.ERR_BAD_LUA_CHUNK)
 end
 
 if not lua_code or
    #lua_code == 0 then
+  io.stderr:write(USAGE_MESSAGE)
   utils.fatal_msg("Lua chunk is empty.", exit_codes.ERR_BAD_LUA_CHUNK)
 end
 
