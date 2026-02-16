@@ -8,6 +8,11 @@ local function debug_msg(s)
     end
 end
 
+local function fatal_msg(s, exit_code)
+    io.stderr:write(s .. "\n")
+    os.exit(exit_code)
+end
+
 local function unreachable(s)
     error(s, 2)
 end
@@ -98,6 +103,8 @@ end
 return {
     debug_msg = debug_msg,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
+    fatal_msg = fatal_msg,
+    merge_tables = merge_tables,
     merge_tables = merge_tables,
     trim = trim,
     unreachable = unreachable,
