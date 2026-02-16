@@ -1,17 +1,15 @@
 local ljopt = require("ljopt")
 local jit = require("jit")
+local utils = require("ljopt.utils")
 
 local exit_codes = {
-  ok = 0,
-  warnings = 1,
-  errors = 2,
-  fatals = 3,
-  critical = 4
+  OK = 0,
+  ERR_BAD_LUA_RUNTIME = 1,
+  ERR_BAD_LUA_CHUNK = 2,
 }
 
 if jit == nil then
-  io.stderr:write("Unsupported Lua runtime.\n")
-  os.exit(exit_codes.critical)
+  utils.fatal_msg("Unsupported Lua runtime.", exit_codes.ERR_BAD_LUA_RUNTIME)
 end
 
 local lua_code = arg[1]
@@ -21,13 +19,12 @@ end
 
 if not lua_code or
    #lua_code == 0 then
-  io.stderr:write("Lua chunk is empty.\n")
-  os.exit(exit_codes.critical)
+  utils.fatal_msg("Lua chunk is empty.", exit_codes.ERR_BAD_LUA_CHUNK)
 end
 
 local result = ljopt.ir.translate_to_smt(lua_code, true)
 io.stdout:write(result)
-os.exit(exit_codes.ok)
+os.exit(exit_codes.OK)
 
 local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
 if #bc == 0 then
