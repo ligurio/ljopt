@@ -102,6 +102,9 @@ local result = {
 }
 
 local function check(self, str)
+    if type(str) ~= "string" then
+        error("the given argument should be a string", 2)
+    end
     local solver = z3.Z3_mk_solver(self.ctx)
     z3.Z3_solver_inc_ref(self.ctx, solver)
     z3.Z3_solver_from_string(self.ctx, solver, ffi.cast("Z3_string", str))
