@@ -31,6 +31,7 @@ build = {
         ljopt = 'ljopt/init.lua',
         ['ljopt.bc_dump'] = 'ljopt/bc_dump.lua',
         ['ljopt.bc_smtlib'] = 'ljopt/bc_smtlib.lua',
+        ['ljopt.config'] = 'ljopt/config.lua',
         ['ljopt.dev_checks'] = 'ljopt/dev_checks.lua',
         ['ljopt.ir.SNAP'] = 'ljopt/ir/SNAP.lua',
         ['ljopt.ir_dump'] = 'ljopt/ir_dump.lua',

@@ -1,7 +1,6 @@
 local ljopt = require("ljopt")
+local ljopt_config = require("ljopt.config")
 local jit = require("jit")
-
-local is_debug = os.getenv("LJOPT_DEBUG")
 
 local exit_codes = {
   ok = 0,
@@ -27,7 +26,7 @@ if not lua_code or
   os.exit(exit_codes.critical)
 end
 
-if is_debug then
+if ljopt_config.is_debug_mode() then
   io.stdout:write(("Lua code: %s\n"):format(lua_code))
 end
 
