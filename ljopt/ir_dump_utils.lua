@@ -1,3 +1,13 @@
+-- IR dump helpers for SMT verification.
+--
+-- This file is intentionally isolated from other files
+-- to prevent changes to runtime behaviour during trace
+-- recording.
+-- Since this helper functions are called from JIT handlers,
+-- isolating them ensures that modifications to other files
+-- won't unexpectedly affect the recorded trace.
+-----------------------------------------------------
+
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
 local jit = require("jit")
@@ -11,9 +21,6 @@ local byte = string.byte
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
 jit.off(true, true)
-
--- IR dump helpers for SMT verification.
------------------------------------------------------
 
 -- A table with recorded execution.
 --   trace : array<pair<SlotId, StackId>>

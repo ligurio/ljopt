@@ -1,4 +1,6 @@
 local ffi = require('ffi')
+local ljopt_config = require('ljopt.config')
+
 local has_luacov, runner = pcall(require, 'luacov.runner')
 
 -- Module with utilities for collecting code coverage from
@@ -56,7 +58,7 @@ local function coverage_enable()
 end
 
 function export.enable()
-    if os.getenv('LJOPT_COVERAGE') then
+    if ljopt_config.is_coverage_mode() then
         io.stdout:write('code coverage is enabled\n')
         if not has_luacov then
             io.stdout:write('luacov is not available\n')

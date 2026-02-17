@@ -8,6 +8,7 @@ local jit = require('jit')
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local dump_ir = require('ljopt.ir_dump')
+local ljopt_config = require('ljopt.config')
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
 local smt_constants = require('ljopt.smt_constants')
@@ -17,8 +18,6 @@ local utils = require('ljopt.utils')
 -- Documentation: https://luajit.org/running.html
 local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
 local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')"
-
-local is_debug = os.getenv('LJOPT_DEBUG')
 
 local dev_trace_dump = function() end
 
@@ -35,7 +34,7 @@ local function dump(o)
     end
 end
 
-if os.getenv('LJOPT_DEBUG') then
+if ljopt_config.is_debug_mode() then
     dev_trace_dump = dump
 end
 
@@ -199,7 +198,7 @@ local function record_code(lua_code, opt)
     -- Flush JIT so we'll have consistent
     -- trace numbers across recordings.
     jit.flush()
-    local exec_records = dump_ir.record(lua_code, is_debug)
+    local exec_records = dump_ir.record(lua_code, ljopt_config.is_debug_mode())
     assert(type(exec_records) == 'table')
     return exec_records
 end
@@ -223,9 +222,7 @@ end
 -- are not equivalent.
 local function traces_to_smt(lua_code)
     local rec_unopt = record_code(lua_code, lj_unoptimized)
-    if (is_debug) then
-        print(string.rep('=', 60))
-    end
+    utils.debug_msg(string.rep('=', 60))
     local rec_opt = record_code(lua_code, lj_optimized)
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
