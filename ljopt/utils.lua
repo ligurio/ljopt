@@ -43,7 +43,7 @@ local function enrich_snapshots_with_exits(trace_record)
     end)
     local cur_snap_id = 1
     for ir_id, ir_node in pairs(trace_record.trace) do
-        if (ir_node ~= nil and ir_node.irt_guard) then
+        if (ir_node ~= nil and ir_node.flags.irt_guard) then
             -- Search for associated snapshot.
             while (#ins2snap >= cur_snap_id + 1 and
                    ins2snap[cur_snap_id + 1].nins <= ir_id) do

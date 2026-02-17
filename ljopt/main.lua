@@ -1,5 +1,4 @@
 local ljopt = require("ljopt")
-local ljopt_config = require("ljopt.config")
 local jit = require("jit")
 
 local exit_codes = {
@@ -24,10 +23,6 @@ if not lua_code or
    #lua_code == 0 then
   io.stderr:write("Lua chunk is empty.\n")
   os.exit(exit_codes.critical)
-end
-
-if ljopt_config.is_debug_mode() then
-  io.stdout:write(("Lua code: %s\n"):format(lua_code))
 end
 
 local result = ljopt.ir.translate_to_smt(lua_code, true)

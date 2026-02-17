@@ -43,9 +43,10 @@ local function create_node(irtype, irop, op1, op2, insn)
     insn = insn or 1
     local node = {
         num = insn,
-        flags = "",
-        irt_guard = nil,
-        irt_isphi = nil,
+        flags = {
+            irt_guard = nil,
+            irt_isphi = nil,
+        },
         irtype = irtype,
         irop = irop,
         op1 = op1,
@@ -99,6 +100,10 @@ test:test("IR arithmetic tests", function(test)
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
                         result = 5, error = 1.},
+        {node = create_node("num", "FLOAD", 'nil', '#226'),
+                        result = -0.0, error = 0.0},
+        {node = create_node("num", "FLOAD", 'nil', '#222'),
+                        result = 0/0, error = 0},
         {node = create_node("num", "FPMATH", f2bv(23.3), "floor"),
 		                result = math.floor(23.3), error = true},
         {node = create_node("num", "FPMATH", f2bv(-23.3), "floor"),

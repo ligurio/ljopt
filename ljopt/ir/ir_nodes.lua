@@ -167,7 +167,7 @@ local function get_unsupported_count()
 end
 
 local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
-    dev_checks('string', 'string', '?string', 'string', '?string', '?string')
+    dev_checks('string', 'table', '?string', 'string', '?string', '?string')
 
     local type_table = {
         -- NOP doesn't have a type.
