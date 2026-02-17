@@ -148,7 +148,7 @@ end
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks(
-        'table', 'string', 'string', '?string', 'string', '?string', '?string'
+        'table', 'string', 'table', '?string', 'string', '?string', '?string'
     )
 
     local public = {

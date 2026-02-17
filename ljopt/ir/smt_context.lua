@@ -120,6 +120,9 @@ end
 function OpStackBV.load(self, op_num, type)
     dev_checks('table', 'number', 'string')
 
+    assert(op_num >= 0,
+        'Index is negative, something weird happening: ' .. op_num
+    )
     local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     local val = string.format('(select %s %d)', self._name, op_num)
     return string.format(conv, val)
@@ -128,6 +131,9 @@ end
 function OpStackBV.store(self, op_num, type, data)
     dev_checks('table', 'number', 'string', 'string')
 
+    assert(op_num >= 0,
+        'Index is negative, something weird happening: ' .. op_num
+    )
     if data == '' then
         return ''
     end
