@@ -25,6 +25,10 @@ local function fnv1a_hash(str)
     return hash
 end
 
+local function join_strings(string_array)
+    return table.concat(string_array, "\n")
+end
+
 local function unreachable(s)
     error(s, 2)
 end
@@ -129,6 +133,7 @@ return {
     fatal_msg = fatal_msg,
     file_exists = file_exists,
     hash = fnv1a_hash,
+    join_strings = join_strings,
     merge_tables = merge_tables,
     trim = trim,
     unreachable = unreachable,
