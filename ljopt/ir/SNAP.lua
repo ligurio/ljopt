@@ -1,3 +1,4 @@
+local arith_utils = require("ljopt.ir.arith_utils")
 local utils = require("ljopt.utils")
 
 -- Translate snapshot representation to SMT-LIB string.
@@ -37,7 +38,9 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
             local op_type = trace[value_data]:get_type()
             local data = ctx.op_stack:load(value_data,op_type)
             if op_type == "int" then
-                data = string.format("((_ to_fp 11 53) %s)", data)
+                -- Convert 64-bv to fp `num`.
+                -- Op stack stores only `num`.
+                data = arith_utils.smt_int_to_fp(data)
             end
             smt_expr = ctx.snap_stack:store(slot, type, data)
             slot_values[slot] = ctx.snap_stack:load(slot, type)

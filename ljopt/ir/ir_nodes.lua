@@ -232,8 +232,9 @@ local function get_nyi_nodes(nodes)
         local node = get_node(lua_node.irop, lua_node.irtype)
         if node == nil or in_loop then
             nyi_nodes[i] = true
-            utils.debug_msg(('%d: NYI node %s'):format(
-                i, 'IRNode' .. lua_node.irop .. lua_node.irtype
+            local loop_debug_str = in_loop and 'in_loop' or 'no_loop'
+            utils.debug_msg(('%d: NYI node %s %s'):format(
+                i, 'IRNode' .. lua_node.irop .. lua_node.irtype, loop_debug_str
             ))
         elseif nyi_nodes[tonumber(lua_node.op1)] ~= nil or
                nyi_nodes[tonumber(lua_node.op2)] ~= nil then

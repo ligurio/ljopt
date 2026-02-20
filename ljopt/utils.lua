@@ -1,3 +1,4 @@
+local bit = require("bit")
 local ljopt_config = require("ljopt.config")
 
 local string_gsub = string.gsub
@@ -11,6 +12,17 @@ end
 local function fatal_msg(s, exit_code)
     io.stderr:write(s .. "\n")
     os.exit(exit_code)
+end
+
+-- Simplest hash for strings:
+-- https://ru.wikipedia.org/wiki/FNV
+local function fnv1a_hash(str)
+    local hash = 2166136261
+    for i = 1, #str do
+        hash = bit.bxor(hash, string.byte(str, i))
+        hash = (hash * 16777619) % 2^32
+    end
+    return hash
 end
 
 local function unreachable(s)
@@ -116,6 +128,7 @@ return {
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     fatal_msg = fatal_msg,
     file_exists = file_exists,
+    hash = fnv1a_hash,
     merge_tables = merge_tables,
     trim = trim,
     unreachable = unreachable,
