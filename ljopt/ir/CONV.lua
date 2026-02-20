@@ -1,3 +1,4 @@
+local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local IRNodeCONV = {}
@@ -17,12 +18,8 @@ function IRNodeCONV:to_smt_lib(ctx)
     if parsed_right_op[1] == 'num.int' then
         left_op = self:get_left_op()
         data = ir_node.retrieve_int_op(left_op, ctx, 'int')
-        -- Extract lower 32 bits and sign extend to 64-bitvector.
-        data = ('RTZ ((_ sign_extend 32) ((_ extract 31 0) %s)) '):format(
-            data
-        )
-        -- Convert 64-bitvector to floating point `num`.
-        data = string.format('((_ to_fp 11 53) %s)', data)
+        -- Convert int to floating point `num`.
+        data = arith_utils.smt_int_to_fp(data)
     elseif parsed_right_op[1] == 'int.num' then
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
         -- TODO handle inputs that are out of range.

@@ -17,7 +17,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(3)
+test:plan(4)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -104,6 +104,69 @@ test:test("Trace exit merge snapshots", function(test)
     test:is(snaps[3].exits[1], 3, "3 guard matched with 3 snapshot")
     test:is(snaps[3].exits[2], 4, "4 guard matched with 3 snapshot")
 
+end)
+
+test:test("arith_utils conversion functions", function(test)
+    test:plan(15)
+
+    -- const_num_to_smt_bv:
+    test:is(arith_utils.const_num_to_smt_bv(0),
+        "#x0000000000000000", "const_num_to_smt_bv: zero")
+    test:is(arith_utils.const_num_to_smt_bv(1),
+        "#x3ff0000000000000", "const_num_to_smt_bv: one")
+    test:is(arith_utils.const_num_to_smt_bv(256),
+        "#x4070000000000000", "const_num_to_smt_bv: 256")
+    test:is(arith_utils.const_num_to_smt_bv(2^32 + 1),
+        "#x41f0000000100000", "const_num_to_smt_bv: no truncation over 32-bit")
+    test:is(arith_utils.const_num_to_smt_bv(-1),
+        "#xbff0000000000000", "const_num_to_smt_bv: -1")
+
+    -- const_int_to_smt_bv:
+    -- string.format %016X, no truncation.
+    test:is(arith_utils.const_int_to_smt_bv(0),
+        "#x0000000000000000", "const_int_to_smt_bv: zero")
+    test:is(arith_utils.const_int_to_smt_bv(1),
+        "#x0000000000000001", "const_int_to_smt_bv: one")
+    test:is(arith_utils.const_int_to_smt_bv(256),
+        "#x0000000000000100", "const_int_to_smt_bv: 256")
+    -- string.format preserves full 64-bit value.
+    test:is(arith_utils.const_int_to_smt_bv(2^32 + 1),
+        "#x0000000100000001", "const_int_to_smt_bv: full 64-bit")
+    test:is(arith_utils.const_int_to_smt_bv(-1),
+        "#xFFFFFFFFFFFFFFFF", "const_int_to_smt_bv: -1")
+    test:is(arith_utils.const_int_to_smt_bv(-256),
+        "#xFFFFFFFFFFFFFF00", "const_int_to_smt_bv: -256")
+
+    -- Ensure these conversions equivalent:
+    -- 1. int -> smt_int_bv -> smt_fp_bv.
+    -- 2. fp -> smt_fp
+    local smt_int = arith_utils.const_int_to_smt_bv(-2^31)
+    local smt_fp = arith_utils.const_num_to_smt_bv(-2^31)
+    test:is(smt:check(("(assert (= ((_ to_fp 11 53) %s) %s))"):format(
+            smt_fp, arith_utils.smt_int_to_fp(smt_int)
+        )), smt.result.SAT, "Int32 min -> FP conversion"
+    )
+
+    local smt_neg1_int = arith_utils.const_int_to_smt_bv(-1)
+    local smt_neg1_fp = arith_utils.const_num_to_smt_bv(-1)
+    test:is(smt:check(("(assert (= ((_ to_fp 11 53) %s) %s))"):format(
+            smt_neg1_fp, arith_utils.smt_int_to_fp(smt_neg1_int)
+        )), smt.result.SAT, "Int -1 -> FP conversion"
+    )
+
+    local smt_neg256_int = arith_utils.const_int_to_smt_bv(-256)
+    local smt_neg256_fp = arith_utils.const_num_to_smt_bv(-256)
+    test:is(smt:check(("(assert (= ((_ to_fp 11 53) %s) %s))"):format(
+            smt_neg256_fp, arith_utils.smt_int_to_fp(smt_neg256_int)
+        )), smt.result.SAT, "Int -256 -> FP conversion"
+    )
+
+    -- 0x0000000080000000: lower 32 bits = INT32_MIN as i32.
+    test:is(smt:check(("(assert (= %s ((_ to_fp 11 53) %s)))"):format(
+            arith_utils.smt_int_to_fp("#x0000000080000000"),
+            arith_utils.const_num_to_smt_bv(-2^31)
+        )), smt.result.SAT, "i32 sign-extend 0x80000000 -> FP -2^31"
+    )
 end)
 
 require("tests.coverage").shutdown()
