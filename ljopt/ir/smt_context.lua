@@ -337,6 +337,137 @@ function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
     self._cur_stack = self._cur_stack + 1
 end
 
+-- We model memory as 3D array, [pointer [version [array itself]]]
+-- When we want to modify array we increase version.
+-- All reads happen from the latest version.
+local MemoryStack = {}
+extended(MemoryStack, StackBase)
+
+-- Idea is that we have:
+--          main_stack
+--       /             \
+--      /               \
+--  optimized_stack     unoptimized_stack
+-- At 0 version they are equal. On every store we increment
+-- version of the slot, preserving old value for all others slots.
+function MemoryStack.init_smt(self, name, base_stack)
+    dev_checks('table', 'string', '?table')
+
+    self._name = name
+    self.base_stack = base_stack
+    self.keys_lookup = {}
+    self.next_free = 0
+    -- slot -> { version, base_slot }
+    self.slot_info = {}
+    -- [Slot [Version [Data]]]
+    local mutable_memory = string.format(
+        '(declare-fun %s () (Array Int (Array Int (Array Int (_ BitVec 64)))))',
+        self._name
+    )
+    -- [Slot [Data]]
+    -- We may initialize children as well
+    -- (it will have zero effect).
+    -- But for some reason 2 assert forall is too much for Z3
+    -- and it never finishes.
+    return mutable_memory
+end
+
+
+function MemoryStack.alloc_slot(self)
+    local current_slot = self.next_free
+    self.next_free = self.next_free + 1
+    return current_slot
+end
+
+-- Takes as input op num (e.g. 0001) or
+-- "string" and returns unique id which will
+-- always be associated with this key in all
+-- memory operations on this stack.
+--
+-- Consider it like hash, but without holes.
+function MemoryStack.key_id(self, key)
+    -- TODO: Add some prefix for types
+    -- to maintain correctness at every slot.
+    if self.keys_lookup[key] == nil then
+        self.keys_lookup[key] = self:alloc_slot()
+    end
+    return self.keys_lookup[key]
+end
+
+function MemoryStack.slot_version(self, slot)
+    if self.slot_info[slot] ~= nil then
+        return self.slot_info[slot].version
+    else
+        return 0
+    end
+end
+
+-- id is optional.
+function MemoryStack.allocate(self, id)
+    dev_checks('table', '?number')
+
+    local result
+    local current_slot = self:alloc_slot()
+    if id ~= nil then
+        assert(self.base_stack ~= nil)
+        result = ('(assert (= %s %s))'):format(
+            self.base_stack:load(id), self:load(current_slot)
+        )
+    else
+        result = ('\n(assert (= (select (select %s %d) 0) zero_pointer))'):
+            format(self._name, current_slot)
+    end
+    self.slot_info[current_slot] = { version = 0, base_slot = id }
+    return current_slot, result
+end
+
+-- Read data from op_num at current version.
+function MemoryStack.load(self, op_num)
+    dev_checks('table', 'number')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    val = string.format('(select %s %d)', val, self:slot_version(op_num))
+    return val
+end
+
+-- Read data from op_num at current version.
+function MemoryStack.load_index(self, op_num, idx)
+    dev_checks('table', 'number', 'string')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    val = string.format('(select %s %d)', val, self:slot_version(op_num))
+    val = string.format('(select %s %s)', val, idx)
+    return val
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function MemoryStack.store(self, op_num, data)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    self.slot_info[op_num].version = (self:slot_version(op_num)) + 1
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    local new_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
+    return string.format('(assert (= %s %s))', new_stack, data)
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function MemoryStack.store_index(self, op_num, index, data)
+    dev_checks('table', 'number', 'string')
+    assert(op_num >= 0, 'Index is negative, something weird happening...')
+
+    local val = string.format('(select %s %d)', self._name, op_num)
+    local old_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
+    local updated_stack = ('(store %s %s %s)'):format(old_stack, index, data)
+
+    self.slot_info[op_num].version = (self:slot_version(op_num)) + 1
+    local new_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
+    return ('(assert (= %s %s))'):format(new_stack, updated_stack)
+end
+
 local SMTContext = {}
 function SMTContext:new(vm_stack_type, op_stack_type)
     dev_checks('table', 'string', 'string')
@@ -354,12 +485,21 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     end
 
     self.te_stack = TEStackBV:new()
+    self.mem_stack = MemoryStack:new()
     self.snap_stack = SnapStack:new()
     self.snap_mapping = { cur_id = 0, map = {} }
+
+    -- ssa_ref -> tab_id
+    self.tab_info = {}
 
     return self
 end
 
+function SMTContext:restart()
+    self.tab_info = {}
+end
+
 return {
-    SMTContext = SMTContext
+    SMTContext = SMTContext,
+    MemoryStack = MemoryStack,
 }
