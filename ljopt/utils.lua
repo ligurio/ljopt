@@ -1,9 +1,19 @@
+local bit = require("bit")
 local ljopt_config = require("ljopt.config")
 
 local function debug_msg(s)
     if ljopt_config.is_debug_mode() then
         io.stderr:write(s .. "\n")
     end
+end
+
+local function fnv1a_hash(str)
+    local hash = 2166136261
+    for i = 1, #str do
+        hash = bit.bxor(hash, string.byte(str, i))
+        hash = (hash * 16777619) % 2^32
+    end
+    return hash
 end
 
 local function unreachable(s)
@@ -89,6 +99,7 @@ end
 
 return {
     debug_msg = debug_msg,
+    hash = fnv1a_hash,
     merge_tables = merge_tables,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     unreachable = unreachable,
