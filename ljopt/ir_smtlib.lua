@@ -121,13 +121,15 @@ local function transform_nodes(nodes)
 end
 
 local vm_stack_prefix = 'vm_'
+local mem_stack_prefix = 'mem_'
 local op_stack_prefix = 'op_'
 local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
 
 -- Translates single trace + snapshots into
 -- SMT formula + fill SMTContext.
-local function translate(trace_record, ctx_src, smt_suffix, tr_id)
+local function translate(trace_record, ctx_src,
+                         smt_suffix, tr_id, shared_stacks)
     if (type(trace_record.trace) ~= 'table') then
         error('IR-dump is not a table')
     end
@@ -144,6 +146,14 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     tr_id = tr_id or '0'
     ctx_src = ctx_src or smt_context.SMTContext:new('BV', 'BV')
     -- 0 stage. Create 'smt-context'.
+    if shared_stacks then
+        -- Otherwise memory shouldn't be used.
+        smtlib_buf = smtlib_buf ..
+            ctx_src.mem_stack:init_smt(
+                mem_stack_prefix .. smt_suffix .. tr_id, shared_stacks.mem_stack
+            ) ..
+            '\n'
+    end
     smtlib_buf = smtlib_buf ..
         ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) ..
         '\n'
@@ -208,9 +218,9 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
     }, failed
 end
 
-local function trace2smt(trace, ctx, suffix, traceno)
+local function trace2smt(trace, ctx, suffix, traceno, shared_stacks)
     local tr_smtlib_unopt, snap_unopt, failed =
-        translate(trace, ctx, suffix, traceno)
+        translate(trace, ctx, suffix, traceno, shared_stacks)
     if (not tr_smtlib_unopt or #tr_smtlib_unopt == 0) then
         assert(not tr_smtlib_unopt or #tr_smtlib_unopt == 0,
             "Translation of trace failed, it shouldn't happen.")
@@ -218,7 +228,7 @@ local function trace2smt(trace, ctx, suffix, traceno)
     return tr_smtlib_unopt, snap_unopt, failed
 end
 
-local function snapshots2smt(snapshots1, snapshots2)
+local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Check whether both traces exited by a guard.
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
@@ -234,6 +244,22 @@ local function snapshots2smt(snapshots1, snapshots2)
                     ('%s    (not (= %s %s))\n'):format(smt_result, val1, val2)
             end
         end
+    end
+    smt_result = smt_result .. '    ; Memory part\n'
+
+    -- If table was loaded from stack make sure it's
+    -- equal in both traces (or remains unchanged).
+    local merged_memory = utils.merge_tables(
+        stack1.vm_slot_map, stack2.vm_slot_map
+    )
+    for base_id, values in pairs(merged_memory) do
+        local value1, value2 = unpack(values)
+        value1 = value1 ~= nil and stack1:load(value1.slot)
+                               or stack1.base_stack:load(base_id)
+        value2 = value2 ~= nil and stack2:load(value2.slot)
+                               or stack2.base_stack:load(base_id)
+        smt_result =
+            ('%s    (not (= %s %s))\n'):format(smt_result, value1, value2)
     end
     smt_result = smt_result .. '))\n'
     return smt_result
@@ -284,13 +310,26 @@ local function traces_to_smt(lua_code)
         elseif rec_opt[traceno] == nil then
             goto continue
         end
+        local shared_mem_stack = smt_context.MemoryStack:new()
+        local shared_stacks = {mem_stack = shared_mem_stack}
+        local cur_trace = shared_mem_stack:init_smt(
+            'shared_mem_stack' .. traceno
+        )
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
-        local cur_trace =
+        cur_trace = cur_trace ..
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
-        local trace_unopt, snaps_unopt, failed1 =
-            trace2smt(rec_unopt[traceno], ctx_src, 'unopt', traceno)
-        local trace_opt, snaps_opt, failed2 =
-            trace2smt(rec_opt[traceno], ctx_src, 'opt', traceno)
+        local trace_unopt, snaps_unopt, failed1 = trace2smt(
+            rec_unopt[traceno], ctx_src, 'unopt', traceno, shared_stacks
+        )
+        -- Our ctx design is incorrect. We shouldn't
+        -- share context between launches.
+        local unopt_mem_stack = ctx_src.mem_stack
+        ctx_src.mem_stack = smt_context.MemoryStack:new()
+        ctx_src:restart()
+        local trace_opt, snaps_opt, failed2 = trace2smt(
+            rec_opt[traceno], ctx_src, 'opt', traceno, shared_stacks
+        )
+        local opt_mem_stack = ctx_src.mem_stack
 
         if failed1 or failed2 then
             io.stderr:write('Skip trace ' .. traceno .. '.\n')
@@ -300,7 +339,9 @@ local function traces_to_smt(lua_code)
         cur_trace = cur_trace .. trace_unopt .. '\n'
         cur_trace = cur_trace .. trace_opt .. '\n'
 
-        local smt_snapshots = snapshots2smt(snaps_unopt, snaps_opt)
+        local smt_snapshots = snapshots2smt(
+            snaps_unopt, snaps_opt, unopt_mem_stack, opt_mem_stack
+        )
 
         cur_trace = cur_trace .. smt_snapshots .. '\n'
 
