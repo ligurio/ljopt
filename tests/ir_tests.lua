@@ -399,8 +399,10 @@ test:test("Single memory stack", function(test)
     test:plan(8)
     local mem_stack = smt_context.MemoryStack:new()
     local init_smt = mem_stack:init_smt("stack2")
-    local pointer, alloc_formula = mem_stack:allocate()
-    local copy_ptr, copy_ptr_formula = mem_stack:allocate()
+
+    -- Allocate takes ssa_id as mandatory argument.
+    local pointer, alloc_formula = mem_stack:allocate(1)
+    local copy_ptr, copy_ptr_formula = mem_stack:allocate(2)
     local rewrite_slot = "1"
     local const_slot = "2"
 
@@ -467,6 +469,7 @@ test:test("Shared memory stack", function(test)
         local no_base_stack2 = smt_context.MemoryStack:new()
 
         local no_base_formula = join_strings({
+            smt_constants.LJOPT_SMTLIB,
             no_base_stack1:init_smt("no_base1"),
             no_base_stack2:init_smt("no_base2"),
             ("(assert (not (= %s %s)))"):format(
@@ -485,6 +488,7 @@ test:test("Shared memory stack", function(test)
         local has_base_stack2 = smt_context.MemoryStack:new()
 
         local has_base_formula = join_strings({
+            smt_constants.LJOPT_SMTLIB,
             base_stack1:init_smt("base_stack1"),
             has_base_stack1:init_smt("has_base_stack1", base_stack1),
             has_base_stack2:init_smt("has_base_stack2", base_stack1),
@@ -516,6 +520,7 @@ test:test("Shared memory stack", function(test)
         local second_value = "#x0000000000000015"
 
         local slots_init_formula = join_strings({
+            smt_constants.LJOPT_SMTLIB,
             base_stack:init_smt("base_stack"),
             mem_stack1:init_smt("mem_stack1", base_stack),
             mem_stack2:init_smt("mem_stack2", base_stack),
