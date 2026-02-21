@@ -10,7 +10,7 @@ make build
 
 ### Requirements
 
-LuaJIT v2.1 with a Lua function `jit.util.snappc()`.
+LuaJIT v2.1 with Lua functions `jit.util.snappc()` and `jit.util.tablesize()`.
 
 ### Usage
 
