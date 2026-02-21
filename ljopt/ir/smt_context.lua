@@ -300,12 +300,12 @@ end
 -- On each snapshot we will store at pos (1 << _cur_stack)
 -- an smt formula, which contains boolean value:
 -- `true` if exited by this snapshot.
-function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
-    dev_checks('table', 'number', 'string', '?string', 'table')
+function SnapStack.inc(self, snap_id, exit_by_this_snap, ctx)
+    dev_checks('table', 'number', '?string', 'table')
 
     if (exit_by_this_snap ~= nil) then
         local id
-        local key = tr_id .. "_" .. snap_id
+        local key = self._name .. "_" .. snap_id
         -- Snapshots should be ordered, matching by ID
         -- is not enough.
         -- E.g. A_0 B and A_1 B, if we first
@@ -337,6 +337,50 @@ function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
     self._cur_stack = self._cur_stack + 1
 end
 
+-- Similar to regular programming languages array.
+local Array1D = {}
+extended(Array1D, StackBase)
+function Array1D.init_smt(self, name)
+    dev_checks('table', 'string')
+
+    self._name = name
+    self._version = 0
+    local mutable_memory = string.format(
+        '(declare-fun %s () (Array Int (Array Int Int)))', self._name
+    )
+    local zero_init = ('\n(assert (= (select %s 0) zero_pointer_i_1d))'):format(
+        self._name
+    )
+    return mutable_memory .. '\n' .. zero_init
+end
+
+
+-- Read data from op_num at current version.
+function Array1D.load(self, op_num)
+    dev_checks('table', 'number')
+
+    local val = string.format('(select %s %d)', self._name, self._version)
+    val = string.format('(select %s %s)', val, op_num)
+    return val
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function Array1D.store(self, op_num, data)
+    dev_checks('table', 'number', 'string')
+
+    local prev_version = self._version
+    self._version = self._version + 1
+
+    local prev_stack = ('(select %s %d)'):format(self._name, prev_version)
+    local updated_stack = ('(store %s %s %s)'):format(prev_stack, op_num, data)
+
+    local new_stack = ('(select %s %d)'):format(self._name, self._version)
+
+    return ('(assert (= %s %s))'):format(new_stack, updated_stack)
+end
+
+
 -- We model memory as 3D array, [pointer [version [array itself]]]
 -- When we want to modify array we increase version.
 -- All reads happen from the latest version.
@@ -357,19 +401,17 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.base_stack = base_stack
     self.keys_lookup = {}
     self.next_free = 0
-    -- slot -> { version, base_slot }
+    -- slot -> { base_slot }
     self.slot_info = {}
+    self.ssa2slot = {}
     -- [Slot [Version [Data]]]
     local mutable_memory = string.format(
         '(declare-fun %s () (Array Int (Array Int (Array Int (_ BitVec 64)))))',
         self._name
     )
-    -- [Slot [Data]]
-    -- We may initialize children as well
-    -- (it will have zero effect).
-    -- But for some reason 2 assert forall is too much for Z3
-    -- and it never finishes.
-    return mutable_memory
+    self.versions_table = Array1D:new()
+    local ver_init = self.versions_table:init_smt('mem_ver_' .. name)
+    return mutable_memory .. '\n' .. ver_init
 end
 
 
@@ -395,48 +437,60 @@ function MemoryStack.key_id(self, key)
 end
 
 function MemoryStack.slot_version(self, slot)
-    if self.slot_info[slot] ~= nil then
-        return self.slot_info[slot].version
-    else
-        return 0
-    end
+    return self.versions_table:load(slot)
 end
 
--- id is optional.
-function MemoryStack.allocate(self, id)
-    dev_checks('table', '?number')
+function MemoryStack.inc_version(self, slot)
+    return self.versions_table:store(slot, ('(+ %s 1)'):format(
+        self.versions_table:load(slot))
+    )
+end
+
+function MemoryStack.allocate(self, ssa_id, inherited_from)
+    dev_checks('table', 'number', '?number')
 
     local result
     local current_slot = self:alloc_slot()
-    if id ~= nil then
+    if inherited_from ~= nil then
         assert(self.base_stack ~= nil)
         result = ('(assert (= %s %s))'):format(
-            self.base_stack:load(id), self:load(current_slot)
+            self.base_stack:load(inherited_from), self:load(current_slot)
         )
     else
         result = ('\n(assert (= (select (select %s %d) 0) zero_pointer))'):
             format(self._name, current_slot)
     end
-    self.slot_info[current_slot] = { version = 0, base_slot = id }
+    self.slot_info[current_slot] = { base_slot = inherited_from }
+    self.ssa2slot[ssa_id] = current_slot
     return current_slot, result
 end
 
--- Read data from op_num at current version.
-function MemoryStack.load(self, op_num)
+-- Read data from ptr at current version.
+function MemoryStack.load(self, ptr)
     dev_checks('table', 'number')
 
-    local val = string.format('(select %s %d)', self._name, op_num)
-    val = string.format('(select %s %d)', val, self:slot_version(op_num))
+    local val = ([[(let (
+    (ptr %s)
+    (version %s)
+) (select (select %s ptr) version))]]):format(
+        ptr, self:slot_version(ptr), self._name
+    )
     return val
 end
 
--- Read data from op_num at current version.
-function MemoryStack.load_index(self, op_num, idx)
+-- Read data from ptr at current version.
+function MemoryStack.load_index(self, ptr, idx)
     dev_checks('table', 'number', 'string')
 
-    local val = string.format('(select %s %d)', self._name, op_num)
-    val = string.format('(select %s %d)', val, self:slot_version(op_num))
-    val = string.format('(select %s %s)', val, idx)
+    local val = ([[(let (
+        (version %s)
+        (ptr %s)
+        (idx %s)
+) (let (
+        (mem_array (select (select %s ptr) version))
+) (select mem_array idx)))]]):format(
+        self:slot_version(ptr), ptr, idx, self._name
+    )
     return val
 end
 
@@ -444,28 +498,37 @@ end
 -- All consequent reads will read new data.
 function MemoryStack.store(self, op_num, data)
     dev_checks('table', 'number', 'string')
-    assert(op_num >= 0, 'Index is negative, something weird happening...')
 
-    self.slot_info[op_num].version = (self:slot_version(op_num)) + 1
+    local inc_ver = self:inc_version(op_num)
 
-    local val = string.format('(select %s %d)', self._name, op_num)
-    local new_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
-    return string.format('(assert (= %s %s))', new_stack, data)
+    local val = string.format('(select %s %s)', self._name, op_num)
+    local new_stack = string.format('(select %s %s)',
+        val, self:slot_version(op_num)
+    )
+    return string.format('%s\n(assert (= %s %s))', inc_ver, new_stack, data)
 end
 
--- Save data to op_num at new version.
+-- Save data to ptr at new version.
 -- All consequent reads will read new data.
-function MemoryStack.store_index(self, op_num, index, data)
-    dev_checks('table', 'number', 'string')
-    assert(op_num >= 0, 'Index is negative, something weird happening...')
+function MemoryStack.store_index(self, ptr, index, data)
+    dev_checks('table', 'number', 'string', 'string')
 
-    local val = string.format('(select %s %d)', self._name, op_num)
-    local old_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
-    local updated_stack = ('(store %s %s %s)'):format(old_stack, index, data)
-
-    self.slot_info[op_num].version = (self:slot_version(op_num)) + 1
-    local new_stack = ('(select %s %d)'):format(val, self:slot_version(op_num))
-    return ('(assert (= %s %s))'):format(new_stack, updated_stack)
+    local old_version = self:slot_version(ptr)
+    local inc_ver = self:inc_version(ptr)
+    local new_version = self:slot_version(ptr)
+    local val = ([[(assert (let (
+    (old_version %s)
+    (new_version %s)
+    (index %s)
+    (data %s)
+    (version_array (select %s %s))
+) (let (
+        (updated_array (store (select version_array old_version) index data))
+        (new_array (select version_array new_version))
+) (= new_array updated_array))))]]):format(
+        old_version, new_version, index, data, self._name, ptr
+    )
+    return string.format('%s\n%s', inc_ver, val)
 end
 
 local SMTContext = {}
