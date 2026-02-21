@@ -296,12 +296,12 @@ end
 -- On each snapshot we will store at pos (1 << _cur_stack)
 -- an smt formula, which contains boolean value:
 -- `true` if exited by this snapshot.
-function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
-    dev_checks('table', 'number', 'string', '?string', 'table')
+function SnapStack.inc(self, snap_id, exit_by_this_snap, ctx)
+    dev_checks('table', 'number', '?string', 'table')
 
     if (exit_by_this_snap ~= nil) then
         local id
-        local key = tr_id .. "_" .. snap_id
+        local key = self._name .. "_" .. snap_id
         -- Snapshots should be ordered, matching by ID
         -- is not enough.
         -- E.g. A_0 B and A_1 B, if we first
@@ -333,6 +333,52 @@ function SnapStack.inc(self, snap_id, tr_id, exit_by_this_snap, ctx)
     self._cur_stack = self._cur_stack + 1
 end
 
+-- Similar to regular programming languages array.
+local Array1D = {}
+extended(Array1D, StackBase)
+function Array1D.init_smt(self, name)
+    dev_checks('table', 'string')
+
+    self._name = name
+    self._version = 0
+    local mutable_memory = string.format(
+        '(declare-fun %s () (Array Int (Array Int Int)))', self._name
+    )
+    -- Our only usecase is versions, we better start
+    -- versions from zero.
+    -- Apart from that zero-initializing makes this
+    -- array comparable in smt.
+    local zero_init = ('\n(assert (= (select %s 0) zero_pointer_i_1d))'):format(
+        self._name
+    )
+    return mutable_memory .. '\n' .. zero_init
+end
+
+-- Read data from op_num at current version.
+function Array1D.load(self, op_num)
+    dev_checks('table', 'number')
+
+    local val = string.format('(select %s %d)', self._name, self._version)
+    val = string.format('(select %s %s)', val, op_num)
+    return val
+end
+
+-- Save data to op_num at new version.
+-- All consequent reads will read new data.
+function Array1D.store(self, op_num, data)
+    dev_checks('table', 'number', 'string')
+
+    local prev_version = self._version
+    self._version = self._version + 1
+
+    local prev_stack = ('(select %s %d)'):format(self._name, prev_version)
+    local updated_stack = ('(store %s %s %s)'):format(prev_stack, op_num, data)
+
+    local new_stack = ('(select %s %d)'):format(self._name, self._version)
+
+    return ('(assert (= %s %s))'):format(new_stack, updated_stack)
+end
+
 local SMTContext = {}
 function SMTContext:new(vm_stack_type, op_stack_type)
     dev_checks('table', 'string', 'string')
@@ -357,5 +403,6 @@ function SMTContext:new(vm_stack_type, op_stack_type)
 end
 
 return {
-    SMTContext = SMTContext
+    SMTContext = SMTContext,
+    Array1D = Array1D,
 }
