@@ -11,13 +11,14 @@
 local jutil = require("jit.util")
 local vmdef = require("jit.vmdef")
 local jit = require("jit")
-local funcinfo = jutil.funcinfo
+local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
+local bcline = require("jit.bc").line
 local tracek = jutil.tracek
 local ljopt_config = require("ljopt.config")
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
-local byte = string.byte
+local byte, rep = string.byte, string.rep
 
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
@@ -26,6 +27,33 @@ jit.off(true, true)
 -- This code called inside tested Lua chunk, so we still
 -- have to isolate global variables by making their local copy.
 local type = type
+
+local function inspect_stack_arguments(func, _pc)
+    -- Get information about the function,
+    -- including its current line.
+    local info = debug.getinfo(func, "S")
+    if not info then return end
+
+    -- Get the active local variables (including arguments)
+    -- at the given PC. Note: maybe we should track the
+    -- whole stack not just single function.
+    --
+    -- level 1 is current function (inspect_stack_arguments)
+    -- level 2 is previous function from ir_dump_utils
+    -- level 3 is previous function from ir_dump
+    -- level 4 is actual function caused trace recording
+    local level = 4
+    local i = 1
+    local result = ""
+    while true do
+        local name, value = debug.getlocal(level, i)
+        if not name then break end
+        result = result .. string.format("(%s)", type(value))
+        i = i + 1
+    end
+    return result
+end
+
 
 -- A table with recorded execution.
 --   trace : array<pair<SlotId, StackId>>
@@ -113,9 +141,32 @@ local function fnv1a_hash(str)
   return string.format("%08x", hash)
 end
 
-local function ljopt_record_trace(traceno, _func, pt, _fd)
+local recprefix = ""
+local recdepth = 0
+
+local function ljopt_record_trace(traceno, func, pc, depth, _callee)
+  if depth ~= recdepth then
+    recdepth = depth
+    recprefix = rep(" .", depth)
+  end
+  local line
+  if pc >= 0 then
+    line = bcline(func, pc, recprefix)
+  else
+    line = "0000 "..recprefix.." FUNCC      \n"
+  end
+  -- -- Do not print fmtfunc result, it contains pointer
+  -- -- which is not stable.
+  -- luacheck: push no max_comment_line_length
+  -- if pc <= 0 then
+  --   line = sub(line, 1, -2).."         ; ".. fmtfunc(func).. "\n"
+  -- end
+  -- luacheck: pop
+  if pc >= 0 and band(funcbc(func, pc), 0xff) < 16 then
+    line = line .. bcline(func, pc+1, recprefix)
+  end
   if trace_bc_hash[traceno] then
-    trace_bc_hash[traceno] = trace_bc_hash[traceno] .. ' ' .. (pt + 1)
+    trace_bc_hash[traceno] = trace_bc_hash[traceno] ..  ' ' .. line
   end
 end
 
@@ -134,30 +185,37 @@ end
 -- All of the above together gives unique ID
 -- (except for cases, when there's multiple snapshots
 --  with same ID, we'll ignore them for now).
-local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
+local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "start" then
+    local stringify_arguments = inspect_stack_arguments(func, pc)
     trace_bc_hash[tr] = ""
     dev_checks("number", "function", "number", "string")
 
-    traces_num[tr] = ""
+    traces_num[tr] = tostring(fnv1a_hash(stringify_arguments))
     if otr then
       if traces_num[otr] ~= nil then
         -- Set parent <trace_id>_<snap_id>
-        traces_num[tr] = traces_num[otr]
+        local parent_trace_id = get_trace_id(otr)
+        traces_num[tr] = traces_num[tr] .. parent_trace_id
         if oex >= 0 then
-          traces_num[tr] = traces_num[tr] .. "_" .. get_snap_uid(otr, oex)
+          local snap_id = get_snap_uid(otr, oex)
+          if #(exec_record[parent_trace_id].snapshots[snap_id].nins) == 1 then
+            traces_num[tr] = traces_num[tr] .. "_" .. snap_id
+          else
+            -- Duplicated snapshot in parent.
+            -- Ignore side traces.
+            -- See: https://github.com/ligurio/ljopt/issues/30.
+            traces_num[tr] = nil
+          end
         end
       else
         -- Parent trace was removed, remove all children as well.
         traces_num[tr] = nil
       end
+      -- Disable child traces.
+      traces_num[tr] = nil
     end
   elseif what == "stop" or what == "abort" then
-    if ljopt_config.is_debug_mode() then
-      io.stderr:write(string.format("Parent trace id: %s Trace hash: %s\n",
-        tostring(traces_num[tr]), trace_bc_hash[tr]
-      ))
-    end
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
       traces_num[tr] = traces_num[tr] .. "_" .. bc_hash
@@ -182,6 +240,11 @@ local function ctlsub(c)
   end
 end
 
+local function get_hmask(t)
+  -- Count hash entries
+  local hmask, asize = jutil.tablesize(t)
+  return hmask, asize
+end
 
 -- Everything same as formatk except float conversion.
 local function ljopt_formatsmt(tr, idx, sn)
@@ -208,7 +271,10 @@ local function ljopt_formatsmt(tr, idx, sn)
   elseif tn == "function" then
     s = fmtfunc(k)
   elseif tn == "table" then
-    s = format("{%p}", k)
+    -- TODO: const value should be printed and parsed
+    -- later as well. For now only asize and hmask are supported.
+    local hmask, asize = get_hmask(k)
+    s = format("{%p:%d:%d}", k, asize, hmask)
   elseif tn == "userdata" then
     if t == 12 then
       s = format("userdata:%p", k)
