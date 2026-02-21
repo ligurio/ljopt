@@ -1,21 +1,32 @@
-From 13cce7e2b0b91a59491289901f654d1af6cef2d1 Mon Sep 17 00:00:00 2001
+From 0640c9d9a1fe7b13ab704b072b06012707c22024 Mon Sep 17 00:00:00 2001
 From: Churkin Aleksey <lekhachurkin@gmail.com>
-Date: Wed, 28 Jan 2026 23:16:15 +0300
+Date: Mon, 9 Feb 2026 19:31:05 +0300
 Subject: [PATCH] patch some internal to expose snapshot pc in
- bytecode
 
 ---
- src/lib_jit.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ src/lib_jit.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/src/lib_jit.c b/src/lib_jit.c
-index b3c1c93c..e0de64dc 100644
+index 9f870f68..689a23bb 100644
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -288,6 +288,32 @@ static const char *const jit_trlinkname[] = {
+@@ -288,6 +288,44 @@ static const char *const jit_trlinkname[] = {
    "interpreter", "return", "stitch"
  };
  
++/* Get detailed table information including hmask, asize, etc. */
++LJLIB_CF(jit_util_tablesize)
++{
++  GCtab *t = (GCtab *)lj_lib_checktab(L, 1);
++  
++  /* Just push both values directly */ 
++  lua_pushinteger(L, (int)t->hmask);
++  lua_pushinteger(L, (int)t->asize);
++  
++  return 2;  /* Return 2 values */
++}
++
 +/* local info = jit.util.snappc(tr) */
 +LJLIB_CF(jit_util_snappc)
 +{
