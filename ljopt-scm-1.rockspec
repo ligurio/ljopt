@@ -98,6 +98,8 @@ build = {
         ['ljopt.ir.HSTORE'] = 'ljopt/ir/HSTORE.lua',
         ['ljopt.ir.NEWREF'] = 'ljopt/ir/NEWREF.lua',
         ['ljopt.ir.SLOAD'] = 'ljopt/ir/SLOAD.lua',
+        ['ljopt.ir.TDUP'] = 'ljopt/ir/TDUP.lua',
+        ['ljopt.ir.TNEW'] = 'ljopt/ir/TNEW.lua',
 
         ['ljopt.ir.CONV'] = 'ljopt/ir/CONV.lua',
 

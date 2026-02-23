@@ -292,6 +292,7 @@ f(1.3)
 f(2.3)
 f(2.3)
 ]], [[
+-- str.len test.
 local function foo()
     return #"123"
 end
@@ -399,6 +400,17 @@ foo(1.1)
 foo(1.1)
 foo(1.1)
 foo(1.1)
+]], [[
+-- TNEW test
+local function foo()
+    local x = {}
+    x["a"] = 1
+    return x
+end
+
+foo()
+foo()
+foo()
 ]]}
     test:plan(2 * #srcs)
 
