@@ -431,7 +431,44 @@ foo({})
             {type = "num", name = "HSTORE"},
             {type = "p32", name = "HREFK"},
             {type = "num", name = "HLOAD"},
+        },
+    }, {
+        code = [[
+-- Array part store (AREF, ASTORE)
+local function foo(x)
+    x[1] = 10
+    x[2] = 20
+    return x
+end
 
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "AREF"},
+            {type = "num", name = "ASTORE"},
+        },
+    }, {
+        code = [[
+-- Array store and load (AREF, ASTORE, ALOAD)
+local function foo(x)
+    x[1] = 100
+    local v = x[1]
+    return v
+end
+
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "AREF"},
+            {type = "num", name = "ALOAD"},
         },
     }}
     test:plan(3 * #srcs)
