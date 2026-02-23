@@ -86,6 +86,9 @@ build = {
         ['ljopt.ir.ULE'] = 'ljopt/ir/ULE.lua',
         ['ljopt.ir.ULT'] = 'ljopt/ir/ULT.lua',
 
+        ['ljopt.ir.ALOAD'] = 'ljopt/ir/ALOAD.lua',
+        ['ljopt.ir.AREF'] = 'ljopt/ir/AREF.lua',
+        ['ljopt.ir.ASTORE'] = 'ljopt/ir/ASTORE.lua',
         ['ljopt.ir.FLOAD'] = 'ljopt/ir/FLOAD.lua',
         ['ljopt.ir.FREF'] = 'ljopt/ir/FREF.lua',
         ['ljopt.ir.FSTORE'] = 'ljopt/ir/FSTORE.lua',
