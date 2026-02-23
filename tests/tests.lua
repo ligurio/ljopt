@@ -470,6 +470,67 @@ foo({})
             {type = "p32", name = "AREF"},
             {type = "num", name = "ALOAD"},
         },
+    }, {
+        code = [[
+-- TNEW test
+local function foo()
+    local x = {}
+    x["a"] = 1
+    return x
+end
+
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Multiple hash keys (TNEW, NEWREF, HSTORE)
+local function foo()
+    local x = {}
+    x["a"] = 1
+    x["b"] = 2
+    x["c"] = 3
+    return x
+end
+
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Table constructor with array part (TNEW, ASTORE)
+local function foo(y)
+    local x = {y, y + 1, y + 2}
+    return x
+end
+
+foo(1)
+foo(2)
+foo(3)
+foo(4)
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "num", name = "ASTORE"},
+            {type = "num", name = "ASTORE"},
+            {type = "num", name = "ASTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 
