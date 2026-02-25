@@ -45,6 +45,7 @@ build = {
         ['ljopt.ir.ir_node_base'] = 'ljopt/ir/ir_node_base.lua',
         ['ljopt.ir.ir_node_dummy'] = 'ljopt/ir/ir_node_dummy.lua',
         ['ljopt.ir.ir_nodes'] = 'ljopt/ir/ir_nodes.lua',
+        ['ljopt.ir.op_type'] = 'ljopt/ir/op_type.lua',
         ['ljopt.ir.smt_context'] = 'ljopt/ir/smt_context.lua',
 
         ['ljopt.ir.BinOp'] = 'ljopt/ir/BinOp.lua',

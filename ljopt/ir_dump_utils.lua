@@ -243,8 +243,9 @@ local function ljopt_formatsmt(tr, idx, sn)
   local k, t, slot = tracek(tr, idx)
   local tn = type(k)
   local s
-  local is_const_supported = false
+  local const_type = nil
   if tn == "number" then
+    const_type = "number"
     if t < 12 then
       s = k == 0 and "NULL" or format("[0x%08x]", k)
     elseif band(sn or 0, 0x30000) ~= 0 then
@@ -256,15 +257,17 @@ local function ljopt_formatsmt(tr, idx, sn)
       -- s = format(0 < k and k < 0x1p-1026 and "%+a" or "%+.14g", k)
       -- luacheck: pop
       s = float_to_smt_bv(k)
-      is_const_supported = true
     end
   elseif tn == "string" then
+    const_type = "string"
     s = format(#k > 20 and '"%.20s"~' or '"%s"', gsub(k, "%c", ctlsub))
   elseif tn == "function" then
+    const_type = "function"
     s = fmtfunc(k)
   elseif tn == "table" then
     -- TODO: const value should be printed and parsed
     -- later as well. For now only asize and hmask are supported.
+    const_type = "table"
     local hmask, asize = get_hmask(k)
     s = format("{%p:%d:%d}", k, asize, hmask)
   elseif tn == "userdata" then
@@ -275,7 +278,8 @@ local function ljopt_formatsmt(tr, idx, sn)
       if s == "[NULL]" then s = "NULL" end
     end
   elseif t == 21 then -- int64_t
-    s = sub(tostring(k), 1, -3)
+    const_type = "int64"
+    s = "L" .. sub(tostring(k), 1, -3)
     if sub(s, 1, 1) ~= "-" then s = "+"..s end
   -- SNAP(1, SNAP_FRAME | SNAP_NORESTORE, REF_NIL)
   elseif sn == 0x1057fff then
@@ -289,7 +293,7 @@ local function ljopt_formatsmt(tr, idx, sn)
   -- Return whether this constant supported in Snapshot.
   -- Currently only num works.
   -- https://github.com/ligurio/ljopt/issues/36
-  return s, is_const_supported
+  return s, {type = const_type, value = k}
 end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>
@@ -309,16 +313,22 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
       local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
       if ref < 0 then
         -- Type 1: Constant.
-        local const_str, is_supported = ljopt_formatsmt(tr, ref, sn)
-        if is_supported then
-          table.insert(snapshot, {s, "const", const_str})
+        local smt_str, const_tab = ljopt_formatsmt(tr, ref, sn)
+        if const_tab ~= nil
+          and const_tab.type == "number"
+          and string.sub(smt_str, 1, 2) == "#x" then
+          table.insert(snapshot, {s, {
+            type = "const",
+            value = smt_str,
+            const_type = const_tab.type,
+          }})
         end
       elseif band(sn, 0x80000) ~= 0 then
         -- Type 2: Soft-float number (needs two SSA slots).
-        table.insert(snapshot, {s, "softfp", ref, ref+1})
+        table.insert(snapshot, {s, {type="softfp", value=ref}})
       else
         -- Type 3: Regular SSA reference.
-        table.insert(snapshot, {s, "ssa", ref})
+        table.insert(snapshot, {s, {type="ssa", value=ref}})
       end
     end
   end
@@ -344,7 +354,8 @@ local function trim(s)
 end
 
 
-local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
+local function ljopt_savetrace(tr, ins, flags, irtype, op,
+                               op1, op2, op1_tab, op2_tab)
   local tr_id = get_trace_id(tr)
   if tr_id == nil then
     -- Skip this trace.
@@ -371,8 +382,17 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op, op1, op2)
     },
     irtype = trim(irtype),
     irop = trim(op),
-    op1 = trim(op1),
-    op2 = trim(op2),
+    -- op1 / op2: structured {type, value} tables
+    -- for the operands (or nil).
+    op1 = op1_tab,
+    op2 = op2_tab,
+    -- op1_txt / op2_txt: raw display strings for
+    -- the operands (trimmed). These are needed for
+    -- literal-mode operands (field names, mode flags,
+    -- slot numbers with '#' prefix, etc.) that
+    -- have no constant table.
+    op1_txt = trim(op1),
+    op2_txt = trim(op2),
   }
   if exec_record[tr_id] ~= nil then
     -- Otherwise this trace was removed due to Snapshot
