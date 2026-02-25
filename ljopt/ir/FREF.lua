@@ -9,8 +9,9 @@ ir_node.extended(impls.IRNodeFREFP32, ir_node.ir_node_base)
 function impls.IRNodeFREFP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
-    if right_op == 'tab.meta' then
-        local table_info = ctx.tab_info[tonumber(left_op)]
+    local right_op_str = ir_node.OpKind.to_string(right_op)
+    if right_op_str == 'tab.meta' then
+        local table_info = ctx.tab_info[left_op.value]
         local result = nil
         if table_info.meta == nil then
             table_info.meta, result = ctx.mem_stack:allocate_child(
@@ -33,7 +34,8 @@ end
 
 function impls.IRNodeFREFP32.is_implemented(_flags, _type, _opcode,
                                               _left_op, right_op)
-    if right_op == 'tab.meta' then
+    local right_op_str = ir_node.OpKind.to_string(right_op)
+    if right_op_str == 'tab.meta' then
         return true
     end
     return false

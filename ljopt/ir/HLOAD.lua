@@ -11,7 +11,7 @@ function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
 
-    local dst_slot = tonumber(left_op)
+    local dst_slot = left_op.value
 
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
@@ -19,8 +19,9 @@ function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
     idx_left = ('(bv2int %s)'):format(idx_left)
     local value
-    if right_op ~= nil and string.sub(right_op, 1, 1) == '"' then
-        value = arith_utils.const_num_to_smt_bv(tonumber(utils.hash(right_op)))
+    local right_op_str = ir_node.OpKind.to_string(right_op)
+    if right_op ~= nil and right_op:is_str() then
+        value = arith_utils.const_num_to_smt_bv(tonumber(utils.hash(right_op_str)))
     else
         value = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
     end
@@ -36,7 +37,7 @@ ir_node.extended(impls.IRNodeHLOADNum, ir_node.ir_node_base)
 function impls.IRNodeHLOADNum:to_smt_lib(ctx)
     local left_op = self:get_left_op()
 
-    local dst_slot = tonumber(left_op)
+    local dst_slot = left_op.value
 
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
@@ -62,7 +63,7 @@ ir_node.extended(impls.IRNodeHLOADTab, ir_node.ir_node_base)
 function impls.IRNodeHLOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
 
-    local dst_slot = tonumber(left_op)
+    local dst_slot = left_op.value
 
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref

@@ -5,6 +5,7 @@ translators.
 
 local dev_checks = require('ljopt.dev_checks')
 local utils = require('ljopt.utils')
+local OpKind = require('ljopt.ir.op_kind')
 
 local function get_ssa_reference(self)
     dev_checks('table')
@@ -42,133 +43,95 @@ local function get_right_op(self)
     return self._right_op
 end
 
-local function parse_op(operand, maxrecord)
-    dev_checks('string', '?number')
-
-    -- Maximum number of recorded IR instructions in LuaJIT.
-    local JIT_P_maxrecord = 4000
-    maxrecord = maxrecord or JIT_P_maxrecord
-
-    -- TODO: Add integer OPs, right now we support only floats,
-    -- represented as #x0123456.
-    if operand:sub(1, 2) == '#x' then
-        -- We represent as a constant only `num` type.
-        return 'num'
-    elseif operand == 'false' or operand == 'true' then
-        -- https://github.com/ligurio/ljopt/issues/36
-        error('We do not support `bool` yet')
-    elseif string.len(operand) == string.len(tostring(maxrecord)) then
-        return 'op'
-    end
-    utils.unreachable('Unknown type for ' .. operand)
-end
-
-local function retrieve_slot_op(operand)
-    dev_checks('string')
-
-    return tonumber(operand:sub(2))
-end
-
--- Loads number from stack.
---
-local function retrieve_num_op(operand, ctx, type)
-    dev_checks('string', 'table', 'string')
-
-    local op_type = parse_op(operand)
-    if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), type)
-    elseif op_type == 'num' then
-        local conv = '((_ to_fp 11 53) %s)'
-        operand = string.format(conv, operand)
-    end
-    return operand
-end
-
 local ffi = require("ffi")
+
+-- Convert the bit pattern of a double stored as #x<hex> to an int64 #x<hex>.
 local function hex_double_to_i64_hex(hex_str)
-    -- Remove #x prefix if present
     local clean_hex = hex_str:gsub("^#x", "")
-
-    -- Convert hex string to number
     local hex_num = tonumber(clean_hex, 16)
-
-    -- Use FFI to interpret the bits as double
     local converter = ffi.new("union { double d; uint64_t i; }")
-    converter.i = hex_num  -- Set the bit pattern
-
-    -- Get the actual double value
+    converter.i = hex_num
     local double_val = converter.d
-
-    -- Convert to int64 and format as hex
     local int64_val = ffi.cast("int64_t", double_val)
     return string.format("#x%016x", tonumber(int64_val))
 end
 
+-- All retrieve_* functions below accept an OpKind object (or nil) as their
+-- first argument.  They replace the old string-based API.
 
-local function retrieve_int_op(operand, ctx, _type)
-    dev_checks('string', 'table', 'string')
-
-    local op_type = parse_op(operand)
-    if op_type == 'op' then
-        -- Result of self may be num, but operand
-        -- should be loaded as int.
-        return ctx.op_stack:load(tonumber(operand), 'int')
-    elseif op_type == 'int' then
-        if string.sub(operand, 1, 2) == '#x' then
-            -- Kinda optimization, lets convert inplace.
-            -- Otherwise bv(float) -> int -> bv(int).
-            return hex_double_to_i64_hex(operand)
-        else
-            utils.unreachable('How? We store string arguments as #x...')
-        end
-    elseif op_type == 'num' then
-        if string.sub(operand, 1, 2) == '#x' then
-            return hex_double_to_i64_hex(operand)
-        else
-            utils.unreachable('How? We store string arguments as #x...')
-        end
-    end
-    assert(false, 'op_type ' .. op_type .. ' is not supported yet')
+-- Returns the integer slot number for an SLOAD-style operand.
+-- Accepts OpKind.SSA (slot stored as integer value) or
+-- OpKind.LIT (text like "#2" – strips the leading '#').
+local function retrieve_slot_op(op)
+    assert(op ~= nil and op:is_slt(), "Op should be stack slot, got: " .. op.kind)
+    -- Literal slot encoded as "#2", "#10", …
+    return op.value
 end
 
-local function retrieve_i64_op(operand, ctx, type)
-    dev_checks('string', 'table', 'string')
-
-    local op_type = parse_op(operand)
-    if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), type)
-    elseif op_type == 'i64' then
-        if operand:sub(-1, -1) == 'L' then
-            operand = operand:sub(1, -2)
-        end
-        if operand:sub(-1, -1) == 'L' then
-            operand = operand:sub(1, -2)
-        end
-        local conv = string.format('#x%.16x', operand)
-        operand = string.format(conv, operand)
+-- Loads a floating-point (num) value.
+-- OpKind.SSA  → load from op_stack by SSA ref.
+-- OpKind.NUM  → format as SMT floating-point bit-vector constant.
+local function retrieve_num_op(op, ctx, type)
+    if op == nil then
+        utils.unreachable('retrieve_num_op: op is nil')
     end
-    return operand
+    if op:is_ssa() then
+        return ctx.op_stack:load(op.value, type)
+    elseif op:is_num() then
+        return string.format('((_ to_fp 11 53) %s)', OpKind.to_string(op))
+    end
+    utils.unreachable('retrieve_num_op: unsupported op kind: ' .. tostring(op and op.kind))
 end
 
--- Tables are stored as first index in 3D memory array.
--- When reading table from op_stack we actually read a `pointer`
--- or index to 2D array (version and regular memory array).
-local function retrieve_tab_op(operand, ctx, type)
-    dev_checks('table', 'string', 'table')
-
-    local op_type = parse_op(operand)
-    if op_type == 'op' then
-        operand = ctx.op_stack:load(tonumber(operand), type)
-    else
-        assert(false, 'unreachable')
+-- Loads an integer (int / i32) value, reinterpreting floats if needed.
+-- OpKind.SSA   → load from op_stack as 'int'.
+-- OpKind.NUM   → reinterpret the double bit-pattern as i64 hex.
+local function retrieve_int_op(op, ctx, _type)
+    if op == nil then
+        utils.unreachable('retrieve_int_op: op is nil')
     end
-    return operand
+    if op:is_ssa() then
+        return ctx.op_stack:load(op.value, 'int')
+    elseif op:is_num() then
+        return hex_double_to_i64_hex(OpKind.to_string(op))
+    end
+    utils.unreachable('retrieve_int_op: unsupported op kind: ' .. tostring(op and op.kind))
+end
+
+-- Loads a 64-bit integer (i64) value.
+-- OpKind.SSA   → load from op_stack.
+-- OpKind.INT64 → format the raw bit pattern as #x<16 hex digits>.
+-- OpKind.NUM   → reinterpret double bit-pattern as i64.
+local function retrieve_i64_op(op, ctx, type)
+    if op == nil then
+        utils.unreachable('retrieve_i64_op: op is nil')
+    end
+    if op:is_ssa() then
+        return ctx.op_stack:load(op.value, type)
+    elseif op:is_i64() then
+        return string.format("#x%016x", tonumber(op.value))
+    elseif op:is_num() then
+        return hex_double_to_i64_hex(OpKind.to_string(op))
+    end
+    utils.unreachable('retrieve_i64_op: unsupported op kind: ' .. tostring(op and op.kind))
+end
+
+-- Tables are stored as the first index in the 3-D memory array.
+-- Accepts OpKind.SSA only (tables are always referenced via SSA).
+local function retrieve_tab_op(op, ctx, type)
+    if op == nil then
+        utils.unreachable('retrieve_tab_op: op is nil')
+    end
+    if op:is_ssa() then
+        return ctx.op_stack:load(op.value, type)
+    end
+    utils.unreachable('retrieve_tab_op: unsupported op kind: ' .. tostring(op and op.kind))
 end
 
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks(
-        'table', 'string', 'table', '?string', 'string', '?string', '?string'
+        'table', 'string', 'table', '?string', 'string', '?table', '?table'
     )
 
     local public = {
@@ -218,5 +181,5 @@ return {
     retrieve_num_op = retrieve_num_op,
     retrieve_int_op = retrieve_int_op,
     retrieve_i64_op = retrieve_i64_op,
-    parse_op = parse_op,
+    OpKind = OpKind,
 }

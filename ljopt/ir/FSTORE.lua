@@ -6,8 +6,8 @@ impls.IRNodeFSTORETab = {}
 ir_node.extended(impls.IRNodeFSTORETab, ir_node.ir_node_base)
 
 function impls.IRNodeFSTORETab:to_smt_lib(ctx)
-    local dst_slot = tonumber(self:get_left_op())
-    local src_slot = tonumber(self:get_right_op())
+    local dst_slot = self:get_left_op().value
+    local src_slot = self:get_right_op().value
 
     local tab_left = ctx.tab_info[dst_slot].mem_ref
     assert(tab_left ~= nil, dst_slot)

@@ -6,16 +6,23 @@ ir_node.extended(IRNodeCONV, ir_node.ir_node_base)
 
 function IRNodeCONV:to_smt_lib(ctx)
     local left_op
-    local right_op = self:get_right_op()
+    -- right_op is an OpKind.LIT whose value is the conversion descriptor
+    -- string, e.g. "i64.num none".  Extract the plain string for parsing.
+    local right_op_str = ir_node.OpKind.to_string(self:get_right_op())
     local data = ''
 
     local parsed_right_op = {}
-    for i in string.gmatch(right_op, '%S+') do
-        table.insert(parsed_right_op, i);
-     end
+    for i in string.gmatch(right_op_str, '%S+') do
+        table.insert(parsed_right_op, i)
+    end
 
     -- TODO: Support other conversions.
     if parsed_right_op[1] == 'num.int' then
+        left_op = self:get_left_op()
+        data = ir_node.retrieve_int_op(left_op, ctx, 'int')
+        -- Convert int to floating point `num`.
+        data = arith_utils.smt_int_to_fp(data)
+    elseif parsed_right_op[1] == 'num.i64' then
         left_op = self:get_left_op()
         data = ir_node.retrieve_int_op(left_op, ctx, 'int')
         -- Convert int to floating point `num`.
@@ -30,12 +37,6 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
         -- luacheck: pop
         data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
-    elseif parsed_right_op[1] == 'num.i64' then
-        left_op = ir_node.retrieve_i64_op(
-            self:get_left_op(), ctx, 'i64'
-        )
-        -- TODO recheck rounding behaviour.
-        data = string.format('((_ to_fp 11 53) %s)', left_op)
     elseif parsed_right_op[1] == 'i64.num' then
         left_op = ir_node.retrieve_num_op(
             self:get_left_op(), ctx, 'num'
@@ -43,7 +44,7 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- TODO handle inputs that are out of range.
         data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
     else
-        assert(false, 'Unsupported type conversion: '..right_op)
+        assert(false, 'Unsupported type conversion: ' .. right_op_str)
     end
 
     local ssa_ref = self:get_ssa_reference()

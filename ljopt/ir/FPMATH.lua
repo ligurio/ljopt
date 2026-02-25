@@ -11,23 +11,23 @@ function impls.IRNodeFPMATHNum:to_smt_lib(ctx)
     local left_op = ir_node.retrieve_num_op(
         self:get_left_op(), ctx, self:get_type()
     )
-    local right_op = self:get_right_op()
+    local right_op_str = ir_node.OpKind.to_string(self:get_right_op())
     local ssa_ref = self:get_ssa_reference()
     local type = self:get_type()
-    if right_op == 'floor' then
+    if right_op_str == 'floor' then
         local data = ('(fp.roundToIntegral RTN %s)'):format(left_op)
         return ctx.op_stack:store(ssa_ref, type, data)
-    elseif right_op == 'ceil' then
+    elseif right_op_str == 'ceil' then
         local data = ('(fp.roundToIntegral RTP %s)'):format(left_op)
         return ctx.op_stack:store(ssa_ref, type, data)
-    elseif right_op == 'trunc' then
+    elseif right_op_str == 'trunc' then
         local data = ('(fp.roundToIntegral RTZ %s)'):format(left_op)
         return ctx.op_stack:store(ssa_ref, type, data)
-    elseif right_op == 'sqrt' then
+    elseif right_op_str == 'sqrt' then
         local data = ('(fp.sqrt RNE %s)'):format(left_op)
         return ctx.op_stack:store(ssa_ref, type, data)
     else
-        utils.unreachable('It should have been marked as NYI: ' .. right_op)
+        utils.unreachable('It should have been marked as NYI: ' .. right_op_str)
     end
 end
 
@@ -37,6 +37,7 @@ end
 
 function impls.IRNodeFPMATHNum.is_implemented(_flags, _type, _opcode,
                                               _left_op, right_op)
+    local right_op_str = ir_node.OpKind.to_string(right_op)
     local nyi_table = {
         'cos',
         'exp',
@@ -51,7 +52,7 @@ function impls.IRNodeFPMATHNum.is_implemented(_flags, _type, _opcode,
     -- functions theory and axioms/properties of each function.
     -- In this way all possible optimizations will be handled.
     for _, value in ipairs(nyi_table) do
-        if value == right_op then
+        if value == right_op_str then
             return false
         end
     end

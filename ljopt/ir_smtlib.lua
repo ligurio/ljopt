@@ -8,6 +8,7 @@ local jit = require('jit')
 
 local ir_node = require('ljopt.ir.ir_nodes')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
+local OpKind = require('ljopt.ir.op_kind')
 local dump_ir = require('ljopt.ir_dump')
 local ljopt_config = require('ljopt.config')
 local smt_context = require('ljopt.ir.smt_context')
@@ -61,14 +62,19 @@ local function construct_nodes(trace)
     end
     for i = 1, table.getn(trace.trace) do
         local node = trace.trace[i]
+        -- Convert raw {type, value} tables (from ir_dump_utils) to OpKind
+        -- objects. For literal-mode operands (field names, mode flags …) the
+        -- raw table is nil but the text string is stored in op1_txt/op2_txt.
+        local left_op  = OpKind.from_raw(node.op1, node.op1_txt)
+        local right_op = OpKind.from_raw(node.op2, node.op2_txt)
         if filtered_nodes[i] == nil then
             table.insert(nodes_table, ir_node.instance(
                 string.format('%04d', node.num),
                 node.flags,
                 node.irtype,
                 node.irop,
-                node.op1,
-                node.op2
+                left_op,
+                right_op
             ))
         else
             table.insert(nodes_table, ir_node_dummy.instance(
@@ -79,8 +85,8 @@ local function construct_nodes(trace)
                 },
                 node.irtype,
                 node.irop,
-                node.op1,
-                node.op2
+                left_op,
+                right_op
             ))
         end
     end
@@ -180,8 +186,8 @@ local function translate(trace_record, ctx_src,
             .. (nodes[i]:get_flags().raw or '') .. ' '
             .. (nodes[i]:get_type() or '') .. ' '
             .. (nodes[i]:get_opcode() or '') .. ' '
-            .. (nodes[i]:get_left_op() or '') .. ' '
-            .. (nodes[i]:get_right_op() or '') .. ' '
+            .. OpKind.to_string(nodes[i]:get_left_op()) .. ' '
+            .. OpKind.to_string(nodes[i]:get_right_op()) .. ' '
 
         smtlib_buf = ('%s%s ; %d   %s\n'):format(smtlib_buf,
             nodes[i]:to_smt_lib(ctx_src), i, parsed_ir)

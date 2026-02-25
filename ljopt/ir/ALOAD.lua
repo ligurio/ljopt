@@ -8,7 +8,7 @@ ir_node.extended(impls.IRNodeALOADNum, ir_node.ir_node_base)
 function impls.IRNodeALOADNum:to_smt_lib(ctx)
     local left_op = self:get_left_op()
 
-    local dst_slot = tonumber(left_op)
+    local dst_slot = left_op.value
 
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
@@ -34,7 +34,7 @@ ir_node.extended(impls.IRNodeALOADTab, ir_node.ir_node_base)
 function impls.IRNodeALOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
 
-    local dst_slot = tonumber(left_op)
+    local dst_slot = left_op.value
 
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref

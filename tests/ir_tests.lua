@@ -19,6 +19,7 @@
 local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
+local OpKind = require("ljopt.ir.op_kind")
 local translate = require("ljopt.ir_smtlib")
 local smt_constants = require("ljopt.smt_constants")
 local smt_context = require("ljopt.ir.smt_context")
@@ -48,9 +49,37 @@ local function f2bv(x)
   return string.format("#x%08X%08X", hi, lo)
 end
 
-local function create_node(irtype, irop, op1, op2, insn)
+local function num(v) return {type = "number", value = v} end
+local function slt(v) return {type = "s_slot", value = v} end
+local function ssa(v) return {type = "ssa", value = v} end
+local function str(v) return {type = "string", value = v} end
+
+local function create_node(irtype, irop, op1_val, op2_val, insn)
     insn = insn or 1
-    local node = {
+    local function process_op(val)
+        if val == nil then
+            return nil
+        elseif type(val) == "table" then
+            if val.type == "number" then
+                return f2bv(val.value)
+            elseif val.type == "ssa" then
+                return string.format("%04d", val.value)
+            elseif val.type == "s_slot" then
+                return string.format("#%d", val.value)
+            elseif val.type == "string" then
+                return '"' .. val.value .. '"'
+            else
+                error("Unknown op type: " .. tostring(val.type))
+            end
+        elseif type(val) == "string" then
+            return val
+        else
+            error("Unexpected op value type: " .. type(val))
+        end
+    end
+    local op1_txt = process_op(op1_val)
+    local op2_txt = process_op(op2_val)
+    return {
         num = insn,
         flags = {
             irt_guard = nil,
@@ -58,10 +87,11 @@ local function create_node(irtype, irop, op1, op2, insn)
         },
         irtype = irtype,
         irop = irop,
-        op1 = op1,
-        op2 = op2,
+        op1 = op1_val,
+        op1_txt = op1_txt,
+        op2 = op2_val,
+        op2_txt = op2_txt,
     }
-    return node
 end
 
 test:test("IR arithmetic tests", function(test)
@@ -73,93 +103,93 @@ test:test("IR arithmetic tests", function(test)
     local op_id = 1
 
     local nodes_to_test = {
-        {node = create_node("num", "ABS", f2bv(-2.3)),
+        {node = create_node("num", "ABS", num(-2.3)),
 		                result = 2.3, error = 1.},
-        {node = create_node("int", "ABS", f2bv(-2.)),
+        {node = create_node("int", "ABS", num(-2.)),
 		                result = 2, error = 1.},
-        {node = create_node("num", "ADD", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("num", "ADD", num(2.3), num(3.4)),
                         result = 2.3 + 3.4, error = 1.},
-        {node = create_node("int", "ADD", f2bv(2.), f2bv(3.0)),
+        {node = create_node("int", "ADD", num(2.), num(3.0)),
                         result = 5, error = 1.},
-        {node = create_node("int", "ADDOV", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("int", "ADDOV", num(2.3), num(3.4)),
                         result = 5, error = 1.},
-        {node = create_node("int", "BAND", f2bv(124245235.), f2bv(824124435.)),
+        {node = create_node("int", "BAND", num(124245235.), num(824124435.)),
                         result = bit.band(124245235, 824124435), error = 1.},
-        {node = create_node("int", "BNOT", f2bv(124245235)),
+        {node = create_node("int", "BNOT", num(124245235)),
                         result = bit.bnot(124245235), error = 1.},
-        {node = create_node("int", "BOR", f2bv(124245235), f2bv(824124435)),
+        {node = create_node("int", "BOR", num(124245235), num(824124435)),
                         result = bit.bor(124245235, 824124435), error = 1.},
-        {node = create_node("int", "BROL", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BROL", num(124245235), num(2)),
                         result = bit.rol(124245235, 2), error = 1.},
-        {node = create_node("int", "BROR", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BROR", num(124245235), num(2)),
                         result = bit.ror(124245235, 2), error = 1.},
-        {node = create_node("int", "BSAR", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BSAR", num(124245235), num(2)),
                         result = bit.rshift(124245235, 2), error = 1.},
-        {node = create_node("int", "BSHL", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BSHL", num(124245235), num(2)),
                         result = bit.lshift(124245235, 2), error = 1.},
-        {node = create_node("int", "BSHR", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BSHR", num(124245235), num(2)),
                         result = bit.rshift(124245235, 2), error = 1.},
-        {node = create_node("int", "BSWAP", f2bv(124245235)),
+        {node = create_node("int", "BSWAP", num(124245235)),
                         result = bit.bswap(124245235), error = 1.},
-        {node = create_node("int", "BXOR", f2bv(124245235), f2bv(2)),
+        {node = create_node("int", "BXOR", num(124245235), num(2)),
                         result = bit.bxor(124245235, 2), error = 1.},
-        {node = create_node("num", "CONV", f2bv(3.0), "num.int"),
+        {node = create_node("num", "CONV", num(3.0), "num.int"),
                         result = 3, error = 2},
-        {node = create_node("int", "CONV", f2bv(3.0), "int.num"),
+        {node = create_node("int", "CONV", num(3.0), "int.num"),
                         result = 3, error = 2},
-        {node = create_node("num", "DIV", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("num", "DIV", num(2.3), num(3.4)),
                         result = 2.3 / 3.4, error = 1.},
-        {node = create_node("int", "DIV", f2bv(23.), f2bv(4.)),
+        {node = create_node("int", "DIV", num(23.), num(4.)),
                         result = 5, error = 1.},
         {node = create_node("num", "FLOAD", 'nil', '#226'),
                         result = -0.0, error = 0.0},
         {node = create_node("num", "FLOAD", 'nil', '#222'),
                         result = 0/0, error = 0},
-        {node = create_node("int", "FLOAD", '"test_str"', 'str.len'),
+        {node = create_node("int", "FLOAD", str("test_str"), 'str.len'),
                         result = #"test_str", error = 1},
-        {node = create_node("num", "FPMATH", f2bv(23.3), "floor"),
+        {node = create_node("num", "FPMATH", num(23.3), "floor"),
 		                result = math.floor(23.3), error = true},
-        {node = create_node("num", "FPMATH", f2bv(-23.3), "floor"),
+        {node = create_node("num", "FPMATH", num(-23.3), "floor"),
 		                result = math.floor(-23.3), error = true},
-        {node = create_node("num", "FPMATH", f2bv(23.3), "ceil"),
+        {node = create_node("num", "FPMATH", num(23.3), "ceil"),
 		                result = math.ceil(23.3), error = true},
-        {node = create_node("num", "FPMATH", f2bv(-23.3), "ceil"),
+        {node = create_node("num", "FPMATH", num(-23.3), "ceil"),
 		                result = math.ceil(-23.3), error = true},
-        {node = create_node("num", "FPMATH", f2bv(23.3), "trunc"),
+        {node = create_node("num", "FPMATH", num(23.3), "trunc"),
 		                result = math.modf(23), error = true},
-        {node = create_node("num", "FPMATH", f2bv(-23.3), "trunc"),
+        {node = create_node("num", "FPMATH", num(-23.3), "trunc"),
 		                result = math.modf(-23), error = true},
-        {node = create_node("num", "FPMATH", f2bv(4.5), "sqrt"),
+        {node = create_node("num", "FPMATH", num(4.5), "sqrt"),
 		                result = math.sqrt(4.5), error = true},
-        {node = create_node("num", "MAX", f2bv(5.), f2bv(3.)),
+        {node = create_node("num", "MAX", num(5.), num(3.)),
                         result = math.max(5., 3.), error = 3.},
-        {node = create_node("int", "MAX", f2bv(5.), f2bv(3.)),
+        {node = create_node("int", "MAX", num(5.), num(3.)),
                         result = math.max(5., 3.), error = 3.},
-        {node = create_node("int", "MAX", f2bv(-5.), f2bv(-3.)),
+        {node = create_node("int", "MAX", num(-5.), num(-3.)),
                         result = math.max(-5., -3.), error = -5.},
-        {node = create_node("num", "MIN", f2bv(5.), f2bv(3.)),
+        {node = create_node("num", "MIN", num(5.), num(3.)),
                         result = math.min(5., 3.), error = 5.},
-        {node = create_node("int", "MIN", f2bv(5.), f2bv(3.)),
+        {node = create_node("int", "MIN", num(5.), num(3.)),
                         result = math.min(5., 3.), error = 5.},
-        {node = create_node("int", "MIN", f2bv(-5.), f2bv(-3.)),
+        {node = create_node("int", "MIN", num(-5.), num(-3.)),
                         result = math.min(-5., -3.), error = 3.},
-        {node = create_node("int", "MOD", f2bv(5), f2bv(3)),
+        {node = create_node("int", "MOD", num(5), num(3)),
                         result = math.fmod(5, 3), error = 1},
-        {node = create_node("num", "MUL", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("num", "MUL", num(2.3), num(3.4)),
                         result = 2.3 * 3.4, error = 1.},
-        {node = create_node("int", "MUL", f2bv(2.), f2bv(3.)),
+        {node = create_node("int", "MUL", num(2.), num(3.)),
                         result = 2 * 3, error = 1.},
-        {node = create_node("int", "MULOV", f2bv(2.), f2bv(3.)),
+        {node = create_node("int", "MULOV", num(2.), num(3.)),
                         result = 2 * 3, error = 1.},
-        {node = create_node("num", "NEG", f2bv(2.3), nil),
+        {node = create_node("num", "NEG", num(2.3), nil),
                         result = -2.3, error = 1.},
-        {node = create_node("int", "NEG", f2bv(2.), nil),
+        {node = create_node("int", "NEG", num(2.), nil),
                         result = -2, error = 1.},
-        {node = create_node("num", "SUB", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("num", "SUB", num(2.3), num(3.4)),
                         result = 2.3 - 3.4, error = 1.},
-        {node = create_node("int", "SUB", f2bv(2.), f2bv(4.)),
+        {node = create_node("int", "SUB", num(2.), num(4.)),
                         result = 2 - 4, error = 1.},
-        {node = create_node("int", "SUBOV", f2bv(2.), f2bv(4.)),
+        {node = create_node("int", "SUBOV", num(2.), num(4.)),
                         result = 2 - 4, error = 1.},
     }
     test:plan(3 * #nodes_to_test)
@@ -219,78 +249,78 @@ test:test("IR guards tests", function(test)
     local op_id = 1
 
     local nodes_to_test = {
-        {node = create_node("int", "ADDOV", f2bv(2.), f2bv(3.0)),
+        {node = create_node("int", "ADDOV", num(2.), num(3.0)),
                         result = "true", error = "false"},
         {node = create_node("int", "ADDOV",
-                        f2bv(2147483647), f2bv(2147483647)),
+                        num(2147483647), num(2147483647)),
                         result = "false", error = "true"},
-        {node = create_node("int", "EQ", f2bv(23.), f2bv(23.)),
+        {node = create_node("int", "EQ", num(23.), num(23.)),
 		                result = true, error = false, te=true},
-        {node = create_node("num", "EQ", f2bv(2), f2bv(2)),
+        {node = create_node("num", "EQ", num(2), num(2)),
                         result = "true", error = "false"},
-        {node = create_node("num", "EQ", f2bv(2), f2bv(2.5)),
+        {node = create_node("num", "EQ", num(2), num(2.5)),
                         result = "false", error = "true"},
-        {node = create_node("int", "GE", f2bv(23.), f2bv(4.)),
+        {node = create_node("int", "GE", num(23.), num(4.)),
 		                result = true, error = false},
-        {node = create_node("int", "GT", f2bv(24.), f2bv(23.)),
+        {node = create_node("int", "GT", num(24.), num(23.)),
 		                result = true, error = false},
-        {node = create_node("num", "LE", f2bv(2.3), f2bv(3.4)),
+        {node = create_node("num", "LE", num(2.3), num(3.4)),
                         result = "true", error = "false"},
 
         -- If any argument is NaN then result is true.
-        {node = create_node("num", "UGE", f2bv(0/0), f2bv(3)),
+        {node = create_node("num", "UGE", num(0/0), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("num", "UGT", f2bv(0/0), f2bv(3)),
+        {node = create_node("num", "UGT", num(0/0), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("num", "ULE", f2bv(0/0), f2bv(3)),
+        {node = create_node("num", "ULE", num(0/0), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("num", "ULT", f2bv(0/0), f2bv(3)),
+        {node = create_node("num", "ULT", num(0/0), num(3)),
                         result = "true", error = "false"},
         -- And check regular arithmetic
-        {node = create_node("num", "UGE", f2bv(2), f2bv(3)),
+        {node = create_node("num", "UGE", num(2), num(3)),
                         result = "false", error = "true"},
-        {node = create_node("num", "UGT", f2bv(2), f2bv(3)),
+        {node = create_node("num", "UGT", num(2), num(3)),
                         result = "false", error = "true"},
-        {node = create_node("num", "ULE", f2bv(2), f2bv(3)),
+        {node = create_node("num", "ULE", num(2), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("num", "ULT", f2bv(2), f2bv(3)),
+        {node = create_node("num", "ULT", num(2), num(3)),
                         result = "true", error = "false"},
 
 
-        {node = create_node("int", "LE", f2bv(23.), f2bv(4.)),
+        {node = create_node("int", "LE", num(23.), num(4.)),
 		                result = false, error = true},
-        {node = create_node("int", "LT", f2bv(22.), f2bv(23.)),
+        {node = create_node("int", "LT", num(22.), num(23.)),
 		                result = true, error = false},
-        {node = create_node("int", "MULOV", f2bv(2.), f2bv(3.0)),
+        {node = create_node("int", "MULOV", num(2.), num(3.0)),
                         result = "true", error = "false"},
         {node = create_node("int", "MULOV",
-                        f2bv(2147483647), f2bv(2147483647)),
+                        num(2147483647), num(2147483647)),
                         result = "false", error = "true"},
-        {node = create_node("num", "NE", f2bv(2), f2bv(2)),
+        {node = create_node("num", "NE", num(2), num(2)),
                         result = "false", error = "true"},
-        {node = create_node("num", "NE", f2bv(2), f2bv(2.5)),
+        {node = create_node("num", "NE", num(2), num(2.5)),
                         result = "true", error = "false"},
-        {node = create_node("int", "SUBOV", f2bv(5), f2bv(3)),
+        {node = create_node("int", "SUBOV", num(5), num(3)),
                         result = "true", error = "false"},
         {node = create_node("int", "SUBOV",
-                        f2bv(-2147483640), f2bv(2147483647)),
+                        num(-2147483640), num(2147483647)),
                         result = "false", error = "true"},
 
-        {node = create_node("int", "UGE", f2bv(3), f2bv(3)),
+        {node = create_node("int", "UGE", num(3), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("int", "UGE", f2bv(2), f2bv(3)),
+        {node = create_node("int", "UGE", num(2), num(3)),
                         result = "false", error = "true"},
-        {node = create_node("int", "UGT", f2bv(3), f2bv(2)),
+        {node = create_node("int", "UGT", num(3), num(2)),
                         result = "true", error = "false"},
-        {node = create_node("int", "UGT", f2bv(3), f2bv(3)),
+        {node = create_node("int", "UGT", num(3), num(3)),
                         result = "false", error = "true"},
-        {node = create_node("int", "ULE", f2bv(2), f2bv(2)),
+        {node = create_node("int", "ULE", num(2), num(2)),
                         result = "true", error = "false"},
-        {node = create_node("int", "ULE", f2bv(3), f2bv(2)),
+        {node = create_node("int", "ULE", num(3), num(2)),
                         result = "false", error = "true"},
-        {node = create_node("int", "ULT", f2bv(2), f2bv(3)),
+        {node = create_node("int", "ULT", num(2), num(3)),
                         result = "true", error = "false"},
-        {node = create_node("int", "ULT", f2bv(3), f2bv(3)),
+        {node = create_node("int", "ULT", num(3), num(3)),
                         result = "false", error = "true"},
     }
     test:plan(3 * #nodes_to_test)
@@ -333,8 +363,8 @@ test:test("CONV from op", function(test)
     test:plan(1)
 
     local conv_slot = 2
-    local addov_node = create_node("int", "ADDOV", f2bv(2), f2bv(3), 1)
-    local conv_node = create_node("num", "CONV", "0001", "num.int", conv_slot)
+    local addov_node = create_node("int", "ADDOV", num(2), num(3), 1)
+    local conv_node = create_node("num", "CONV", ssa(1), "num.int", conv_slot)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
@@ -362,9 +392,9 @@ test:test("CONV (num.int (int.num))", function(test)
 
     local conv_slot = 2
     local conv_slot2 = 3
-    local addov_node = create_node("num", "ADD", f2bv(2), f2bv(3), 1)
-    local conv_node = create_node("int", "CONV", "0001", "int.num", conv_slot)
-    local conv_node2 = create_node("num", "CONV", "0002", "num.int", conv_slot2)
+    local addov_node = create_node("num", "ADD", num(2), num(3), 1)
+    local conv_node = create_node("int", "CONV", ssa(1), "int.num", conv_slot)
+    local conv_node2 = create_node("num", "CONV", ssa(2), "num.int", conv_slot2)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
@@ -378,7 +408,7 @@ test:test("CONV (num.int (int.num))", function(test)
         op_init ..
         conv_smt1 ..
         ("\n(assert (= %s #x0000000000000005))"):format(
-               ctx_src.op_stack:load(conv_slot, "int"), f2bv(5))
+               ctx_src.op_stack:load(conv_slot, "int"), (5))
     test:is(smt:check(expect_sat1), smt.result.SAT,
         "SMT-LIB checking CONV is SAT1"
     )
@@ -604,16 +634,16 @@ test:test("Memory IRs tests", function(test)
         mem_init,
     })
     local nodes = {
-        create_node("tab", "SLOAD", "#1", nil, 1),
-        create_node("p32", "NEWREF", "0001", "#x4026000000000000", 2),
-        create_node("num", "HSTORE", "0002", "#x3FF0000000000000", 3),
+        create_node("tab", "SLOAD", slt(1), nil, 1),
+        create_node("p32", "NEWREF", ssa(1), num(11), 2),
+        create_node("num", "HSTORE", ssa(2), num(1), 3),
 
-        create_node("p32", "HREF", "0001", "#x4026000000000000", 4),
-        create_node("num", "HLOAD", "0004", nil, 5),
+        create_node("p32", "HREF", ssa(1), num(11), 4),
+        create_node("num", "HLOAD", ssa(4), nil, 5),
 
-        create_node("num", "HSTORE", "0002", "#x3F00000000000000", 3),
+        create_node("num", "HSTORE", ssa(2), num(2), 3),
 
-        create_node("num", "HLOAD", "0004", nil, 6)
+        create_node("num", "HLOAD", ssa(4), nil, 6)
     }
     local trace = {
         trace = nodes,
@@ -627,10 +657,11 @@ test:test("Memory IRs tests", function(test)
   -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (select (select (select mem 0) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
-        "(assert (= (select (select (select mem 0) 2) (bv2int #x4026000000000000)) #x3F00000000000000))" .. '\n'
+        "(assert (= (select (select (select mem 1) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
+        "(assert (= (select (select (select mem 1) 2) (bv2int #x4026000000000000)) #x3F00000000000000))" .. '\n'
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
+    print(expect_sat)
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
 end)
 
@@ -654,16 +685,16 @@ test:test("Array IRs tests", function(test)
         mem_init,
     })
     local nodes = {
-        create_node("tab", "SLOAD", "#1", nil, 1),
-        create_node("p32", "NEWREF", "0001", "#x4026000000000000", 2),
-        create_node("num", "ASTORE", "0002", "#x3FF0000000000000", 3),
+        create_node("tab", "SLOAD", slt(1), nil, 1),
+        create_node("p32", "NEWREF", ssa(1), num(11), 2),
+        create_node("num", "ASTORE", ssa(2), num(1), 3),
 
-        create_node("p32", "AREF", "0001", "#x4026000000000000", 4),
-        create_node("num", "ALOAD", "0004", nil, 5),
+        create_node("p32", "AREF", ssa(1), num(11), 4),
+        create_node("num", "ALOAD", ssa(4), nil, 5),
 
-        create_node("num", "ASTORE", "0002", "#x3F00000000000000", 3),
+        create_node("num", "ASTORE", ssa(2), num(1), 3),
 
-        create_node("num", "ALOAD", "0004", nil, 6)
+        create_node("num", "ALOAD", ssa(4), nil, 6)
     }
     local trace = {
         trace = nodes,

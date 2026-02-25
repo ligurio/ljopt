@@ -295,7 +295,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
     local m, ot, op1, op2, ridsp = traceir(tr, ins)
     local oidx, t = 6*shr(ot, 8), band(ot, 31)
     local op = sub(irnames, oidx+1, oidx+6)
-    local op1_txt, op2_txt
+    local op1_txt, op2_txt, op1_tab, op2_tab
     local rid
     if op == "LOOP  " then
       if dumpreg then
@@ -328,14 +328,16 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then
-	op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
+	op1_txt, op1_tab = ir_dump_utils.ljopt_formatsmt(tr, op1)
 	write_out(op1_txt)
       elseif m1 ~= 3 then -- op1 != IRMnone
 	if op1 < 0 then
-	  op1_txt = ir_dump_utils.ljopt_formatsmt(tr, op1)
+	  op1_txt, op1_tab = ir_dump_utils.ljopt_formatsmt(tr, op1)
 	  write_out(op1_txt)
+    assert(op1_tab ~= nil)
 	else
 	  op1_txt = format(m1 == 0 and "%04d" or "#%-3d", op1)
+    op1_tab = {type = m1 == 0 and "ssa" or "s_slot", value = op1}
 	  write_out(op1_txt)
 	end
 	if m2 ~= 3*4 then -- op2 != IRMnone
@@ -349,13 +351,15 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	      write_out(op2_txt)
 	    else
 	      op2_txt = format("  #%-3d", op2)
+          op2_tab = {type = "ssa", value = op2}
 	      write_out(op2_txt)
 	    end
 	  elseif op2 < 0 then
-	    op2_txt = ir_dump_utils.ljopt_formatsmt(tr, op2)
+	    op2_txt, op2_tab = ir_dump_utils.ljopt_formatsmt(tr, op2)
 	    write_out("  ", op2_txt)
 	  else
 	    op2_txt = format("  %04d", op2)
+      op2_tab = {type="ssa", value=op2}
 	    write_out(op2_txt)
 	  end
 	end
@@ -368,7 +372,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 		       (band(ot, 128) == 0 and " " or ">"),
 		       band(ot, 64) == 0 and " " or "+")
     ir_dump_utils.ljopt_savetrace(
-      tr, ins, flags, irtype[t], op, op1_txt, op2_txt
+      tr, ins, flags, irtype[t], op, op1_txt, op2_txt, op1_tab, op2_tab
     )
   end
   if snap then
