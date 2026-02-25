@@ -6,13 +6,13 @@ ir_node.extended(IRNodeCONV, ir_node.ir_node_base)
 
 function IRNodeCONV:to_smt_lib(ctx)
     local left_op
-    local right_op = self:get_right_op()
+    local right_op = self:get_right_op():get_lit()
     local data = ''
 
     local parsed_right_op = {}
     for i in string.gmatch(right_op, '%S+') do
-        table.insert(parsed_right_op, i);
-     end
+        table.insert(parsed_right_op, i)
+    end
 
     -- TODO: Support other conversions.
     if parsed_right_op[1] == 'num.int' then

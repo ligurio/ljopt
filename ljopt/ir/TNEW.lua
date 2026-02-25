@@ -10,8 +10,8 @@ ir_node.extended(impls.IRNodeTNEWTab, ir_node.ir_node_base)
 
 function impls.IRNodeTNEWTab:to_smt_lib(ctx)
     -- >  tab TNEW   #0    #0
-    local asize = tonumber(self:get_left_op():sub(2))
-    local hsize = tonumber(self:get_right_op():sub(2))
+    local asize = self:get_left_op():get_imm()
+    local hsize = self:get_right_op():get_imm()
     hsize = 2^hsize - 1   -- 2^x - 1
 
     local asize_id = tostring(

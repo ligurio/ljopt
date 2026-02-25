@@ -5,6 +5,7 @@ Provides mapping between IR node opcodes and their translators.
 local dev_checks = require('ljopt.dev_checks')
 local ljopt_config = require('ljopt.config')
 local utils = require('ljopt.utils')
+local op_type = require('ljopt.ir.op_type')
 
 local ir_node_ADD = require('ljopt.ir.ADD')
 local ir_node_BAND = require('ljopt.ir.BAND')
@@ -216,9 +217,19 @@ local function get_node(opcode, type)
 end
 
 local function instance(ssa_ref, flags, type, opcode, left_op, right_op)
-    dev_checks('string', 'table', '?string', 'string', '?string', '?string')
+    dev_checks('string', 'table', '?string', 'string', '?table', '?table')
     local node = get_node(opcode, type)
     return node:new(ssa_ref, flags, type, opcode, left_op, right_op)
+end
+
+-- Extract the SSA reference number from a raw {type, value} irins
+-- operand. Returns the integer SSA ref when the operand is an SSA
+-- reference, else nil.
+local function raw_ssa_ref(raw_op)
+    if raw_op ~= nil and raw_op.type == op_type.SSA then
+        return raw_op.value
+    end
+    return nil
 end
 
 -- Let's mark all unimplemented nodes and ignore them and their
@@ -236,20 +247,36 @@ local function get_nyi_nodes(nodes)
             utils.debug_msg(('%d: NYI node %s %s'):format(
                 i, 'IRNode' .. lua_node.irop .. lua_node.irtype, loop_debug_str
             ))
-        elseif nyi_nodes[tonumber(lua_node.op1)] ~= nil or
-               nyi_nodes[tonumber(lua_node.op2)] ~= nil then
-            nyi_nodes[i] = true
-            utils.debug_msg(
-                ('%d: NYI one of the arguments for %s'):format(
-                    i, 'IRNode' .. lua_node.irop .. lua_node.irtype
+        else
+            -- Check whether either SSA operand
+            -- depends on a NYI node.
+            local dep1 = raw_ssa_ref(lua_node.op1)
+            local dep2 = raw_ssa_ref(lua_node.op2)
+            if (dep1 and nyi_nodes[dep1]) or (dep2 and nyi_nodes[dep2]) then
+                nyi_nodes[i] = true
+                utils.debug_msg(
+                    ('%d: NYI one of the arguments for %s'):format(
+                        i, 'IRNode' .. lua_node.irop .. lua_node.irtype
+                    )
                 )
-            )
-        elseif node.is_implemented(lua_node.flags, lua_node.irtype,
-                   lua_node.irop, lua_node.op1, lua_node.op2) == false then
-            nyi_nodes[i] = true
-            utils.debug_msg(('%d: NYI part of node %s'):format(
-                i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
-            ))
+            else
+                -- Convert raw tables to OpType for
+                -- is_implemented checks so implementations
+                -- can inspect operand kinds cleanly.
+                local left_op  = op_type.from_raw(
+                    lua_node.op1, lua_node.op1_txt
+                )
+                local right_op = op_type.from_raw(
+                    lua_node.op2, lua_node.op2_txt
+                )
+                if node.is_implemented(lua_node.flags, lua_node.irtype,
+                        lua_node.irop, left_op, right_op) == false then
+                    nyi_nodes[i] = true
+                    utils.debug_msg(('%d: NYI part of node %s'):format(
+                        i, 'IRNode' .. nodes[i].irop .. nodes[i].irtype
+                    ))
+                end
+            end
         end
     end
     return nyi_nodes

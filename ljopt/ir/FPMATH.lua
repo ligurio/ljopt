@@ -11,7 +11,7 @@ function impls.IRNodeFPMATHNum:to_smt_lib(ctx)
     local left_op = ir_node.retrieve_num_op(
         self:get_left_op(), ctx, self:get_type()
     )
-    local right_op = self:get_right_op()
+    local right_op = self:get_right_op():get_lit()
     local ssa_ref = self:get_ssa_reference()
     local type = self:get_type()
     if right_op == 'floor' then
@@ -36,7 +36,8 @@ local function instance(node_str)
 end
 
 function impls.IRNodeFPMATHNum.is_implemented(_flags, _type, _opcode,
-                                              _left_op, right_op)
+                                              _left_op, right_op_val)
+    local right_op = right_op_val:get_lit()
     local nyi_table = {
         'cos',
         'exp',

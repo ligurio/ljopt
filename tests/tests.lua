@@ -114,15 +114,23 @@ f(1)
             if (table.getn(snap.slots) ~= 0) then
                 test:is(snap.slots[1][1], 2, "Incorrect slot")
                 test:is(
-                    snap.slots[1][2], "ssa", "Incorrect snapshot entry type"
+                    snap.slots[1][2].type, "ssa",
+                    "Incorrect snapshot entry type"
                 )
-                test:is(snap.slots[1][3], 1, "Incorrect entry value")
+                test:is(
+                    snap.slots[1][2].value, 1,
+                    "Incorrect entry value"
+                )
 
                 test:is(snap.slots[2][1], 3, "Incorrect slot")
                 test:is(
-                    snap.slots[2][2], "ssa", "Incorrect snapshot entry type"
+                    snap.slots[2][2].type, "ssa",
+                    "Incorrect snapshot entry type"
                 )
-                test:is(snap.slots[2][3], 3, "Incorrect entry value")
+                test:is(
+                    snap.slots[2][2].value, 3,
+                    "Incorrect entry value"
+                )
             end
         end
     end
@@ -189,8 +197,14 @@ f(1)
     test:is(#trace.snapshots[4].slots, 1, "Second snapshot has return value")
     local return_slots = trace.snapshots[4].slots
     test:is(return_slots[1][1], 3, "Incorrect slot")
-    test:is(return_slots[1][2], "ssa", "Incorrect snapshot entry type")
-    test:is(return_slots[1][3], 2, "Incorrect entry value")
+    test:is(
+        return_slots[1][2].type, "ssa",
+        "Incorrect snapshot entry type"
+    )
+    test:is(
+        return_slots[1][2].value, 2,
+        "Incorrect entry value"
+    )
 end)
 
 -- Main tests for traces equivalence.

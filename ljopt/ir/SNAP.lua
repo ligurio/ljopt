@@ -24,7 +24,9 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
     -- Slot number -> SMT expression.
     local slot_values = {}
     for _, pair in ipairs(snapshot.slots) do
-        local slot, value_type, value_data = pair[1], pair[2], pair[3]
+        local slot = pair[1]
+        local value_type = pair[2].type
+        local value_data = pair[2].value
         local smt_expr
         local type = "num"
         if value_type == "ssa" then
@@ -68,7 +70,7 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
             slot_values[slot] = ctx.snap_stack:load(slot, type)
         elseif value_type == "softfp" then
             error("This path was not tested and never occured before.")
-            local ref2 = pair[4]
+            local ref2 = value_data + 1
             local left = ctx.snap_stack:store(
                 slot, type, ctx.op_stack:load(value_data, type))
             local right = ctx.snap_stack:store(
