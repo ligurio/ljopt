@@ -282,9 +282,10 @@ local function traces_to_smt(lua_code)
 
     local traces_smtlib = {}
     for traceno in pairs(rec_unopt) do
-        if ljopt_config.is_strict_mode() then
+        if ljopt_config.is_strict_traces_matching() then
             assert(rec_opt[traceno] ~= nil, 'Unmatched trace ' ..
-                traceno .. ' disable `LJOPT_STRICT` if you want to ignore it.'
+                traceno .. ' disable `LJOPT_STRICT` or ' ..
+                '`LJOPT_STRICT_TRACE_MATCHING` if you want to ignore it.'
             )
         elseif rec_opt[traceno] == nil then
             goto continue
