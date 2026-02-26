@@ -394,6 +394,45 @@ foo(1.1)
             {type = "num", name = "ADD"},
             {type = "num", name = "UGE"},
         },
+    }, {
+        code = [[
+-- Multiple hash keys (TNEW, NEWREF, HSTORE)
+local function foo(x)
+    x["a"] = 1
+    x["b"] = 2
+    return x
+end
+
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Hash store and load numeric value (HREFK, HSTORE, HLOAD)
+local function foo(x)
+    x["key"] = 42
+    local v = x["key"]
+    return v
+end
+
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "HREFK"},
+            {type = "num", name = "HLOAD"},
+
+        },
     }}
     test:plan(3 * #srcs)
 

@@ -150,6 +150,21 @@ local function retrieve_i64_op(operand, ctx, type)
     return operand
 end
 
+-- Tables are stored as first index in 3D memory array.
+-- When reading table from op_stack we actually read a `pointer`
+-- or index to 2D array (version and regular memory array).
+local function retrieve_tab_op(operand, ctx, type)
+    dev_checks('table', 'string', 'table')
+
+    local op_type = parse_op(operand)
+    if op_type == 'op' then
+        operand = ctx.op_stack:load(tonumber(operand), type)
+    else
+        utils.unreachable('Tables in argument appear only as an IR.')
+    end
+    return operand
+end
+
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks(
@@ -199,6 +214,7 @@ return {
     ir_node_base = ir_node_base,
     extended = extended,
     retrieve_slot_op = retrieve_slot_op,
+    retrieve_tab_op = retrieve_tab_op,
     retrieve_num_op = retrieve_num_op,
     retrieve_int_op = retrieve_int_op,
     retrieve_i64_op = retrieve_i64_op,

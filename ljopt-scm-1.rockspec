@@ -87,6 +87,12 @@ build = {
         ['ljopt.ir.ULT'] = 'ljopt/ir/ULT.lua',
 
         ['ljopt.ir.FLOAD'] = 'ljopt/ir/FLOAD.lua',
+        ['ljopt.ir.FSTORE'] = 'ljopt/ir/FSTORE.lua',
+        ['ljopt.ir.HLOAD'] = 'ljopt/ir/HLOAD.lua',
+        ['ljopt.ir.HREF'] = 'ljopt/ir/HREF.lua',
+        ['ljopt.ir.HREFK'] = 'ljopt/ir/HREFK.lua',
+        ['ljopt.ir.HSTORE'] = 'ljopt/ir/HSTORE.lua',
+        ['ljopt.ir.NEWREF'] = 'ljopt/ir/NEWREF.lua',
         ['ljopt.ir.SLOAD'] = 'ljopt/ir/SLOAD.lua',
 
         ['ljopt.ir.CONV'] = 'ljopt/ir/CONV.lua',

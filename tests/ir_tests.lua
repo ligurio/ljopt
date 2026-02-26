@@ -30,7 +30,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(6)
+test:plan(7)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -391,6 +391,14 @@ test:test("CONV (num.int (int.num))", function(test)
     )
 end)
 
+local function make_sequential_ids(limit)
+    local ident = {}
+    for i=1, limit do
+        ident[i] = i
+    end
+    return ident
+end
+
 test:test("Single memory stack", function(test)
     test:plan(8)
     local mem_stack = smt_context.MemoryStack:new()
@@ -566,6 +574,56 @@ test:test("Shared memory stack", function(test)
             smt.result.UNSAT, "Check same values"
         )
     end
+end)
+
+test:test("Memory IRs tests", function(test)
+    test:plan(2)
+
+    local base_stack = smt_context.MemoryStack:new()
+    local base_init = base_stack:init_smt("base")
+
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+    local vm_init = ctx_src.vm_stack:init_smt("vm")
+    local mem_init = ctx_src.mem_stack:init_smt("mem", base_stack)
+
+    local prefix = utils.join_strings({
+        smt_constants.LJOPT_SMTLIB,
+        base_init,
+        op_init,
+        vm_init,
+        mem_init,
+    })
+    local nodes = {
+        create_node("tab", "SLOAD", "#1", nil, 1),
+        create_node("p32", "NEWREF", "0001", "#x4026000000000000", 2),
+        create_node("num", "HSTORE", "0002", "#x3FF0000000000000", 3),
+
+        create_node("p32", "HREF", "0001", "#x4026000000000000", 4),
+        create_node("num", "HLOAD", "0004", nil, 5),
+
+        create_node("num", "HSTORE", "0002", "#x3F00000000000000", 3),
+
+        create_node("num", "HLOAD", "0004", nil, 6)
+    }
+    local trace = {
+        trace = nodes,
+        ssa_ref2id = make_sequential_ids(6),
+    }
+
+    local conv_smt = translate.translate(
+        trace, ctx_src, nil, nil, {mem_stack=base_stack}
+    )
+
+    -- luacheck: push no max_line_length
+    local expect_sat =
+        prefix .. conv_smt ..
+        "(assert (= (select (select (select mem 0) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
+        "(assert (= (select (select (select mem 0) 2) (bv2int #x4026000000000000)) #x3F00000000000000))" .. '\n'
+    -- luacheck: pop
+    test:is(smt:parse(expect_sat), true, "Parse memory operations")
+    test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
 end)
 
 require("tests.coverage").shutdown()

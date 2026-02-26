@@ -36,14 +36,24 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 goto continue
             end
             local op_type = trace[value_data]:get_type()
-            local data = ctx.op_stack:load(value_data,op_type)
-            if op_type == "int" then
-                -- Convert 64-bv to fp `num`.
-                -- Op stack stores only `num`.
-                data = arith_utils.smt_int_to_fp(data)
+            if op_type == "tab" then
+                local tab_left = ctx.tab_info[value_data].mem_ref
+                local tab = ctx.mem_stack:load(tab_left)
+                smt_expr = "; Table, use directly"
+                slot_values[slot] = tab
+            else
+                -- Snap stack stores only `num`. It will let us
+                -- support narrow in future and this inivariant
+                -- holds for real LuaJIT stack.
+                local data = ctx.op_stack:load(value_data,op_type)
+                if op_type == "int" then
+                    -- Convert 64-bv to fp `num`.
+                    -- Op stack stores only `num`.
+                    data = arith_utils.smt_int_to_fp(data)
+                end
+                smt_expr = ctx.snap_stack:store(slot, op_type, data)
+                slot_values[slot] = ctx.snap_stack:load(slot, op_type)
             end
-            smt_expr = ctx.snap_stack:store(slot, op_type, data)
-            slot_values[slot] = ctx.snap_stack:load(slot, op_type)
         elseif value_type == "const" then
             if value_data == 'true' then
                 -- 1.0 as float
@@ -53,7 +63,6 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 value_data = '#x0000000000000000'
             end
             local cnst = ('((_ to_fp 11 53) %s)'):format(value_data)
-            cnst = cnst:gsub('+', '')
             -- Convert constant to SMT.
             smt_expr = ctx.snap_stack:store(slot, type, cnst)
             slot_values[slot] = ctx.snap_stack:load(slot, type)
