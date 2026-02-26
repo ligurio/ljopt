@@ -90,7 +90,7 @@ end
 
 -- This function was copied from ir_dump
 local function fmtfunc(func, pc)
-  dev_checks("function", "number")
+  dev_checks("function", "?number")
   local fi = funcinfo(func, pc)
   if fi.loc then
     return fi.loc
