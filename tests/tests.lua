@@ -73,6 +73,11 @@ end
 test:test("fold_brol (LuaJIT#1079)", function(test)
     test:plan(4)
 
+    -- Disable strict mode due to for loop.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+
+
     local lua_sample =[[
 local bit = require('bit');
 for i = 1, 3 do
@@ -98,10 +103,16 @@ end
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
+
+    ljopt_config.set_strict_mode(strict_mode)
 end)
 
 test:test("fold_signed_zero (LuaJIT#783)", function(test)
     test:plan(4)
+
+    -- Disable strict mode due to for loop.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
 
     local lua_sample = [[
 local minus_zero = -0
@@ -131,6 +142,8 @@ end
     test:isnt(smtlib_enabled_fold, nil, 'SMT-LIB output with enabled fold')
     test:is(smt:parse(smtlib_enabled_fold), true,
             'SMT-LIB with enabled fold is correct')
+
+    ljopt_config.set_strict_mode(strict_mode)
 end)
 
 -- Snapshot parsing tests
@@ -205,6 +218,8 @@ end
 f(0)
 f(1)
 f(1)
+f(1)
+f(1)
 ]]
     -- Later we check, that parsed exactly
     -- SNAP   #0   [ ---- ---- ]
@@ -239,6 +254,11 @@ end
 f(0)
 f(1)
 f(1)
+f(1)
+f(1)
+f(1)
+f(1)
+f(1)
 ]], [[
 local function f(y)
   -- The numbers are arbitrary.
@@ -249,14 +269,28 @@ end
 f(0)
 f(1)
 f(1)
+f(1)
+f(1)
+f(1)
+f(1)
+f(1)
 ]],
 [[
 local function f(x)
   return x + 0.23, x > 0.23, x < 0.23, x >= 0.23, x <= 0.23, x - 0.23, x / 0.23, x * 0.23
 end
-f(0.1)
-f(1.2)
-f(1.2)
+-- This test requires more calls for some reason.
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(1.3)
+f(2.3)
+f(2.3)
 ]]}
     test:plan(2 * #srcs)
 
@@ -281,6 +315,10 @@ debug.setmetatable("string", nil)
 local function foo()
     return 1
 end
+foo()
+foo()
+foo()
+foo()
 foo()
 foo()
 ]]
@@ -309,6 +347,8 @@ local function f()
     return x
 end
 
+f()
+f()
 f()
 f()
 f()
@@ -346,7 +386,11 @@ local function foo(c)
   return 0
 end
 foo(1.1)
-foo(1.2)
+foo(1.1)
+foo(1.1)
+foo(1.1)
+foo(1.1)
+foo(1.1)
 ]]}
     test:plan(2 * #srcs)
 

@@ -39,6 +39,9 @@ end
 foo(-0.0)
 foo(-0.0)
 foo(-0.0)
+foo(-0.0)
+foo(-0.0)
+foo(-0.0)
 ]]
     test:plan(2)
 

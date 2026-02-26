@@ -7,6 +7,12 @@ local is_debug_enabled = os.getenv("LJOPT_DEBUG") ~= nil
 local is_dump_model_enabled = os.getenv("LJOPT_DUMP_MODEL") ~= nil
 local is_strict_mode_enabled = os.getenv("LJOPT_STRICT") ~= nil
 
+-- If disabled we can miss some traces,
+-- if such traceback do not have a counterpart trace
+-- in second launch.
+local is_strict_traces_matching_enabled =
+    os.getenv("LJOPT_STRICT_TRACE_MATCHING") ~= nil
+
 local function is_debug_mode()
     return is_debug_enabled
 end
@@ -23,6 +29,15 @@ end
 local function set_strict_mode(val)
     dev_checks("boolean")
     is_strict_mode_enabled = val
+end
+
+local function is_strict_traces_matching()
+    return is_strict_traces_matching_enabled
+end
+
+local function set_strict_traces_matching(val)
+    dev_checks("boolean")
+    is_strict_traces_matching_enabled = val
 end
 
 local function is_coverage_mode()
@@ -43,6 +58,8 @@ return {
     set_debug_mode = set_debug_mode,
     is_strict_mode = is_strict_mode,
     set_strict_mode = set_strict_mode,
+    is_strict_traces_matching = is_strict_traces_matching,
+    set_strict_traces_matching = set_strict_traces_matching,
     is_coverage_mode = is_coverage_mode,
     set_coverage_mode = set_coverage_mode,
     is_dump_model = is_dump_model,
