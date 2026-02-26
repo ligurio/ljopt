@@ -13,8 +13,10 @@ function IRNodeDummy:to_smt_lib()
     return ''
 end
 
-local function instance(ssa_ref, flags, type, left_op, right_op)
-    return IRNodeDummy:new(ssa_ref, flags, type, 'dummy', left_op, right_op)
+local function instance(ssa_ref, flags, type, ir_op, left_op, right_op)
+    return IRNodeDummy:new(
+        ssa_ref, flags, type, ir_op .. 'dummy', left_op, right_op
+    )
 end
 
 local is_dummy_node = true
