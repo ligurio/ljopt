@@ -174,7 +174,7 @@ local function translate(trace_record, ctx_src, smt_suffix, tr_id)
             .. (nodes[i]:get_right_op() or '') .. ' '
 
         smtlib_buf = ('%s%s ; %d   %s\n'):format(smtlib_buf,
-            nodes[i]:to_smt_lib(ctx_src), i, parsed_ir)
+            nodes[i]:to_smt_lib(ctx_src), i, utils.trim(parsed_ir))
     end
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
