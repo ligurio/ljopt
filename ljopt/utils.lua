@@ -1,5 +1,7 @@
 local ljopt_config = require("ljopt.config")
 
+local string_gsub = string.gsub
+
 local function debug_msg(s)
     if ljopt_config.is_debug_mode() then
         io.stderr:write(s .. "\n")
@@ -87,9 +89,16 @@ local function enrich_snapshots_with_exits(nodes, trace_record)
     return true
 end
 
+local function trim(str)
+  if str == nil then return end
+  local res = string_gsub(str, '^%s*(.-)%s*$', '%1')
+  return res
+end
+
 return {
     debug_msg = debug_msg,
-    merge_tables = merge_tables,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
+    merge_tables = merge_tables,
+    trim = trim,
     unreachable = unreachable,
 }
