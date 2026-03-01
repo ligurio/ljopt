@@ -635,6 +635,23 @@ foo()
             {type = "cdt", name = "CNEWI"},
             {type = "i64", name = "ADD"},
             {type = "cdt", name = "CNEWI"},
+        }
+    }, {
+        code = [[
+-- String concatenation (BUFHDR, BUFPUT, BUFSTR)
+local function foo(a, b)
+    return a .. b
+end
+
+foo("hello", " world")
+foo("hello", " world")
+foo("hello", " world")
+]],
+        ins = {
+            {type = "p32", name = "BUFHDR"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
         },
     }, {
         code = [[

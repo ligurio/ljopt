@@ -1,4 +1,5 @@
 local arith_utils = require("ljopt.ir.arith_utils")
+local op_type = require("ljopt.ir.op_type")
 local utils = require("ljopt.utils")
 
 -- Translate snapshot representation to SMT-LIB string.
@@ -28,7 +29,6 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
         local value_type = pair[2].type
         local value_data = pair[2].value
         local smt_expr
-        local type = "num"
         if value_type == "ssa" then
             -- Write only if this value is implemented.
             if filtered_nodes[value_data] ~= nil then
@@ -37,23 +37,27 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 )
                 goto continue
             end
-            local op_type = trace[value_data]:get_type()
-            if op_type == "tab" then
+            local type = trace[value_data]:get_type()
+            if type == "tab" then
                 local tab_left = ctx.tab_info[value_data].mem_ref
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Table, use directly"
                 slot_values[slot] = tab
-            elseif op_type == "cdt" then
+            elseif type == "cdt" then
                 local tab_left = ctx.tab_info[value_data].mem_ref
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Cdt, use directly"
+                slot_values[slot] = tab
+            elseif type == "str" then
+                local tab = ctx.op_stack:load(value_data, op_type.STR)
+                smt_expr = "; str, use directly"
                 slot_values[slot] = tab
             else
                 -- Snap stack stores only `num`. It will let us
                 -- support narrow in future and this inivariant
                 -- holds for real LuaJIT stack.
                 local data = ctx.op_stack:load(value_data, 'i64')
-                if op_type == "int" then
+                if type == "int" then
                     -- Convert int-encoded bv
                     -- to IEEE 754 num-encoded bv.
                     data = ('(fp.to_ieee_bv %s)'):format(
@@ -76,6 +80,7 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
             slot_values[slot] = ctx.snap_stack:load(slot, 'i64')
         elseif value_type == "softfp" then
             error("This path was not tested and never occured before.")
+            local type = "num"
             local ref2 = value_data + 1
             local left = ctx.snap_stack:store(
                 slot, type, ctx.op_stack:load(value_data, type))

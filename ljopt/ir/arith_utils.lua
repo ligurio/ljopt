@@ -35,6 +35,10 @@ local function const_str_to_memcell(num_value)
     return ('(str-val "%s")'):format(num_value)
 end
 
+local function const_str_to_smt_str(str)
+    return ('"%s"'):format(str)
+end
+
 local function const_int_to_smt_bv(int_value)
     return string.format("#x%016X", int_value)
 end
@@ -73,6 +77,7 @@ return {
     const_num_to_smt_bv = const_num_to_smt_bv,
     const_num_to_memcell = const_num_to_memcell,
     const_str_to_memcell = const_str_to_memcell,
+    const_str_to_smt_str = const_str_to_smt_str,
     const_i64_to_memcell = const_i64_to_memcell,
     memcell_to_str = memcell_to_str,
     const_int_to_smt_bv = const_int_to_smt_bv,

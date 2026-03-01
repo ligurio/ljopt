@@ -91,6 +91,9 @@ build = {
         ['ljopt.ir.ALOAD'] = 'ljopt/ir/ALOAD.lua',
         ['ljopt.ir.AREF'] = 'ljopt/ir/AREF.lua',
         ['ljopt.ir.ASTORE'] = 'ljopt/ir/ASTORE.lua',
+        ['ljopt.ir.BUFHDR'] = 'ljopt/ir/BUFHDR.lua',
+        ['ljopt.ir.BUFPUT'] = 'ljopt/ir/BUFPUT.lua',
+        ['ljopt.ir.BUFSTR'] = 'ljopt/ir/BUFSTR.lua',
         ['ljopt.ir.CNEW'] = 'ljopt/ir/CNEW.lua',
         ['ljopt.ir.CNEWI'] = 'ljopt/ir/CNEWI.lua',
         ['ljopt.ir.FLOAD'] = 'ljopt/ir/FLOAD.lua',
@@ -104,6 +107,8 @@ build = {
         ['ljopt.ir.TNEW'] = 'ljopt/ir/TNEW.lua',
 
         ['ljopt.ir.CONV'] = 'ljopt/ir/CONV.lua',
+        ['ljopt.ir.STRTO'] = 'ljopt/ir/STRTO.lua',
+        ['ljopt.ir.TOSTR'] = 'ljopt/ir/TOSTR.lua',
 
         ['ljopt.ir.NOP'] = 'ljopt/ir/NOP.lua',
    },
