@@ -135,7 +135,7 @@ test:test("FFI: Fix 64 bit shift fold rules (LuaJIT#1079)", function(test)
     local chunk = read_reproducer_file("lj_1079.lua")
     test:ok(reproduce_bug_in_runtime(chunk, "folding bitwise rol"),
         "reproduce in runtime")
-    test:skip("reproduce using SMT (broken, see ljopt#16)")
+    test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/1086

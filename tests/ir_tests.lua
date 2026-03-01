@@ -30,7 +30,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(9)
+test:plan(10)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -46,6 +46,7 @@ local function num(v) return {type = "number", value = v} end
 local function imm(v) return {type = "imm", value = v} end
 local function ssa(v) return {type = "ssa", value = v} end
 local function str(v) return {type = "string", value = v} end
+local function i64(v) return {type = "int64", value = v} end
 
 local function create_node(irtype, irop, op1_val, op2_val, insn)
     insn = insn or 1
@@ -61,6 +62,8 @@ local function create_node(irtype, irop, op1_val, op2_val, insn)
                 return string.format("#%d", val.value)
             elseif val.type == "string" then
                 return '"' .. val.value .. '"'
+            elseif val.type == "int64" then
+                return tostring(val.value)
             else
                 error("Unknown op type: " .. tostring(val.type))
             end
@@ -114,8 +117,16 @@ test:test("IR arithmetic tests", function(test)
                         result = bit.bor(124245235, 824124435), error = 1.},
         {node = create_node("int", "BROL", num(124245235), num(2)),
                         result = bit.rol(124245235, 2), error = 1.},
+        {node = create_node("i64", "BROL", num(3.), num(2.)),
+                        result = 12, error = 1},
+        {node = create_node("i64", "BROL", num(-3.), num(1.)),
+                        result = -5, error = 1},
         {node = create_node("int", "BROR", num(124245235), num(2)),
                         result = bit.ror(124245235, 2), error = 1.},
+        {node = create_node("i64", "BROR", num(12.), num(2.)),
+                        result = 3, error = 1},
+        {node = create_node("i64", "BROR", num(-3.), num(1.)),
+                        result = -2, error = 1},
         {node = create_node("int", "BSAR", num(124245235), num(2)),
                         result = bit.rshift(124245235, 2), error = 1.},
         {node = create_node("int", "BSHL", num(124245235), num(2)),
@@ -130,6 +141,18 @@ test:test("IR arithmetic tests", function(test)
                         result = 3, error = 2},
         {node = create_node("int", "CONV", num(3.0), "int.num"),
                         result = 3, error = 2},
+        {node = create_node("i64", "CONV", num(3.0), "i64.num"),
+                        result = 3, error = 1},
+        {node = create_node("i64", "CONV", num(-5.0), "i64.num"),
+                        result = -5, error = 1},
+        {node = create_node("int", "CONV", i64(0x100000005LL), "int.i64"),
+                        result = 5, error = 1},
+        {node = create_node("int", "CONV", i64(-3), "int.i64"),
+                        result = -3, error = 1},
+        {node = create_node("i64", "CONV", num(7.0), "i64.int sext"),
+                        result = 7, error = 1},
+        {node = create_node("i64", "CONV", num(-3.0), "i64.int sext"),
+                        result = -3, error = 1},
         {node = create_node("num", "DIV", num(2.3), num(3.4)),
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", num(23.), num(4.)),
@@ -754,6 +777,47 @@ test:test("TNEW test", function(test)
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
+end)
+
+test:test("CONV from i64", function(test)
+    -- 0001    i64 CONV   num(3.0)  i64.num
+    -- 0002    num CONV   0001      num.i64
+
+    test:plan(2)
+
+    local conv_slot = 2
+    local i64_node = create_node("i64", "CONV", num(3.0), "i64.num", 1)
+    local num_node = create_node("num", "CONV", ssa(1), "num.i64", conv_slot)
+
+    local ctx_src = smt_context.SMTContext:new("BV", "BV")
+
+    local op_init = ctx_src.op_stack:init_smt("op")
+
+    local conv_smt = translate.translate(
+        {trace={i64_node, num_node}}, ctx_src, nil, nil
+    )
+
+    -- i64.num converts 3.0 to integer 3.
+    -- num.i64 converts integer 3 back to float 3.0.
+    local expect_sat =
+        op_init ..
+        conv_smt ..
+        ("\n(assert (= %s ((_ to_fp 11 53) %s)))"):format(
+            ctx_src.op_stack:load(conv_slot, "num"), f2bv(3)
+        )
+    test:is(smt:check(expect_sat), smt.result.SAT,
+        "SMT-LIB checking CONV i64.num -> num.i64 is SAT"
+    )
+
+    local expect_unsat =
+        op_init ..
+        conv_smt ..
+        ("\n(assert (= %s ((_ to_fp 11 53) %s)))"):format(
+            ctx_src.op_stack:load(conv_slot, "num"), f2bv(99)
+        )
+    test:is(smt:check(expect_unsat), smt.result.UNSAT,
+        "SMT-LIB checking CONV i64.num -> num.i64 wrong is UNSAT"
+    )
 end)
 
 require("tests.coverage").shutdown()

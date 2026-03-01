@@ -2,8 +2,42 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeBRORI64 = { op_str = 'ext_rotate_right' }
+impls.IRNodeBRORI64 = {}
 ir_node.extended(impls.IRNodeBRORI64, ir_node.ir_node_base)
+
+function impls.IRNodeBRORI64:to_smt_lib(ctx)
+    local left_op = ir_node.retrieve_int_op(
+        self:get_left_op(), ctx, self:get_type()
+    )
+    local right_op = ir_node.retrieve_int_op(
+        self:get_right_op(), ctx, self:get_type()
+    )
+
+    -- For 64-bit rotate right, we need the full 64-bit values.
+    local left_i64 = left_op
+    local right_i64 = right_op
+
+    -- Extract the lower 6 bits for shift amount
+    -- (bits 5-0, since 2^6 = 64). BROR is done by modulos 64.
+    local shift_amount = ('((_ extract 5 0) %s)'):format(
+        right_i64
+    )
+    shift_amount = ('((_ zero_extend 58) %s)'):format(
+        shift_amount
+    )
+    -- Implement 64-bit rotate right using SMT-LIB
+    -- (x >> (shift % 64)) | (x << (64 - (shift % 64)))
+    local fmt = '(bvor (bvlshr %s %s) '
+        .. '(bvshl %s (bvsub ' .. '#x0000000000000040 %s)))'
+    local rotated = fmt:format(
+        left_i64, shift_amount, left_i64, shift_amount
+    )
+
+    return ctx.op_stack:store(
+        self:get_ssa_reference(), self:get_type(),
+        rotated
+    )
+end
 
 impls.IRNodeBRORInt = {}
 ir_node.extended(impls.IRNodeBRORInt, ir_node.ir_node_base)

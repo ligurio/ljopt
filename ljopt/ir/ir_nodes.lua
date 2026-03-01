@@ -119,8 +119,8 @@ local opcodes_table = {
     ['XSNEW'] = false,
     ['TNEW'] = require('ljopt.ir.TNEW'),
     ['TDUP'] = false,
-    ['CNEW'] = false,
-    ['CNEWI'] = false,
+    ['CNEW'] = require('ljopt.ir.CNEW'),
+    ['CNEWI'] = require('ljopt.ir.CNEWI'),
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,

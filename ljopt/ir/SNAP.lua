@@ -43,6 +43,11 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Table, use directly"
                 slot_values[slot] = tab
+            elseif op_type == "cdt" then
+                local tab_left = ctx.tab_info[value_data].mem_ref
+                local tab = ctx.mem_stack:load(tab_left)
+                smt_expr = "; Cdt, use directly"
+                slot_values[slot] = tab
             else
                 -- Snap stack stores only `num`. It will let us
                 -- support narrow in future and this inivariant
@@ -51,7 +56,9 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 if op_type == "int" then
                     -- Convert 64-bv to fp `num`.
                     -- Op stack stores only `num`.
-                    data = arith_utils.smt_int_to_fp(data)
+                    data = arith_utils.smt_fp_to_i64(
+                        arith_utils.smt_int_to_fp(data)
+                    )
                 end
                 smt_expr = ctx.snap_stack:store(slot, op_type, data)
                 slot_values[slot] = ctx.snap_stack:load(slot, op_type)
