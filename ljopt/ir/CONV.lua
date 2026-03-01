@@ -37,12 +37,21 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
         -- luacheck: pop
         data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
+    elseif parsed_right_op[1] == 'i64.int' then
+        data = ir_node.retrieve_int_op(
+            self:get_left_op(), ctx, 'int'
+        )
+    elseif parsed_right_op[1] == 'i64.int sext' then
+        data = ir_node.retrieve_int_op(
+            self:get_left_op(), ctx, 'int'
+        )
+        data = arith_utils.smt_int_to_i64(data, true)
     elseif parsed_right_op[1] == 'i64.num' then
         left_op = ir_node.retrieve_num_op(
             self:get_left_op(), ctx, 'num'
         )
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
+        data = arith_utils.smt_fp_to_i64(left_op)
     else
         assert(false, 'Unsupported type conversion: ' .. right_op_str)
     end

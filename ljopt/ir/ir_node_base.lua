@@ -116,6 +116,21 @@ local function retrieve_i64_op(op, ctx, type)
     utils.unreachable('retrieve_i64_op: unsupported op kind: ' .. tostring(op and op.kind))
 end
 
+local function retrieve_p64_op(op, ctx, type)
+    if op == nil then
+        utils.unreachable('retrieve_p64_op: op is nil')
+    end
+    assert(op:is_ssa(), op.kind)
+    if op:is_ssa() then
+        return ctx.op_stack:load(op.value, type)
+    elseif op:is_i64() then
+        return string.format("#x%016x", tonumber(op.value))
+    elseif op:is_num() then
+        return hex_double_to_i64_hex(OpKind.to_string(op))
+    end
+    utils.unreachable('retrieve_i64_op: unsupported op kind: ' .. tostring(op and op.kind))
+end
+
 -- Tables are stored as the first index in the 3-D memory array.
 -- Accepts OpKind.SSA only (tables are always referenced via SSA).
 local function retrieve_tab_op(op, ctx, type)
@@ -181,5 +196,6 @@ return {
     retrieve_num_op = retrieve_num_op,
     retrieve_int_op = retrieve_int_op,
     retrieve_i64_op = retrieve_i64_op,
+    retrieve_p64_op = retrieve_p64_op,
     OpKind = OpKind,
 }

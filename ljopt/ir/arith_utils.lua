@@ -48,8 +48,21 @@ local function smt_int_to_fp(int_value)
     return string.format("((_ to_fp 11 53) %s)", bv)
 end
 
+local function smt_int_to_i64(int_value, sext)
+    -- Extract lower 32-bit and extend with sign.
+    local bv = ("RTZ ((_ sign_extend 32) ((_ extract 31 0) %s))"):format(
+        int_value
+    )
+    -- Convert 64-bitvector to floating point `num`.
+    return bv
+end
+
 local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
+end
+
+local function smt_fp_to_i64(fp_value)
+    return string.format("((_ fp.to_sbv 64) RNE %s)", fp_value)
 end
 
 return {
@@ -57,6 +70,8 @@ return {
     const_num_to_smt_bv = const_num_to_smt_bv,
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
+    smt_fp_to_i64 = smt_fp_to_i64,
     smt_int_to_fp = smt_int_to_fp,
+    smt_int_to_i64 = smt_int_to_i64,
     smt_i64_to_fp = smt_i64_to_fp,
 }

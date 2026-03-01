@@ -9,6 +9,7 @@ ir_node.extended(impls.IRNodeHLOADStr, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
+    assert(left_op:is_ssa())
     local right_op = self:get_right_op()
 
     local dst_slot = left_op.value

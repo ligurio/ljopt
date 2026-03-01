@@ -12,6 +12,9 @@ ir_node.extended(IRNodeBinOpInt, IRNodeBinOpBase)
 local IRNodeBinOpI64 = {}
 ir_node.extended(IRNodeBinOpI64, IRNodeBinOpBase)
 
+local IRNodeBinOpP64 = {}
+ir_node.extended(IRNodeBinOpP64, IRNodeBinOpBase)
+
 -- Implements any binary operation
 -- with `num` as left and right argument
 function IRNodeBinOpNum:to_smt_lib(ctx)
@@ -53,6 +56,18 @@ function IRNodeBinOpI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+function IRNodeBinOpP64:to_smt_lib(ctx)
+    local left_op = ir_node.retrieve_p64_op(
+        self:get_left_op(), ctx, self:get_type()
+    )
+    local right_op = ir_node.retrieve_i64_op(
+        self:get_right_op(), ctx, self:get_type()
+    )
+    local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
+    assert(self:get_left_op():is_ssa())
+    ctx.tab_info[self:get_ssa_reference()] = ctx.tab_info[self:get_left_op().value]
+    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+end
 
 local IRNodeBinOpGuardNum = {}
 ir_node.extended(IRNodeBinOpGuardNum, IRNodeBinOpBase)
@@ -100,6 +115,7 @@ return {
     BinOpNum = IRNodeBinOpNum,
     BinOpInt = IRNodeBinOpInt,
     BinOpI64 = IRNodeBinOpI64,
+    BinOpP64 = IRNodeBinOpP64,
     BinOpGuardNum = IRNodeBinOpGuardNum,
     BinOpGuardInt = IRNodeBinOpGuardInt,
     BinOpGuardI64 = IRNodeBinOpGuardI64,

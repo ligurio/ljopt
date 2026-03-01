@@ -48,6 +48,22 @@ function impls.IRNodeSLOADTab:to_smt_lib(ctx)
     )
 end
 
+impls.IRNodeSLOADCdt = {}
+ir_node.extended(impls.IRNodeSLOADCdt, ir_node.ir_node_base)
+
+function impls.IRNodeSLOADCdt:to_smt_lib(ctx)
+    local slot = ir_node.retrieve_slot_op(self:get_left_op())
+    local ssa_ref = self:get_ssa_reference()
+    local mem_slot, smt_fm = ctx.mem_stack:allocate(ssa_ref, slot)
+    ctx.tab_info[ssa_ref] = {mem_ref = mem_slot}
+    return ('%s\n%s'):format(
+        -- I suppose guard for SLOAD is always true for us.
+        -- It means we never exit by it.
+        ctx.te_stack:store(ssa_ref, 'true'),
+        smt_fm
+    )
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
