@@ -21,6 +21,9 @@ local LJOPT_SMTLIB = ([[
   ((as const (Array MemCell MemCell)) (int-val #x0000000000000000)))
 (define-const zero_pointer_i_1d (Array Int Int)
   ((as const (Array Int Int)) 0))
+; Uninterpreted functions for TOSTR/STRTO conversions.
+(declare-fun tostr_num ((_ BitVec 64)) String)
+(declare-fun strto_num (String) (_ BitVec 64))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 
@@ -30,8 +33,12 @@ local LJOPT_SMTLIB = ([[
 -- of interfering with user keys.
 local FIELD_TAB_PREFIX = '```'
 
+-- String buffer slot.
+local STRING_BUFF_SLOT = FIELD_TAB_PREFIX .. 'bufhdr'
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
     FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
+    STRING_BUFF_SLOT = STRING_BUFF_SLOT,
 }

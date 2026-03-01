@@ -121,6 +121,10 @@ local opcodes_table = {
     ['TDUP'] = false,
     ['CNEW'] = require('ljopt.ir.CNEW'),
     ['CNEWI'] = require('ljopt.ir.CNEWI'),
+    -- Strings.
+    ['BUFHDR'] = require('ljopt.ir.BUFHDR'),
+    ['BUFPUT'] = require('ljopt.ir.BUFPUT'),
+    ['BUFSTR'] = require('ljopt.ir.BUFSTR'),
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,
@@ -128,8 +132,8 @@ local opcodes_table = {
     -- Type Conversions.
     ['CONV'] = ir_node_CONV,
     ['TOBIT'] = false,
-    ['TOSTR'] = false,
-    ['STRTO'] = false,
+    ['TOSTR'] = require('ljopt.ir.TOSTR'),
+    ['STRTO'] = require('ljopt.ir.STRTO'),
     -- Calls.
     ['CALLN'] = false,
     ['CALLL'] = false,
