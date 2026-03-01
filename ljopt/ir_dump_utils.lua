@@ -295,6 +295,7 @@ local function ljopt_formatsmt(tr, idx, sn)
     return "----" -- Special case for LJ_FR2 slot 1.
   else
     s = tostring(k) -- For primitives.
+    const_type = s:sub(-2) == "LL" and "int64" or nil
   end
   if slot then
     s = format("%s @%d", s, slot)

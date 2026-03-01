@@ -28,6 +28,17 @@ local function const_int_to_smt_bv(int_value)
     return string.format("#x%016X", int_value)
 end
 
+local function const_i64_to_smt_bv(int_value)
+    local u = ffi.new("union { int64_t i; uint64_t u; }")
+    u.i = int_value
+
+    -- Convert uint64_t cdata to hex string without using string.format on cdata
+    local lo = tonumber(ffi.cast("uint32_t", bit.band(u.u, 0xFFFFFFFF)))
+    local hi = tonumber(ffi.cast("uint32_t", bit.rshift(u.u, 32)))
+
+    return string.format("#x%08X%08X", hi, lo)
+end
+
 local function smt_int_to_fp(int_value)
     -- Extract lower 32-bit and extend with sign.
     local bv = ("RTZ ((_ sign_extend 32) ((_ extract 31 0) %s))"):format(
@@ -37,9 +48,15 @@ local function smt_int_to_fp(int_value)
     return string.format("((_ to_fp 11 53) %s)", bv)
 end
 
+local function smt_i64_to_fp(i64_value)
+    return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
+end
+
 return {
     i32_overflow_check = i32_overflow_check,
     const_num_to_smt_bv = const_num_to_smt_bv,
     const_int_to_smt_bv = const_int_to_smt_bv,
+    const_i64_to_smt_bv = const_i64_to_smt_bv,
     smt_int_to_fp = smt_int_to_fp,
+    smt_i64_to_fp = smt_i64_to_fp,
 }

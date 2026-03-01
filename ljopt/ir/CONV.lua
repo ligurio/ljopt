@@ -26,7 +26,7 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = self:get_left_op()
         data = ir_node.retrieve_int_op(left_op, ctx, 'int')
         -- Convert int to floating point `num`.
-        data = arith_utils.smt_int_to_fp(data)
+        data = arith_utils.smt_i64_to_fp(data)
     elseif parsed_right_op[1] == 'int.num' then
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
         -- TODO handle inputs that are out of range.

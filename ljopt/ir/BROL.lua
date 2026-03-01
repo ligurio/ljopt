@@ -38,7 +38,7 @@ function impls.IRNodeBROLI64:to_smt_lib(ctx)
     -- Extract the lower 6 bits for shift amount (bits 5-0, since 2^6 = 64)
     -- BROL is done by modulos 64.
     local shift_amount = ('((_ extract 5 0) %s)'):format(right_i64)
-    
+    shift_amount = ('((_ zero_extend 58) %s)'):format(shift_amount)
     -- Implement 64-bit rotate left using SMT-LIB
     -- (x << shift) | (x >> (64 - shift))
     -- Need to handle shift = 0 case carefully
