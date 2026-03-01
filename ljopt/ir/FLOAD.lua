@@ -83,6 +83,37 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+impls.IRNodeFLOADI64 = {}
+ir_node.extended(impls.IRNodeFLOADI64, ir_node.ir_node_base)
+
+function impls.IRNodeFLOADI64:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local right_op = self:get_right_op()
+    local right_op_str = op_type.to_string(right_op)
+    local data = ''
+    if right_op_str == 'cdata.int64' then
+        if left_op:is_i64() then
+            data = arith_utils.const_i64_to_smt_bv(left_op:get_i64())
+        elseif left_op:is_ssa() then
+            -- Table pointer. Compile time.
+            local tab_left = ctx.tab_info[left_op:get_ssa()].mem_ref
+            -- Table index. Runtime.
+            local idx_left = tostring(
+                utils.hash(smt_constants.FIELD_TAB_PREFIX .. 'cdata.value')
+            )
+            data = ctx.mem_stack:load_index(tab_left, idx_left)
+        else
+            utils.unreachable(
+                'Unsupported left_op: ' .. left_op.type ..
+                ' ' .. op_type.to_string(left_op)
+            )
+        end
+    else
+        utils.unreachable('FLOADI64: unsupported right_op: ' .. right_op_str)
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+end
+
 
 impls.IRNodeFLOADTab = {}
 ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)

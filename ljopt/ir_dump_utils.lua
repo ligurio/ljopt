@@ -286,6 +286,11 @@ local function ljopt_formatsmt(tr, idx, sn)
     return "----" -- Special case for LJ_FR2 slot 1.
   else
     s = tostring(k) -- For primitives.
+    if ffi.istype("int64_t", k) then
+      const_type = "int64"
+    elseif ffi.istype("uint64_t", k) then
+      const_type = "uint64"
+    end
   end
   if slot then
     s = format("%s @%d", s, slot)
@@ -361,6 +366,8 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op,
     -- Skip this trace.
     return
   end
+
+  assert(irtype ~= nil, "Unknown IR type.")
 
   -- The symbol ">" indicates the instruction of the
   -- guard's location

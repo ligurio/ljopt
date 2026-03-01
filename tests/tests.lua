@@ -545,6 +545,55 @@ foo(4)
             {type = "num", name = "ASTORE"},
             {type = "num", name = "ASTORE"},
         },
+    }, {
+        code = [[
+local bit = require('bit');
+local function foo()
+    return bit.rol(127LL, 1LL) ~= 0, bit.ror(127LL, 1LL) ~= 0
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "int", name = "CONV"},
+            {type = "i64", name = "BROL"},
+            {type = "i64", name = "BROR"},
+            {type = "cdt", name = "CNEWI"}
+        }
+    }, {
+        code = [[
+-- CNEWI + FLOAD cdata.int64
+local ffi = require("ffi")
+local function foo()
+    local v = ffi.new("int64_t", 42)
+    return 42LL + 1LL, v + 1LL
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "i64", name = "CONV"},
+            {type = "cdt", name = "CNEWI"},
+            {type = "i64", name = "ADD"},
+            {type = "cdt", name = "CNEWI"},
+            {type = "i64", name = "ADD"},
+            {type = "cdt", name = "CNEWI"},
+        },
+    }, {
+        code = [[
+-- SLOAD cdt
+local function foo(x)
+    return x + 1LL
+end
+foo(5LL)
+foo(5LL)
+foo(5LL)
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+        },
     }}
     test:plan(3 * #srcs)
 

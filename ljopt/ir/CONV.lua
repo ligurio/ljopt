@@ -31,11 +31,16 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- luacheck: pop
         data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
     elseif parsed_right_op[1] == 'num.i64' then
-        left_op = ir_node.retrieve_i64_op(
-            self:get_left_op(), ctx, 'i64'
-        )
-        -- TODO recheck rounding behaviour.
-        data = string.format('((_ to_fp 11 53) %s)', left_op)
+        left_op = self:get_left_op()
+        data = ir_node.retrieve_i64_op(left_op, ctx, 'int')
+        -- Convert int to floating point `num`.
+        data = arith_utils.smt_i64_to_fp(data)
+    elseif parsed_right_op[1] == 'int.i64' then
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
+        -- Truncate to lower 32 bits, then sign-extend back to 64.
+        data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(left_op)
+    elseif parsed_right_op[1] == 'i64.int' and parsed_right_op[2] == 'sext' then
+        data = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
     elseif parsed_right_op[1] == 'i64.num' then
         left_op = ir_node.retrieve_num_op(
             self:get_left_op(), ctx, 'num'

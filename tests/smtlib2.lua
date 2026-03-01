@@ -131,7 +131,7 @@ local function new()
     local self = {}
     local cfg = z3.Z3_mk_config()
     z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"),
-                          ffi.cast("Z3_string", "2000"))
+                          ffi.cast("Z3_string", "5000"))
     self.ctx = z3.Z3_mk_context(cfg)
     z3.Z3_del_config(cfg)
 

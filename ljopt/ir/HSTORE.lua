@@ -20,7 +20,7 @@ function impls.IRNodeHSTOREStr:to_smt_lib(ctx)
     idx_left = ('(bv2int %s)'):format(idx_left)
     local value
     if right_op ~= nil and right_op:is_str() then
-        value = arith_utils.const_num_to_smt_bv(
+        value = arith_utils.const_i64_to_smt_bv(
             tonumber(utils.hash(right_op:get_str()))
         )
     else
