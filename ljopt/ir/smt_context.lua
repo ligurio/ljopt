@@ -341,6 +341,7 @@ function SnapStack.inc(self, snap_id, exit_by_this_snap, ctx)
     self._cur_stack = self._cur_stack + 1
 end
 
+
 -- Similar to regular programming languages array.
 local Array1D = {}
 extended(Array1D, StackBase)
@@ -382,6 +383,71 @@ function Array1D.store(self, op_num, data)
     local new_stack = ('(select %s %d)'):format(self._name, self._version)
 
     return ('(assert (= %s %s))'):format(new_stack, updated_stack)
+end
+
+
+-- Versioned string storage. Modeled as a 2D SMT array:
+--   [slot [version -> String]]
+-- Each slot holds a string that can be updated; versioning
+-- ensures successive writes don't conflict in SMT.
+-- Slot indices are always compile-time Lua integers,
+-- so versions are tracked as plain Lua numbers (no Array1D).
+local StringStack = {}
+extended(StringStack, StackBase)
+
+function StringStack.init_smt(self, name,  base_stack)
+    dev_checks('table', 'string')
+
+    self._name = name
+    self.next_free = 0
+    self.base_stack = base_stack
+    self._versions = {}
+    return string.format(
+        '(declare-fun %s () (Array Int (Array Int String)))', self._name
+    )
+end
+
+function StringStack.allocate(self, vm_slot)
+    dev_checks('table', 'number')
+
+    local current_slot = self.next_free
+    self.next_free = self.next_free + 1
+    self._versions[current_slot] = 0
+    local result = ""
+
+    if vm_slot ~= nil then
+        assert(self.base_stack ~= nil)
+        result = ('\n(assert (= (select (select %s %d) 0) %s))'):format(
+            self._name, current_slot, self.base_stack:load(vm_slot)
+        )
+    else
+        result = ('\n(assert (= (select (select %s %d) 0) ""))'):format(
+            self._name, current_slot
+        )
+    end
+    return current_slot, result
+end
+
+-- Read string from slot at current version.
+function StringStack.load(self, slot)
+    dev_checks('table', 'number')
+
+    -- In base stack versions can be null.
+    return ('(select (select %s %s) %s)'):format(
+        self._name, slot, self._versions[slot] or 0
+    )
+end
+
+-- Write string to slot at new version.
+-- All subsequent reads will see the new data.
+function StringStack.append(self, slot, data)
+    dev_checks('table', 'number', 'string')
+
+    local new_value = ("(str.++ %s %s)"):format(self:load(slot), data)
+    self._versions[slot] = self._versions[slot] + 1
+    return ('(assert (= (select (select %s %s) %s) %s))'):format(
+        self._name, slot, self._versions[slot], new_value
+    )
 end
 
 
@@ -555,6 +621,7 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.mem_stack = MemoryStack:new()
     self.snap_stack = SnapStack:new()
     self.snap_mapping = { cur_id = 0, map = {} }
+    self.string_stack = StringStack:new()
 
     -- ssa_ref -> tab_id
     self.tab_info = {}
@@ -569,4 +636,5 @@ end
 return {
     SMTContext = SMTContext,
     MemoryStack = MemoryStack,
+    StringStack = StringStack,
 }

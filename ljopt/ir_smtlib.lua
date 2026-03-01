@@ -133,6 +133,7 @@ local mem_stack_prefix = 'mem_'
 local op_stack_prefix = 'op_'
 local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
+local string_stack_prefix = 'str_'
 
 -- Translates single trace + snapshots into
 -- SMT formula + fill SMTContext.
@@ -159,6 +160,11 @@ local function translate(trace_record, ctx_src,
         smtlib_buf = smtlib_buf ..
             ctx_src.mem_stack:init_smt(
                 mem_stack_prefix .. smt_suffix .. tr_id, shared_stacks.mem_stack
+            ) ..
+            '\n'
+        smtlib_buf = smtlib_buf ..
+            ctx_src.string_stack:init_smt(
+                string_stack_prefix .. smt_suffix .. tr_id, shared_stacks.string_stack
             ) ..
             '\n'
     end
@@ -327,9 +333,16 @@ local function traces_to_smt(lua_code)
             goto continue
         end
         local shared_mem_stack = smt_context.MemoryStack:new()
-        local shared_stacks = {mem_stack = shared_mem_stack}
+        local shared_string_stack = smt_context.StringStack:new()
+        local shared_stacks = {
+            mem_stack = shared_mem_stack,
+            string_stack = shared_string_stack
+        }
         local cur_trace = shared_mem_stack:init_smt(
             'shared_mem_stack' .. traceno
+        )
+        local cur_trace = shared_string_stack:init_smt(
+            'shared_string_stack' .. traceno
         )
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         cur_trace = cur_trace ..

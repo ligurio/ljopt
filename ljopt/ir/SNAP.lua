@@ -46,6 +46,11 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Cdt, use directly"
                 slot_values[slot] = tab
+            elseif op_type == "str" then
+                local tab_left = ctx.tab_info[value_data].mem_ref
+                local tab = ctx.string_stack:load(tab_left)
+                smt_expr = "; str, use directly"
+                slot_values[slot] = tab
             else
                 -- Snap stack stores only `num`.
                 -- It will let us support narrow

@@ -121,6 +121,10 @@ local opcodes_table = {
     ['TDUP'] = require('ljopt.ir.TDUP'),
     ['CNEW'] = require('ljopt.ir.CNEW'),
     ['CNEWI'] = require('ljopt.ir.CNEWI'),
+    -- Strings.
+    ['BUFHDR'] = require('ljopt.ir.BUFHDR'),
+    ['BUFPUT'] = require('ljopt.ir.BUFPUT'),
+    ['BUFSTR'] = require('ljopt.ir.BUFSTR'),
     -- Barriers.
     ['TBAR'] = false,
     ['OBAR'] = false,

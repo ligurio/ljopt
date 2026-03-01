@@ -29,7 +29,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(8)
+test:plan(9)
 
 local function join_strings(string_array)
     local joined = ""
@@ -612,6 +612,64 @@ test:test("Shared memory stack", function(test)
             smt.result.UNSAT, "Check same values"
         )
     end
+end)
+
+test:test("Single string stack", function(test)
+    test:plan(8)
+    local str_stack = smt_context.StringStack:new()
+    local init_smt = str_stack:init_smt("str_test")
+
+    local slot0, alloc0 = str_stack:allocate(1)
+    local slot1, alloc1 = str_stack:allocate(2)
+
+    -- 1. Store "hello" to slot0, read it back.
+    local formula = join_strings({
+        smt_constants.LJOPT_SMTLIB,
+        init_smt,
+        alloc0,
+        str_stack:store(slot0, '"hello"'),
+    })
+    local check_1 = ('(assert (not (= %s "hello")))'):format(
+        str_stack:load(slot0)
+    )
+    test:is(smt:parse(formula .. check_1), true, "Parse store then load")
+    test:is(smt:check(formula .. check_1),
+        smt.result.UNSAT, "Check store then load"
+    )
+
+    -- 2. Overwrite slot0 with "world", read should return "world".
+    formula = formula .. join_strings({
+        str_stack:store(slot0, '"world"'),
+    })
+    local check_2 = ('(assert (not (= %s "world")))'):format(
+        str_stack:load(slot0)
+    )
+    test:is(smt:parse(formula .. check_2), true, "Parse overwrite")
+    test:is(smt:check(formula .. check_2),
+        smt.result.UNSAT, "Check overwrite"
+    )
+
+    -- 3. Store "foo" to slot1, verify slot1 is independent of slot0.
+    formula = formula .. join_strings({
+        alloc1,
+        str_stack:store(slot1, '"foo"'),
+    })
+    local check_3 = ('(assert (not (= %s "foo")))'):format(
+        str_stack:load(slot1)
+    )
+    test:is(smt:parse(formula .. check_3), true, "Parse independent slot")
+    test:is(smt:check(formula .. check_3),
+        smt.result.UNSAT, "Check independent slot"
+    )
+
+    -- 4. slot0 still holds "world" after writing to slot1.
+    local check_4 = ('(assert (not (= %s "world")))'):format(
+        str_stack:load(slot0)
+    )
+    test:is(smt:parse(formula .. check_4), true, "Parse slot0 unchanged")
+    test:is(smt:check(formula .. check_4),
+        smt.result.UNSAT, "Check slot0 unchanged"
+    )
 end)
 
 test:test("Memory IRs tests", function(test)
