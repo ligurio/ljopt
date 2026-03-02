@@ -209,6 +209,12 @@ test:test("IR arithmetic tests", function(test)
                         result = 2 - 4, error = 1.},
         {node = create_node("int", "SUBOV", num(2.), num(4.)),
                         result = 2 - 4, error = 1.},
+        {node = create_node("int", "TOBIT", num(2.3)),
+                        result = bit.tobit(2.3), error = 1.},
+        {node = create_node("int", "TOBIT", num(-2.3)),
+                        result = bit.tobit(-2.3), error = 1.},
+        {node = create_node("int", "TOBIT", num(2147483647)),
+                        result = bit.tobit(2147483647), error = 1.},
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.

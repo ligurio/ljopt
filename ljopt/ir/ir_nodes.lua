@@ -131,7 +131,7 @@ local opcodes_table = {
     ['XBAR'] = false,
     -- Type Conversions.
     ['CONV'] = ir_node_CONV,
-    ['TOBIT'] = false,
+    ['TOBIT'] = require('ljopt.ir.TOBIT'),
     ['TOSTR'] = require('ljopt.ir.TOSTR'),
     ['STRTO'] = require('ljopt.ir.STRTO'),
     -- Calls.
