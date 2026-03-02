@@ -310,6 +310,32 @@ foo(1)
             {type = "num", name = "CONV"},
             {type = "num", name = "EQ"}
         },
+--[[
+    }, {
+-- Fix BV <-> FP casts, now it's too slow:
+-- https://github.com/ligurio/ljopt/issues/57
+        code = [[
+local bit = require("bit")
+local function foo(x)
+    return bit.tobit(x), bit.band(x, 0xff), bit.bnot(x),
+           bit.bswap(x), bit.lshift(x, 2), bit.rshift(x, 2),
+           bit.arshift(x, 2), bit.rol(x, 2)
+end
+foo(1.5)
+foo(1.5)
+foo(1.5)
+\]\],
+        ins = {
+            {type = "int", name = "TOBIT"},
+            {type = "int", name = "BAND"},
+            {type = "int", name = "BNOT"},
+            {type = "int", name = "BSWAP"},
+            {type = "int", name = "BSHL"},
+            {type = "int", name = "BSHR"},
+            {type = "int", name = "BSAR"},
+            {type = "int", name = "BROL"},
+        },
+]]
     }}
     test:plan(3 * #srcs)
 

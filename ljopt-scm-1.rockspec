@@ -108,6 +108,7 @@ build = {
 
         ['ljopt.ir.CONV'] = 'ljopt/ir/CONV.lua',
         ['ljopt.ir.STRTO'] = 'ljopt/ir/STRTO.lua',
+        ['ljopt.ir.TOBIT'] = 'ljopt/ir/TOBIT.lua',
         ['ljopt.ir.TOSTR'] = 'ljopt/ir/TOSTR.lua',
 
         ['ljopt.ir.NOP'] = 'ljopt/ir/NOP.lua',
