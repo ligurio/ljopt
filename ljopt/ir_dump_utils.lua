@@ -153,11 +153,6 @@ local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
       end
     end
   elseif what == "stop" or what == "abort" then
-    if ljopt_config.is_debug_mode() then
-      io.stderr:write(string.format("Parent trace id: %s Trace hash: %s\n",
-        tostring(traces_num[tr]), trace_bc_hash[tr]
-      ))
-    end
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
       traces_num[tr] = traces_num[tr] .. "_" .. bc_hash
