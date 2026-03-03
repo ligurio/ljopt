@@ -20,7 +20,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(34)
+test:plan(36)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -111,9 +111,19 @@ end
 
 -- Some bugs cannot be reproduced using `pcall()`. In such cases
 -- test executes Lua chunk in a separated LuaJIT process.
-local function reproduce_bug_in_popen(filename, err_msg)
-    local cmd = ("%s %s/tests/reproducers/%s"):format(
-        progname(arg), coverage.cwd(), filename)
+-- `jit_options` is an optional table of LuaJIT command-line
+-- options (e.g. {"-Otryside=1"}) to force the required JIT
+-- behavior. The default options are applied first, so options
+-- provided by the caller override them.
+local function reproduce_bug_in_popen(filename, err_msg, jit_options)
+    local options = { "-Ohotloop=1", "-Ohotexit=1" }
+    if jit_options ~= nil then
+        for _, opt in ipairs(jit_options) do
+            options[#options + 1] = opt
+        end
+    end
+    local cmd = ("%s %s %s/tests/reproducers/%s"):format(
+        progname(arg), table.concat(options, " "), coverage.cwd(), filename)
     local output = run_shell_command(cmd)
     if buggy_build then
        return string.match(output, err_msg) ~= nil
@@ -187,7 +197,10 @@ end)
 test:test("Problem of HREFK with table.clear (LuaJIT#792)", function(test)
     test:plan(2)
     local filename = "lj_792.lua"
-    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP"),
+    -- The reproducer relies on the default hotloop/hotexit
+    -- thresholds to hit the exact trace shape.
+    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP",
+        {"-Ohotloop=56", "-Ohotexit=10"}),
         "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
@@ -500,6 +513,26 @@ test:test("Fix ABC elimination in lj_fold.c",
 function(test)
     test:plan(2)
     test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/737
+-- https://github.com/tarantool/luajit/commit/ca0de768be31f10ccd35569f786a960a76e9fdbb
+test:test("Use-def analysis misses slots used by upvalues (LuaJIT#737)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_737.lua", "assertion is violated"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1128
+-- https://github.com/tarantool/luajit/commit/005e8cea3173879bb838fe48e2eb734baca23f0a
+test:test("Restore of sunk tables with double IR_NEWREF (LuaJIT#1128)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_1128.lua", "assertion is violated",
+        {"-Otryside=1"}), "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 
