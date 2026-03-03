@@ -110,9 +110,19 @@ end
 
 -- Some bugs cannot be reproduced using `pcall()`. In such cases
 -- test executes Lua chunk in a separated LuaJIT process.
-local function reproduce_bug_in_popen(filename, err_msg)
-    local cmd = ("%s %s/tests/reproducers/%s"):format(
-        progname(arg), coverage.cwd(), filename)
+-- `jit_options` is an optional table of LuaJIT command-line
+-- options (e.g. {"-Otryside=1"}) to force the required JIT
+-- behavior. The default options are applied first, so options
+-- provided by the caller override them.
+local function reproduce_bug_in_popen(filename, err_msg, jit_options)
+    local options = { "-Ohotloop=1", "-Ohotexit=1" }
+    if jit_options ~= nil then
+        for _, opt in ipairs(jit_options) do
+            options[#options + 1] = opt
+        end
+    end
+    local cmd = ("%s %s %s/tests/reproducers/%s"):format(
+        progname(arg), table.concat(options, " "), coverage.cwd(), filename)
     local output = run_shell_command(cmd)
     if buggy_build then
        return string.match(output, err_msg) ~= nil
@@ -189,12 +199,43 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/issues/792
 -- https://github.com/LuaJIT/LuaJIT/commit/d5a237eae03d2ad346f82390836371a952e9a286
 -- https://github.com/tarantool/luajit/commit/aed147cd9e40e480c4fe3dc8494a5431727dba87
+--
+-- The original multi-check reproducer is split into one file per
+-- check: the Lua script aborts at the first failing assert, so a
+-- single file cannot exercise every check.
+-- XXX: SMT reproduction of LuaJIT#792 is not enabled. table.clear
+-- is recorded as the unsupported `CALLS lj_tab_clear`, so its
+-- effect on the table is not modelled and the generated formula is
+-- spuriously SAT on the fixed build. See
+-- https://github.com/ligurio/ljopt/issues/116.
 test:test("Problem of HREFK with table.clear (LuaJIT#792)", function(test)
-    test:plan(2)
-    local filename = "lj_792.lua"
-    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
+    test:plan(12)
+
+    test:ok(reproduce_bug_in_popen("lj_792_1.lua", "AREF forward from TNEW"),
+        "AREF forward from TNEW: reproduce in runtime")
+    test:skip("AREF forward from TNEW: reproduce with SMT")
+
+    test:ok(reproduce_bug_in_popen("lj_792_2.lua", "AREF forward from TDUP"),
+        "AREF forward from TDUP: reproduce in runtime")
+    test:skip("AREF forward from TDUP: reproduce with SMT")
+
+    test:ok(reproduce_bug_in_popen("lj_792_3.lua", "HREF forward from TNEW"),
+        "HREF forward from TNEW: reproduce in runtime")
+    test:skip("HREF forward from TNEW: reproduce with SMT")
+
+    test:ok(reproduce_bug_in_popen("lj_792_4.lua", "HREF forward from TDUP"),
+        "HREF forward from TDUP: reproduce in runtime")
+    test:skip("HREF forward from TDUP: reproduce with SMT")
+
+    test:ok(reproduce_bug_in_popen("lj_792_5.lua",
+        "not forward the field value across table.clear"),
+        "HREFK value forwarding: reproduce in runtime")
+    test:skip("HREFK value forwarding: reproduce with SMT")
+
+    test:ok(reproduce_bug_in_popen("lj_792_6.lua",
+        "correct field value after table.clear"),
+        "HREFK dropped guard: reproduce in runtime")
+    test:skip("HREFK dropped guard: reproduce with SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/9
