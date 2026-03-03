@@ -87,12 +87,50 @@ Translate IR to SMT-LIB:
 $ LUA_PATH="./?/init.lua;;" bin/ljopt example.lua > example.smt2
 ```
 
-Validate correctness of the `fold` optimisation with SMT solver, for example
-Z3:
+Validate correctness of the `fold` optimisation with SMT solver,
+for example Z3:
 
 ```sh
 $ z3 -smt2 example.smt2
 ```
+
+Instead of a file a Lua chunk can be read from STDIN:
+
+```sh
+$ LUA_PATH="./?/init.lua;;" bin/ljopt - < example.lua
+```
+
+Validate correctness of the `fold` optimisation with an SMT solver
+(Z3 or cvc5) automatically:
+
+```sh
+$ LUA_PATH="./?/init.lua;;" bin/ljopt --check example.lua
+SMT backend: CVC5 1.3.0
+    Start  1:  example.lua:1
+1/1 Trace #1:  example.lua:1..................................   Passed    0.76 sec
+
+100% traces passed, 0 traces failed out of 1
+
+Total verification time (real) =   0.79 sec
+```
+
+Every recorded trace is translated into its own formula and checked
+separately. Before a trace is checked a `Start N: <file>:<line>` line
+reports where it starts (a trace recorded in a loop is reported at that
+loop's line), then its result line follows once the solver returns a
+`Passed`, `Failed` or `Timeout` verdict, together with the time the
+solver spent on the formula. The lines stream out as the traces are
+checked. The summary line gives the share of passed traces (traces with a
+`Timeout` verdict are counted separately) and the last line reports the
+total wall-clock time of the verification.
+
+The backend is selected with `LJOPT_SMT` (cvc5 by default, falling back to
+the other solver). An UNSAT formula means the unoptimised and optimised
+traces are equivalent and the verification has passed; a SAT formula (a
+counterexample is found) means the verification has failed; an undecided
+answer is reported as `Timeout`. The exit code is 0, 3 and 4 for a
+`Passed`, `Failed` and `Timeout` result respectively. Without a solver
+`--check` prints the SMT-LIB formula to stdout and exits with 4.
 
 ### License
 
