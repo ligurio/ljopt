@@ -19,7 +19,47 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(8)
+-- Capture everything a function writes to io.stdout.
+local function capture_stdout(fn)
+    local chunks = {}
+    local saved = io.stdout
+    io.stdout = { -- luacheck: ignore 122
+        write = function(_, s) chunks[#chunks + 1] = s end,
+        flush = function() end,
+    }
+    local ok, err = pcall(fn)
+    io.stdout = saved -- luacheck: ignore 122
+    assert(ok, err)
+    return table.concat(chunks)
+end
+
+-- Deterministic stand-in for a solver backend. `check` maps the
+-- marker at the end of the formula to a verdict.
+local SMT_RESULT = {
+    UNSAT = -1,
+    UNKNOWN = 0,
+    SAT = 1,
+}
+local function mock_solver()
+    return {
+        result = SMT_RESULT,
+        parse = function(_self, str)
+            return type(str) == "string"
+        end,
+        check = function(_self, str)
+            if str:sub(-7) == "UNKNOWN" then
+                return SMT_RESULT.UNKNOWN
+            elseif str:sub(-5) == "UNSAT" then
+                return SMT_RESULT.UNSAT
+            elseif str:sub(-3) == "SAT" then
+                return SMT_RESULT.SAT
+            end
+            return SMT_RESULT.UNSAT
+        end,
+    }
+end
+
+test:plan(10)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -333,6 +373,61 @@ test:test("loop unrolling remaps call arguments", function(test)
         "the peeled call plus one per unrolled iteration")
     test:is(count_duplicates(args), 0,
         "every call reads its own iteration's argument")
+end)
+
+test:test("utils rjust", function(test)
+    test:plan(2)
+
+    test:is(utils.rjust(3, 5), "    3", "rjust number")
+    test:is(utils.rjust("#1", 3), " #1", "rjust string")
+end)
+
+test:test("utils solver helpers", function(test)
+    test:plan(13)
+
+    local backends = utils.solver_backends()
+    test:is(#backends, 2, "solver_backends count")
+    test:is(backends[1], ljopt_config.get_smt_solver(),
+        "solver_backends preferred first")
+    local names = {[backends[1]] = true, [backends[2]] = true}
+    test:ok(names.z3 and names.cvc5, "solver_backends both backends")
+
+    local solver = utils.find_solver()
+    test:isnt(solver, nil, "find_solver returns a solver")
+    test:is(type(solver.check), "function", "find_solver solver API")
+
+    local t1 = utils.clock_monotonic()
+    test:is(type(t1), "number", "clock_monotonic type")
+    test:ok(utils.clock_monotonic() >= t1, "clock_monotonic monotonic")
+
+    local mock = mock_solver()
+    local widths = {tag_w = 2, counter_w = 4}
+    local traces = {
+        [1] = "UNSAT",
+        [2] = "SAT",
+        [3] = "UNKNOWN",
+    }
+    local verdict, status, solve_time
+    local output = capture_stdout(function()
+        verdict, status, solve_time =
+            utils.check_trace(mock, traces, 1, 1, "a.lua:1", widths)
+    end)
+    test:is(verdict, "Passed", "check_trace UNSAT verdict")
+    test:is(status, "passed", "check_trace UNSAT status")
+    test:is(type(solve_time), "number", "check_trace UNSAT time")
+    test:like(output, "Start", "check_trace prints the start line")
+
+    capture_stdout(function()
+        verdict = utils.check_trace(mock, traces, 2, 2, "b.lua:2",
+            widths)
+    end)
+    test:is(verdict, "Failed", "check_trace SAT verdict")
+
+    capture_stdout(function()
+        verdict = utils.check_trace(mock, traces, 3, 3, "c.lua:3",
+            widths)
+    end)
+    test:is(verdict, "Timeout", "check_trace UNKNOWN verdict")
 end)
 
 require("tests.coverage").shutdown()
