@@ -38,6 +38,7 @@ build = {
         ['ljopt.ir_dump_utils'] = 'ljopt/ir_dump_utils.lua',
         ['ljopt.ir_smtlib'] = 'ljopt/ir_smtlib.lua',
         ['ljopt.main'] = 'ljopt/main.lua',
+        ['ljopt.runtime'] = 'ljopt/runtime.lua',
         ['ljopt.smt_constants'] = 'ljopt/smt_constants.lua',
         ['ljopt.utils'] = 'ljopt/utils.lua',
 

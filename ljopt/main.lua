@@ -1,6 +1,7 @@
 local jit = require("jit")
 local utils = require("ljopt.utils")
 local ljopt = require("ljopt")
+local runtime = require("ljopt.runtime")
 
 local exit_codes = {
   OK = 0,
@@ -52,7 +53,11 @@ if not ok then
 end
 
 local err
-ok, err = pcall(res)
+local env = setmetatable({}, {__index = _G})
+local mt = getmetatable("string")
+setfenv(res, env)
+ok, err = runtime.capture(res)
+debug.setmetatable("", mt)
 if not ok then
   utils.fatal_msg("Runtime error: " .. err, exit_codes.ERR_BAD_LUA_CHUNK)
 end
