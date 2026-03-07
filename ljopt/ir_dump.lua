@@ -23,7 +23,6 @@ local byte, rep = string.byte, string.rep
 local type, tostring = type, tostring
 
 local ir_dump_utils = require('ljopt.ir_dump_utils')
-local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
 
 -- Disable JIT for ir_dump to not interfere with verification
 -- traces.
@@ -503,14 +502,12 @@ local function dumpoff()
     jit.attach(dump_record)
     if out then out:close() end
     out = nil
-    toggle_debug_hook()
   end
 end
 
 -- Open the output file and attach dump handlers.
 local function dumpon(outfile)
   if active then dumpoff() end
-  toggle_debug_hook()
   -- Flush JIT so we'll have consistent
   -- trace numbers across recordings.
   jit.flush()
@@ -524,39 +521,17 @@ local function dumpon(outfile)
   out = outfile or io.stderr
 end
 
-local function record(lua_code, opt, is_debug_mode)
-  -- Lua treats any independent chunk as the body of an anonymous function.
-  -- For instance, for the chunk "a = 1", loadstring returns the equivalent
-  -- of `function () a = 1 end`, https://www.lua.org/pil/8.html
-  local fn, err = loadstring(lua_code)
-  if fn == nil then
-    error(("cannot load Lua code: %s"):format(err))
-  end
-
+local function record(fn, opt, is_debug_mode)
   debug_mode = is_debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
 
-  -- Set LuaJIT options right before pcall, so no traces
-  -- generated between load() and pcall(), otherwise
-  -- it can affect JIT behaviour, making it non-deterministic.
   if opt == nil then
       opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
   end
   assert(load(opt))()
 
-  -- This solution is not complete, issue for tracking progress
-  -- on isolation: https://github.com/ligurio/ljopt/issues/35
-  -- Lua chunk can override globals. Make a copy.
-  local env = setmetatable({}, {__index = _G})
-  local mt = getmetatable("string")
-  setfenv(fn, env)
   dumpon()
   pcall(fn)
-
-  -- Set metatable for strings before `dumpoff`, so coverage
-  -- will have valid string metatable, otherwise
-  -- coverage will fail.
-  debug.setmetatable("", mt)
   dumpoff()
 
   return ir_dump_utils.ljopt_get_execution_state()

@@ -7,7 +7,7 @@
 local ir_node = require('ljopt.ir.ir_nodes')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local op_type = require('ljopt.ir.op_type')
-local dump_ir = require('ljopt.ir_dump')
+local runtime = require('ljopt.runtime')
 local ljopt_config = require('ljopt.config')
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
@@ -275,7 +275,7 @@ end
 
 -- Helper to record dump with the given optimization.
 local function record_code(lua_code, opt)
-    local exec_records = dump_ir.record(
+    local exec_records = runtime.record_sandboxed(
         lua_code, opt, ljopt_config.is_debug_mode()
     )
     assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))

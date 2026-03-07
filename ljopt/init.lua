@@ -1,4 +1,4 @@
-local dump_ir = require("ljopt.ir_dump")
+local runtime = require("ljopt.runtime")
 local dump_bc = require("ljopt.bc_dump")
 local smtlib_bc = require("ljopt.bc_smtlib")
 local smtlib_ir = require("ljopt.ir_smtlib")
@@ -20,7 +20,7 @@ local VERSION = "0.0.1"
 
 return {
     ir = {
-	    record = dump_ir.record,
+	    record = runtime.record_sandboxed,
 	    traces_to_smt = smtlib_ir.traces_to_smt,
 	    translate_to_smt = smtlib_ir.translate_to_smt,
     },
