@@ -1,6 +1,6 @@
 local arith_utils = require('ljopt.ir.arith_utils')
+local op_type = require('ljopt.ir.op_type')
 local ir_node = require('ljopt.ir.ir_node_base')
-local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -14,16 +14,23 @@ function impls.IRNodeHREFP32:to_smt_lib(ctx)
     if right_op ~= nil and right_op:is_str() then
         -- Drop @0 etc
         local s = right_op:get_str():gsub('^([^"]*"[^"]*").*', '%1')
-        id = arith_utils.const_int_to_smt_bv(tonumber(utils.hash(s)))
+        id = arith_utils.const_str_to_memcell(s)
     else
-        id = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
+        id = ir_node.retrieve_raw_val(right_op, ctx)
     end
     local ssa_ref = self:get_ssa_reference()
     ctx.tab_info[ssa_ref] = ctx.tab_info[left_op:get_ssa()]
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, self:get_type(), id)
+        ctx.op_stack:store(ssa_ref, op_type.ANY, id)
     )
+end
+
+function impls.IRNodeHREFP32.is_implemented(_flags, _type, _opcode,
+                                              left_op, _right_op_val)
+    -- Skip HREF from non ssa tables (constant tables).
+    -- Same reason as in TDUP.
+    return left_op:is_ssa()
 end
 
 local function instance(node_str)

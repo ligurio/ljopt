@@ -14,6 +14,7 @@ TYPE constants
   FUN  - string description (fmtfunc output).
   I64  - int64 constant.
   IMM  - IRMlit, integer embedded to IR (#123).
+  INT  - integer constant.
   LIT  - LuaJIT literals such as 'I', 'tab.hmask' etc.
   NUM  - Lua number.
   SSA  - positive integer (the SSA ref number).
@@ -25,15 +26,17 @@ local OpType = {}
 
 -- Type-tag constants.
 
+OpType.ANY    = 'any'
 OpType.BOOL   = 'bool'
 OpType.FUN    = 'function'
-OpType.I64    = 'int64'
+OpType.I64    = 'i64'
 OpType.IMM    = 'imm'
+OpType.INT    = 'int'
 OpType.LIT    = 'lit'
-OpType.NUM    = 'number'
+OpType.NUM    = 'num'
 OpType.SSA    = 'ssa'
 OpType.STR    = 'string'
-OpType.TAB    = 'table'
+OpType.TAB    = 'tab'
 
 -- Operand metatable.
 
@@ -44,6 +47,7 @@ function op_mt:is_bool()   return self.type == OpType.BOOL end
 function op_mt:is_fun()    return self.type == OpType.FUN  end
 function op_mt:is_i64()    return self.type == OpType.I64  end
 function op_mt:is_imm()    return self.type == OpType.IMM  end
+function op_mt:is_int()    return self.type == OpType.INT  end
 function op_mt:is_lit()    return self.type == OpType.LIT  end
 function op_mt:is_num()    return self.type == OpType.NUM  end
 function op_mt:is_ssa()    return self.type == OpType.SSA  end
@@ -54,6 +58,7 @@ function op_mt:get_bool()  assert(self:is_bool()); return self._value end
 function op_mt:get_fun()   assert(self:is_fun());  return self._value end
 function op_mt:get_i64()   assert(self:is_i64());  return self._value end
 function op_mt:get_imm()   assert(self:is_imm());  return self._value end
+function op_mt:get_int()   assert(self:is_int());  return self._value end
 function op_mt:get_lit()   assert(self:is_lit());  return self._value end
 function op_mt:get_num()   assert(self:is_num());  return self._value end
 function op_mt:get_ssa()   assert(self:is_ssa());  return self._value end
@@ -66,11 +71,11 @@ function op_mt:get_tab()   assert(self:is_tab());  return self._value end
 function OpType.new(type, value)
 
     -- Map from `ir_dump` type strings to OpType.
-    -- The only difference is number -> num.
     local supported_types = {
         bool         = OpType.BOOL,
         ["function"] = OpType.FUN,
         imm          = OpType.IMM,
+        int          = OpType.INT,
         int64        = OpType.I64,
         lit          = OpType.LIT,
         number       = OpType.NUM,

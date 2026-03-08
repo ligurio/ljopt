@@ -547,6 +547,61 @@ foo(4)
         },
     }, {
         code = [[
+-- HSTORE tab (store table in table)
+local function foo(x, y)
+    x["key"] = y
+    return x
+end
+foo({}, {})
+foo({}, {})
+foo({}, {})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- HSTORE nil (delete key)
+local function foo(x)
+    x["key"] = nil
+    return x
+end
+foo({key=1})
+foo({key=1})
+foo({key=1})
+]],
+        ins = {
+            {type = "nil", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- HLOAD str
+local function foo(x)
+    return x["key"]
+end
+foo({key="hello"})
+foo({key="hello"})
+foo({key="hello"})
+]],
+        ins = {
+            {type = "str", name = "HLOAD"},
+        },
+    }, {
+        code = [[
+-- EQ i64
+local function foo(a, b)
+    return a == b
+end
+foo(5LL, 5LL)
+foo(5LL, 5LL)
+foo(5LL, 5LL)
+]],
+        ins = {
+            {type = "i64", name = "EQ"},
+        },
+    }, {
+        code = [[
 local bit = require('bit');
 local function foo()
     return bit.rol(127LL, 1LL) ~= 0, bit.ror(127LL, 1LL) ~= 0
@@ -593,6 +648,34 @@ foo(5LL)
 ]],
         ins = {
             {type = "cdt", name = "SLOAD"},
+        },
+    }, {
+        code = [[
+-- ASTORE str
+local function foo(t)
+    t[1] = "hello"
+    return t
+end
+foo({nil})
+foo({nil})
+foo({nil})
+]],
+        ins = {
+            {type = "str", name = "ASTORE"},
+        },
+    }, {
+        code = [[
+-- ASTORE tab
+local function foo(t, v)
+    t[1] = v
+    return t
+end
+foo({nil}, {})
+foo({nil}, {})
+foo({nil}, {})
+]],
+        ins = {
+            {type = "tab", name = "ASTORE"},
         },
     }}
     test:plan(3 * #srcs)

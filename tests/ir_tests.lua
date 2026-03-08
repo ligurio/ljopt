@@ -20,6 +20,7 @@ local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 local translate = require("ljopt.ir_smtlib")
+local op_type = require('ljopt.ir.op_type')
 local smt_constants = require("ljopt.smt_constants")
 local smt_context = require("ljopt.ir.smt_context")
 local utils = require("ljopt.utils")
@@ -94,7 +95,8 @@ test:test("IR arithmetic tests", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
-    local op_init = ctx_src.op_stack:init_smt("op")
+    local op_init = smt_constants.LJOPT_SMTLIB ..
+        ctx_src.op_stack:init_smt("op")
 
     local op_id = 1
 
@@ -260,7 +262,8 @@ test:test("IR guards tests", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
-    local op_init = ctx_src.op_stack:init_smt("op")
+    local op_init = smt_constants.LJOPT_SMTLIB ..
+        ctx_src.op_stack:init_smt("op")
 
     local op_id = 1
 
@@ -384,7 +387,8 @@ test:test("CONV from op", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
-    local op_init = ctx_src.op_stack:init_smt("op")
+    local op_init = smt_constants.LJOPT_SMTLIB ..
+        ctx_src.op_stack:init_smt("op")
 
     local conv_smt = translate.translate(
         {trace={addov_node, conv_node}}, ctx_src, nil, nil
@@ -414,7 +418,8 @@ test:test("CONV (num.int (int.num))", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
-    local op_init = ctx_src.op_stack:init_smt("op")
+    local op_init = smt_constants.LJOPT_SMTLIB ..
+        ctx_src.op_stack:init_smt("op")
 
     local conv_smt1 = translate.translate(
         {trace={addov_node, conv_node}}, ctx_src, nil, nil
@@ -455,10 +460,16 @@ test:test("Single memory stack", function(test)
     test:plan(8)
     local mem_stack = smt_context.MemoryStack:new()
     local init_smt = mem_stack:init_smt("stack2")
+
+    -- Allocate takes ssa_id as mandatory argument.
     local pointer, alloc_formula = mem_stack:allocate()
     local copy_ptr, copy_ptr_formula = mem_stack:allocate()
-    local rewrite_slot = "1"
-    local const_slot = "2"
+    local rewrite_slot = smt_context.create_value(
+        "#x0000000000000001", op_type.I64
+    )
+    local const_slot = smt_context.create_value(
+        "#x0000000000000002", op_type.I64
+    )
 
     local first_value = "#x0000000000000005"
     local second_value = "#x0000000000000015"
@@ -467,11 +478,12 @@ test:test("Single memory stack", function(test)
         smt_constants.LJOPT_SMTLIB,
         init_smt,
         alloc_formula,
-        mem_stack:store_index(pointer, rewrite_slot, first_value),
-        mem_stack:store_index(pointer, const_slot, first_value),
+        mem_stack:store_index(pointer, rewrite_slot, first_value, op_type.I64),
+        mem_stack:store_index(pointer, const_slot, first_value, op_type.I64),
     })
     local check_1 = ("(assert (not (= %s %s)))"):format(
-        first_value, mem_stack:load_index(pointer, rewrite_slot)
+        first_value,
+        mem_stack:load_index(pointer, rewrite_slot, op_type.I64)
     )
     test:is(smt:parse(final_formula .. check_1), true, "Parse read after write")
     test:is(smt:check(final_formula .. check_1),
@@ -479,10 +491,11 @@ test:test("Single memory stack", function(test)
     )
 
     final_formula = final_formula .. utils.join_strings({
-        mem_stack:store_index(pointer, rewrite_slot, second_value),
+        mem_stack:store_index(pointer, rewrite_slot, second_value, op_type.I64),
     })
     local check_2 = ("(assert (not (= %s %s)))"):format(
-        second_value, mem_stack:load_index(pointer, rewrite_slot)
+        second_value,
+        mem_stack:load_index(pointer, rewrite_slot, op_type.I64)
     )
     test:is(smt:parse(final_formula .. check_2),
         true, "Parse read after rewrite"
@@ -497,14 +510,16 @@ test:test("Single memory stack", function(test)
     })
     -- 3rd and 4th checks: we copy correctly.
     local check3 = ("(assert (not (= %s %s)))"):format(
-        second_value, mem_stack:load_index(copy_ptr, rewrite_slot)
+        second_value,
+        mem_stack:load_index(copy_ptr, rewrite_slot, op_type.I64)
     )
     test:is(smt:parse(final_formula .. check3), true, "Parse copy rewrite")
     test:is(smt:check(final_formula .. check3),
         smt.result.UNSAT, "Check copy rewrite"
     )
     local check4 = ("(assert (not (= %s %s)))"):format(
-        first_value, mem_stack:load_index(copy_ptr, const_slot)
+        first_value,
+        mem_stack:load_index(copy_ptr, const_slot, op_type.I64)
     )
     test:is(smt:parse(final_formula .. check4), true, "Parse copy write once")
     test:is(smt:check(final_formula .. check4),
@@ -569,7 +584,9 @@ test:test("Shared memory stack", function(test)
         local mem_stack1 = smt_context.MemoryStack:new()
         local mem_stack2 = smt_context.MemoryStack:new()
 
-        local slot1 = "1"
+        local slot1 = smt_context.create_value(
+            "#x0000000000000005", op_type.I64
+        )
         local first_value = "#x0000000000000005"
         local second_value = "#x0000000000000015"
 
@@ -585,8 +602,8 @@ test:test("Shared memory stack", function(test)
             slots_init_formula,
             clone1,
             clone2,
-            mem_stack1:store_index(st1, slot1, first_value),
-            mem_stack2:store_index(st2, slot1, second_value),
+            mem_stack1:store_index(st1, slot1, first_value, op_type.I64),
+            mem_stack2:store_index(st2, slot1, second_value, op_type.I64),
         })
         local test_formula1 = utils.join_strings({
             slots_init_formula,
@@ -614,9 +631,9 @@ test:test("Shared memory stack", function(test)
 
         local test_formula3 = utils.join_strings({
             slots_init_formula,
-            mem_stack1:store_index(st1, slot1, first_value),
-            mem_stack2:store_index(st2, slot1, second_value),
-            mem_stack2:store_index(st2, slot1, first_value),
+            mem_stack1:store_index(st1, slot1, first_value, op_type.I64),
+            mem_stack2:store_index(st2, slot1, second_value, op_type.I64),
+            mem_stack2:store_index(st2, slot1, first_value, op_type.I64),
             ("(assert (not (= %s %s)))"):format(
                 mem_stack1:load(st1), mem_stack2:load(st2)
             ),
@@ -671,8 +688,8 @@ test:test("Memory IRs tests", function(test)
     -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (select (select (select mem 0) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
-        "(assert (= (select (select (select mem 0) 2) (bv2int #x4026000000000000)) #x3F00000000000000))" .. '\n'
+        "(assert (= (get-bv (select (select (select mem 0) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
+        "(assert (= (get-bv (select (select (select mem 0) 2) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
@@ -721,8 +738,8 @@ test:test("Array IRs tests", function(test)
     -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (select (select (select mem 0) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
-        "(assert (= (select (select (select mem 0) 2) (bv2int #x4026000000000000)) #x3F00000000000000))" .. '\n'
+        "(assert (= (get-bv (select (select (select mem 0) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
+        "(assert (= (get-bv (select (select (select mem 0) 2) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
@@ -772,8 +789,8 @@ test:test("TNEW test", function(test)
     -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (select (select (select mem 0) 1) (bv2int #x4026000000000000)) #x3FF0000000000000))" .. '\n' ..
-        "(assert (= (select (select (select mem 0) 2) (bv2int #x4026000000000000)) #x4000000000000000))" .. '\n'
+        "(assert (= (get-bv (select (select (select mem 0) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
+        "(assert (= (get-bv (select (select (select mem 0) 2) (int-val #x4026000000000000))) #x4000000000000000))" .. "\n"
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
@@ -791,7 +808,8 @@ test:test("CONV from i64", function(test)
 
     local ctx_src = smt_context.SMTContext:new("BV", "BV")
 
-    local op_init = ctx_src.op_stack:init_smt("op")
+    local op_init = smt_constants.LJOPT_SMTLIB ..
+        ctx_src.op_stack:init_smt("op")
 
     local conv_smt = translate.translate(
         {trace={i64_node, num_node}}, ctx_src, nil, nil
