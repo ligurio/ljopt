@@ -1,6 +1,6 @@
 local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
-local utils = require('ljopt.utils')
+local op_type = require('ljopt.ir.op_type')
 
 local impls = {}
 
@@ -16,20 +16,11 @@ function impls.IRNodeHSTOREStr:to_smt_lib(ctx)
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
     -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
-    idx_left = ('(bv2int %s)'):format(idx_left)
-    local value
-    if right_op ~= nil and right_op:is_str() then
-        value = arith_utils.const_i64_to_smt_bv(
-            tonumber(utils.hash(right_op:get_str()))
-        )
-    else
-        value = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
-    end
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
+    local value = ir_node.retrieve_str_op(right_op, ctx)
 
-    assert(tab_left ~= nil, dst_slot)
-
-    return ctx.mem_stack:store_index(tab_left, idx_left, value)
+    assert(value ~= nil)
+    return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.STR)
 end
 
 impls.IRNodeHSTORENum = {}
@@ -44,21 +35,12 @@ function impls.IRNodeHSTORENum:to_smt_lib(ctx)
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
     -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
-    idx_left = ('(bv2int %s)'):format(idx_left)
-    local value
-    if right_op ~= nil and right_op:is_str() then
-        local hash = utils.hash(right_op:get_str())
-        value = arith_utils.const_num_to_smt_bv(tonumber(hash))
-    elseif right_op ~= nil and right_op:is_num() then
-        value = arith_utils.const_num_to_smt_bv(right_op:get_num())
-    else
-        value = ir_node.retrieve_i64_op(right_op, ctx, 'i64')
-    end
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
+    local value = ir_node.retrieve_num_op(right_op, ctx, op_type.NUM)
 
     assert(tab_left ~= nil, dst_slot)
 
-    return ctx.mem_stack:store_index(tab_left, idx_left, value)
+    return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.NUM)
 end
 
 impls.IRNodeHSTORETab = {}
@@ -83,9 +65,27 @@ function impls.IRNodeHSTORETab:to_smt_lib(ctx)
     -- Table index. Runtime.
     local idx_right = ctx.mem_stack:key_id(src_slot)
     idx_right = arith_utils.const_int_to_smt_bv(idx_right)
-    local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
-    idx_left = ('(bv2int %s)'):format(idx_left)
-    return ctx.mem_stack:store_index(tab_left, idx_left, idx_right)
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
+    return ctx.mem_stack:store_index(tab_left, idx_left, idx_right, op_type.I64)
+end
+
+impls.IRNodeHSTORE = {}
+ir_node.extended(impls.IRNodeHSTORE, ir_node.ir_node_base)
+
+function impls.IRNodeHSTORE:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+
+    local dst_slot = left_op:get_ssa()
+
+    -- Table pointer. Compile time.
+    local tab_left = ctx.tab_info[dst_slot].mem_ref
+    -- Table index. Runtime.
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
+    -- Nil sentinel value.
+    local value = '#x0000000000000000'
+
+    assert(tab_left ~= nil, dst_slot)
+    return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.I64)
 end
 
 local function instance(node_str)

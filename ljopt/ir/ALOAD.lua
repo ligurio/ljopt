@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local op_type = require('ljopt.ir.op_type')
 
 local impls = {}
 
@@ -13,17 +14,14 @@ function impls.IRNodeALOADNum:to_smt_lib(ctx)
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
     -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
-    idx_left = ('(bv2int %s)'):format(idx_left)
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
     assert(tab_left ~= nil, dst_slot)
     return ('%s\n%s'):format(
-        -- I suppose guard for ALOAD is always true for us.
-        -- It means we never exit by it.
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, 'i64', ctx.mem_stack:load_index(
-            tab_left, idx_left)
+        ctx.op_stack:store(ssa_ref, op_type.NUM,
+            ctx.mem_stack:load_index(tab_left, idx_left, op_type.NUM)
         )
     )
 end
@@ -39,17 +37,16 @@ function impls.IRNodeALOADTab:to_smt_lib(ctx)
     -- Table pointer. Compile time.
     local tab_left = ctx.tab_info[dst_slot].mem_ref
     -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
-    idx_left = ('(bv2int %s)'):format(idx_left)
+    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
 
     assert(tab_left ~= nil, dst_slot)
-    local tab_ptr = ctx.mem_stack:load_index(tab_left, idx_left)
+    local tab_ptr = ctx.mem_stack:load_index(tab_left, idx_left, op_type.TAB)
 
     local ssa_ref = self:get_ssa_reference()
     ctx.tab_info[ssa_ref] = {mem_ref = ('(bv2int %s)'):format(tab_ptr)}
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, 'i64', tab_ptr)
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tab_ptr)
     )
 end
 

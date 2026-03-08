@@ -1,5 +1,6 @@
 local utils = require('ljopt.utils')
 local arith_utils = require('ljopt.ir.arith_utils')
+local op_type = require('ljopt.ir.op_type')
 local ir_node = require('ljopt.ir.ir_node_base')
 local constants = require('ljopt.smt_constants')
 
@@ -12,12 +13,12 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
     local typ = self:get_left_op()
     local value = self:get_right_op()
 
-    local cdt_type = tostring(
-        utils.hash(constants.FIELD_TAB_PREFIX .. 'cdata.ctypeid')
+    local cdt_type = arith_utils.const_str_to_memcell(
+        constants.FIELD_TAB_PREFIX .. 'cdata.ctypeid'
     )
 
-    local cdt_value = tostring(
-        utils.hash(constants.FIELD_TAB_PREFIX .. 'cdata.value')
+    local cdt_value = arith_utils.const_str_to_memcell(
+        constants.FIELD_TAB_PREFIX .. 'cdata.value'
     )
 
     local ssa_ref = self:get_ssa_reference()
@@ -41,8 +42,8 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
     return ('%s\n%s\n%s\n%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         init,
-        ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type),
-        ctx.mem_stack:store_index(idx, cdt_value, smt_value),
+        ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type, op_type.I64),
+        ctx.mem_stack:store_index(idx, cdt_value, smt_value, op_type.I64),
         ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_num_to_smt_bv(idx))
     )
 end

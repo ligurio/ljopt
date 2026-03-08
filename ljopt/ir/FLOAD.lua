@@ -66,21 +66,26 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     if right_op == 'str.len' then
         if left_op:is_str() then
             -- If right argument is a constant string.
-            data = arith_utils.const_int_to_smt_bv(#left_op:get_str())
+            data = arith_utils.const_i64_to_smt_bv(#left_op:get_str())
         else
-            utils.unreachable('str.len: left operand is not a string literal')
+            data = ('((_ int2bv %d) (str.len %s))'):format(
+                64,
+                ctx.op_stack:load(left_op:get_ssa(), op_type.STR)
+            )
         end
     elseif right_op:sub(1, 3) == 'tab' then
         -- Loads tab.hmask, tab.asize, etc.
-        local field_hash = tostring(
-            utils.hash(smt_constants.FIELD_TAB_PREFIX .. right_op)
+        local field_hash = arith_utils.const_str_to_memcell(
+            smt_constants.FIELD_TAB_PREFIX .. right_op
         )
         local tab_left = ctx.tab_info[left_op:get_ssa()].mem_ref
-        data = ctx.mem_stack:load_index(tonumber(tab_left), field_hash)
+        data = ctx.mem_stack:load_index(
+            tonumber(tab_left), field_hash, op_type.INT
+        )
     else
         utils.unreachable('FLOADInt: unsupported right_op: ' .. right_op)
     end
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+    return ctx.op_stack:store(self:get_ssa_reference(), op_type.INT, data)
 end
 
 impls.IRNodeFLOADI64 = {}
@@ -98,10 +103,10 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
             -- Table pointer. Compile time.
             local tab_left = ctx.tab_info[left_op:get_ssa()].mem_ref
             -- Table index. Runtime.
-            local idx_left = tostring(
-                utils.hash(smt_constants.FIELD_TAB_PREFIX .. 'cdata.value')
+            local idx_left = arith_utils.const_str_to_memcell(
+                smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
             )
-            data = ctx.mem_stack:load_index(tab_left, idx_left)
+            data = ctx.mem_stack:load_index(tab_left, idx_left, op_type.I64)
         else
             utils.unreachable(
                 'Unsupported left_op: ' .. left_op.type ..
@@ -111,7 +116,7 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     else
         utils.unreachable('FLOADI64: unsupported right_op: ' .. right_op_str)
     end
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+    return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
 

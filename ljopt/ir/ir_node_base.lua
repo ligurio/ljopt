@@ -4,6 +4,7 @@ translators.
 ]] --
 
 local dev_checks = require('ljopt.dev_checks')
+local arith_utils = require('ljopt.ir.arith_utils')
 local utils = require('ljopt.utils')
 local op_type = require('ljopt.ir.op_type')
 
@@ -106,6 +107,24 @@ local function retrieve_int_op(op, ctx, _type)
     )
 end
 
+-- Loads a strings value,
+-- reinterpreting floats if needed.
+-- OpType.SSA - load from op_stack as 'str'.
+-- OpType.STR - just return str.
+local function retrieve_str_op(op, ctx)
+    if op == nil then
+        utils.unreachable('retrieve_str_op: op is nil')
+    end
+    if op:is_ssa() then
+        return ctx.op_stack:load(op:get_ssa(), op_type.STR)
+    elseif op:is_str() then
+        return '"' .. op:get_str() .. '"'
+    end
+    utils.unreachable(
+        'retrieve_str_op: unsupported op type: ' .. tostring(op and op.type)
+    )
+end
+
 -- Loads a 64-bit integer (i64) value.
 -- OpType.SSA - load from op_stack.
 -- OpType.I64 - format the raw bit pattern as #x<16 hex digits>.
@@ -136,6 +155,21 @@ local function retrieve_tab_op(operand, ctx, type)
     -- Delayed until true dynamic tables are not supported.
     -- https://github.com/ligurio/ljopt/issues/46
     return ctx.op_stack:load(tonumber(operand), type)
+end
+
+-- All the other methods of `retrieve_*` are deprecated.
+-- Usually we move value from something to the stack.
+-- And for stacks more convenient to simply store MemCell.
+local function retrieve_raw_val(op, ctx)
+    if op:is_ssa() then
+        return ctx.op_stack:load(op:get_ssa(), op_type.ANY)
+    elseif op:is_str() then
+        return arith_utils.const_str_to_memcell(op:get_str())
+    elseif op:is_num() then
+        return arith_utils.const_num_to_memcell(op:get_num())
+    else
+        utils.unreachable(op.type)
+    end
 end
 
 local ir_node_base = {}
@@ -188,7 +222,9 @@ return {
     extended = extended,
     retrieve_slot_op = retrieve_slot_op,
     retrieve_tab_op = retrieve_tab_op,
+    retrieve_raw_val = retrieve_raw_val,
     retrieve_num_op = retrieve_num_op,
+    retrieve_str_op = retrieve_str_op,
     retrieve_int_op = retrieve_int_op,
     retrieve_i64_op = retrieve_i64_op,
 }

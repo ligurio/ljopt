@@ -1,4 +1,3 @@
-local utils = require('ljopt.utils')
 local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 local constants = require('ljopt.smt_constants')
@@ -12,12 +11,12 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
     local value = self:get_left_op()
     local maybe_size = self:get_right_op()
 
-    local cdt_size = tostring(
-        utils.hash(constants.FIELD_TAB_PREFIX .. 'cdata.size')
+    local cdt_size = arith_utils.const_str_to_memcell(
+        constants.FIELD_TAB_PREFIX .. 'cdata.size'
     )
 
-    local cdt_type = tostring(
-        utils.hash(constants.FIELD_TAB_PREFIX .. 'cdata.ctypeid')
+    local cdt_type = arith_utils.const_str_to_memcell(
+        constants.FIELD_TAB_PREFIX .. 'cdata.ctypeid'
     )
 
     local ssa_ref = self:get_ssa_reference()

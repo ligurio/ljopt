@@ -4,6 +4,7 @@ is used for checking if two IR traces are equivalent.
 ]]--
 
 local utils = require('ljopt.utils')
+local op_type = require('ljopt.ir.op_type')
 local smt_constants = require('ljopt.smt_constants')
 
 local dev_checks = require('ljopt.dev_checks')
@@ -27,6 +28,8 @@ local type2bv = {
     ['i64'] = '%s',
     ['p32'] = '%s',
     ['p64'] = '%s',
+    [op_type.STR] = '%s',
+    [op_type.ANY] = '%s',
     ['num'] = '(fp.to_ieee_bv %s)',
 }
 
@@ -43,6 +46,8 @@ local bv2type = {
     ['i64'] = '%s',
     ['p32'] = '%s',
     ['p64'] = '%s',
+    [op_type.STR] = '%s',
+    [op_type.ANY] = '%s',
     ['num'] = '((_ to_fp 11 53) %s)',
 }
 
@@ -65,6 +70,26 @@ function StackBase:new()
     return public
 end
 
+local function create_value(memcell, type)
+    if type == op_type.STR then
+        return ('(str-val %s)'):format(memcell)
+    elseif type == op_type.ANY then
+        return memcell
+    else
+        return ('(int-val %s)'):format(memcell)
+    end
+end
+
+local function extract_value(memcell, type)
+    if type == op_type.ANY then
+        return memcell
+    elseif type == op_type.STR then
+        return ('(get-str %s)'):format(memcell)
+    else
+        return ('(get-bv %s)'):format(memcell)
+    end
+end
+
 local VMStackBV = {}
 extended(VMStackBV, StackBase)
 
@@ -74,7 +99,7 @@ function VMStackBV.init_smt(self, name)
     self._name = name
     self._cur_stack = 0
     return string.format(
-        '(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))', name
+        '(declare-fun %s () (Array Int (Array Int (MemCell))))', name
     )
 end
 
@@ -89,7 +114,7 @@ function VMStackBV.load(self, slot_num, type)
     else
         conv = assert(bv2type[type], 'Unsupported load type ' .. type)
     end
-    return string.format(conv, slot)
+    return string.format(conv, extract_value(slot, type))
 end
 
 function VMStackBV.store(self, slot_num, type, data)
@@ -118,7 +143,8 @@ function OpStackBV.init_smt(self, name)
 
     self._name = name
     return string.format(
-        '(declare-fun %s () (Array Int (_ BitVec 64)))', self._name
+        '(declare-fun %s () (Array Int MemCell))\n',
+        self._name
     )
 end
 
@@ -130,7 +156,7 @@ function OpStackBV.load(self, op_num, type)
     )
     local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     local val = string.format('(select %s %d)', self._name, op_num)
-    return string.format(conv, val)
+    return string.format(conv, extract_value(val, type))
 end
 
 function OpStackBV.store(self, op_num, type, data)
@@ -145,7 +171,7 @@ function OpStackBV.store(self, op_num, type, data)
     local conv = assert(type2bv[type], 'Unsupported store op type ' .. type)
     return string.format(
         '(assert (let ((a!1 %s)) (= (select %s %d) a!1)))',
-        string.format(conv, data),
+        create_value(string.format(conv, data), type),
         self._name,
         op_num
     )
@@ -251,7 +277,7 @@ function SnapStack.init_smt(self, name)
     self._exited_by_snap = ('(_ bv0 %d)'):format(smt_constants.MAXSNAP)
     self._cur_stack = 1
     return string.format([[
-(declare-fun %s () (Array Int (Array Int (_ BitVec 64))))
+(declare-fun %s () (Array Int (Array Int (MemCell))))
 ; %d is arbitrary constant for maximum number of trace exits per snapshot
 (declare-fun %s () (_ BitVec %d))
 ]], self._name, smt_constants.MAXSNAP,
@@ -269,7 +295,7 @@ function SnapStack.load(self, slot_num, type)
     else
         conv = assert(bv2type[type], 'Unsupported load type ' .. type, nil)
     end
-    return string.format(conv, slot)
+    return string.format(conv, extract_value(slot, op_type.NUM))
 end
 
 function SnapStack.load_te(self)
@@ -288,7 +314,7 @@ function SnapStack.store(self, slot_num, type, data)
     dev_checks('table', 'number', 'string', 'string')
 
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
-    local conv_data = string.format(conv, data)
+    local conv_data = create_value(string.format(conv, data), op_type.NUM)
     local stack = string.format('(select %s %d)', self._name, self._cur_stack)
     local new_stack = string.format('(store %s %d %s)',
         stack, slot_num, conv_data
@@ -407,7 +433,7 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.vm_slot_map = {}
     -- [Slot][Version][Data]
     local mutable_memory = string.format(
-        '(declare-fun %s () (Array Int (Array Int (Array Int (_ BitVec 64)))))',
+        '(declare-fun %s () MemPtr)',
         self._name
     )
     self.versions_table = Array1D:new()
@@ -484,10 +510,13 @@ function MemoryStack.load(self, ptr)
 end
 
 -- Read single value from ptr at current version at idx.
-function MemoryStack.load_index(self, ptr, idx)
-    dev_checks('table', 'number', 'string')
+function MemoryStack.load_index(self, ptr, idx, type)
+    dev_checks('table', 'number', 'string', 'string')
     local memory_array = self:load(ptr)
-    return ('(select %s %s)'):format(memory_array, idx)
+    local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
+    return conv:format(
+        extract_value(('(select %s %s)'):format(memory_array, idx), type)
+    )
 end
 
 -- Save data to ptr at new version.
@@ -506,9 +535,11 @@ end
 
 -- Save data to ptr at new version.
 -- All consequent reads will read new data.
-function MemoryStack.store_index(self, ptr, index, data)
-    dev_checks('table', 'number', 'string', 'string')
+function MemoryStack.store_index(self, ptr, index, data, type)
+    dev_checks('table', 'number', 'string', 'string', 'string')
 
+    local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
+    data = conv:format(data)
     local old_version = self:slot_version(ptr)
     local inc_ver = self:inc_version(ptr)
     local new_version = self:slot_version(ptr)
@@ -522,7 +553,8 @@ function MemoryStack.store_index(self, ptr, index, data)
         (updated_array (store (select version_array old_version) index data))
         (new_array (select version_array new_version))
 ) (= new_array updated_array))))]]):format(
-        old_version, new_version, index, data, self._name, ptr
+        old_version, new_version, index,
+        create_value(data, type), self._name, ptr
     )
     return string.format('%s\n%s', inc_ver, val)
 end
@@ -559,6 +591,8 @@ function SMTContext:restart()
 end
 
 return {
+    create_value = create_value,
+    extract_value = extract_value,
     SMTContext = SMTContext,
     Array1D = Array1D,
     MemoryStack = MemoryStack,
