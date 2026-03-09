@@ -733,6 +733,22 @@ foo({nil}, {})
         ins = {
             {type = "tab", name = "ASTORE"},
         },
+    }, {
+        code = [[
+local x = {}
+for i = 1, 3 do
+  x = { [-0.000000] = "123" }
+
+end
+
+assert(x[0.0] == "123")
+]],
+        ins = {
+            {type = "num", name = "CONV"},
+            {type = "num", name = "NEG"},
+            {type = "p32", name = "NEWREF"},
+            {type = "str", name = "HSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 

@@ -17,6 +17,7 @@ function impls.IRNodeAREFP32:to_smt_lib(ctx)
         id = arith_utils.const_str_to_memcell(s)
     else
         id = ir_node.retrieve_raw_val(right_op, ctx)
+        id = arith_utils.normalize_table_key(id)
     end
     local ssa_ref = self:get_ssa_reference()
     ctx.tab_info[ssa_ref] = ctx.tab_info[left_op:get_ssa()]

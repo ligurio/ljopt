@@ -1,3 +1,4 @@
+local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
 
@@ -10,6 +11,7 @@ function impls.IRNodeNEWREFP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
     local id = ir_node.retrieve_raw_val(right_op, ctx)
+    id = arith_utils.normalize_table_key(id)
     ctx.tab_info[self:get_ssa_reference()] = ctx.tab_info[left_op:get_ssa()]
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.ANY, id)
 end
