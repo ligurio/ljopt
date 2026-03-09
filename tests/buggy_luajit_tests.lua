@@ -7,6 +7,7 @@
 -- them to separate file.
 
 local ljopt = require("ljopt")
+local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 local smt_constants = require('ljopt.smt_constants')
@@ -41,6 +42,10 @@ local function reproduce_bug_in_runtime(chunk, err_msg)
     end
     return ok == expected_result and err_is_matched
 end
+
+-- Since not all nodes are implemented we should reset
+-- STRICT_MODE here (e.g. for loops can be presented in tests).
+ljopt_config.set_strict_mode(false)
 
 -- The function records LuaJIT traces, translate every trace to
 -- SMT-LIB formulas, check their SMT-LIB syntax and check that
