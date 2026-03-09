@@ -72,6 +72,17 @@ local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
 
+-- LuaJIT treats -0.0 and +0.0 as the same table key.
+-- Accepts a MemCell and returns a MemCell: for int-val keys,
+-- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
+local function normalize_table_key(memcell)
+    return ('(ite ((_ is int-val) %s)' ..
+            ' (ite (fp.isZero ((_ to_fp 11 53) (get-bv %s)))' ..
+            ' (int-val #x0000000000000000) %s) %s)'):format(
+               memcell, memcell, memcell, memcell
+            )
+end
+
 return {
     i32_overflow_check = i32_overflow_check,
     const_num_to_smt_bv = const_num_to_smt_bv,
@@ -82,6 +93,7 @@ return {
     memcell_to_str = memcell_to_str,
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
+    normalize_table_key = normalize_table_key,
     smt_int_to_fp = smt_int_to_fp,
     smt_i64_to_fp = smt_i64_to_fp,
 }
