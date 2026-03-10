@@ -94,6 +94,7 @@ build = {
         ['ljopt.ir.BUFHDR'] = 'ljopt/ir/BUFHDR.lua',
         ['ljopt.ir.BUFPUT'] = 'ljopt/ir/BUFPUT.lua',
         ['ljopt.ir.BUFSTR'] = 'ljopt/ir/BUFSTR.lua',
+        ['ljopt.ir.CALLN'] = 'ljopt/ir/CALLN.lua',
         ['ljopt.ir.CNEW'] = 'ljopt/ir/CNEW.lua',
         ['ljopt.ir.CNEWI'] = 'ljopt/ir/CNEWI.lua',
         ['ljopt.ir.FLOAD'] = 'ljopt/ir/FLOAD.lua',

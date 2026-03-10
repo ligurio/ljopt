@@ -319,7 +319,20 @@ local function dump_ir(tr, dumpsnap, dumpreg)
       if sub(op, 1, 4) == "CALL" then
 	local ctype
 	if m2 == 1*4 then -- op2 == IRMlit
-	  write_out(format("%-10s  (", vmdef.ircall[op2]))
+	  op2_txt = vmdef.ircall[op2]
+	  write_out(format("%-10s  (", op2_txt))
+	  -- Capture argument for ljopt: resolve CARG chain.
+	  if op1 >= 0 then
+	    local _, a_ot = traceir(tr, op1)
+	    local a_oidx = 6*shr(a_ot, 8)
+	    local a_op = sub(irnames, a_oidx+1, a_oidx+6)
+	    if a_op ~= "CARG  " then
+	      op1_tab = {type = "ssa", value = op1}
+	      op1_txt = format("%04d", op1)
+	    end
+	  elseif op1 < 0 and op1 ~= -1 then
+	    op1_txt, op1_tab = ir_dump_utils.ljopt_formatsmt(tr, op1)
+	  end
 	else
 	  ctype = dumpcallfunc(tr, op2)
 	end
