@@ -297,6 +297,19 @@ foo()
             -- int FLOAD str.len
             {type = "int", name = "FLOAD"}
         },
+    }, {
+        code = [[
+local function foo(c)
+  return 1 == c
+end
+foo(1)
+foo(1)
+foo(1)
+]],
+        ins = {
+            {type = "num", name = "CONV"},
+            {type = "num", name = "EQ"}
+        },
     }}
     test:plan(3 * #srcs)
 

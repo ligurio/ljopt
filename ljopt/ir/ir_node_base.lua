@@ -83,6 +83,8 @@ local function retrieve_num_op(op, ctx, type)
         return ctx.op_stack:load(op:get_ssa(), type)
     elseif op:is_num() then
         return string.format('((_ to_fp 11 53) %s)', op_type.to_string(op))
+    elseif op:is_bool() then
+        utils.unreachable('Bool cannot be argument of num')
     end
     utils.unreachable(
         'retrieve_num_op: unsupported op type: ' .. tostring(op and op.type)
@@ -101,6 +103,8 @@ local function retrieve_int_op(op, ctx, _type)
         return ctx.op_stack:load(op:get_ssa(), 'int')
     elseif op:is_num() then
         return hex_double_to_i64_hex(op_type.to_string(op))
+    elseif op:is_bool() then
+        utils.unreachable('Bool cannot be argument of int')
     end
     utils.unreachable(
         'retrieve_int_op: unsupported op type: ' .. tostring(op and op.type)
@@ -139,6 +143,8 @@ local function retrieve_i64_op(op, ctx, type)
         return string.format('#x%016x', tonumber(op:get_i64()))
     elseif op:is_num() then
         return hex_double_to_i64_hex(op_type.to_string(op))
+    elseif op:is_bool() then
+        utils.unreachable('Bool cannot be argument of `i64`')
     end
     utils.unreachable(
         'retrieve_i64_op: unsupported op type: ' .. tostring(op and op.type)
@@ -167,6 +173,8 @@ local function retrieve_raw_val(op, ctx)
         return arith_utils.const_str_to_memcell(op:get_str())
     elseif op:is_num() then
         return arith_utils.const_num_to_memcell(op:get_num())
+    elseif op:is_bool() then
+        return arith_utils.const_num_to_memcell(op:get_bool())
     else
         utils.unreachable(op.type)
     end
