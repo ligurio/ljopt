@@ -135,7 +135,7 @@ local opcodes_table = {
     ['TOSTR'] = require('ljopt.ir.TOSTR'),
     ['STRTO'] = require('ljopt.ir.STRTO'),
     -- Calls.
-    ['CALLN'] = false,
+    ['CALLN'] = require('ljopt.ir.CALLN'),
     ['CALLL'] = false,
     ['CALLS'] = false,
     ['CALLXS'] = false,

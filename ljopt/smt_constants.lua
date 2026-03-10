@@ -24,6 +24,19 @@ local LJOPT_SMTLIB = ([[
 ; Uninterpreted functions for TOSTR/STRTO conversions.
 (declare-fun tostr_num ((_ BitVec 64)) String)
 (declare-fun strto_num (String) (_ BitVec 64))
+; Uninterpreted functions for math library calls.
+(declare-fun math_sin ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_cos ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_tan ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_asin ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_acos ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_atan ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_sinh ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_cosh ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_tanh ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_exp ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_log ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_log10 ((_ BitVec 64)) (_ BitVec 64))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 

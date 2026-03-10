@@ -8,6 +8,7 @@ local smt = require("tests.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local ir_smtlib = require("ljopt.ir_smtlib")
+local op_type = require("ljopt.ir.op_type")
 local test = require("tests.tap").test("ljopt")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
@@ -29,27 +30,38 @@ end
 -- @lua_code - chunk to test
 -- Returns (true, nil) if all instructions found in order
 -- and (false, <err>) otherwise.
-local function check_ins_present(lua_chunk, expected_ins)
-    local exec_records = record_code(lua_chunk)
+local function check_ins_present(lua_chunk, expected_ins, opt)
+    local exec_records = record_code(lua_chunk, opt)
     for _, trace in pairs(exec_records) do
         local nodes = ir_smtlib.construct_nodes(trace)
         local ni = 1
         for _, instr in ipairs(expected_ins) do
             local found = false
+            local function op_matches(op, expected)
+                if expected == nil then return true end
+                return op ~= nil and op._value == expected._value
+            end
             while ni <= #nodes do
                 local node = nodes[ni]
                 ni = ni + 1
                 if node:get_opcode() == instr.name
                     and node:get_type() == instr.type
+                    and op_matches(node:get_left_op(), instr.left_op)
+                    and op_matches(node:get_right_op(), instr.right_op)
                 then
                     found = true
                     break
                 end
             end
             if not found then
-                return false, ("Instruction %s(%s) not found"):format(
-                    instr.name, instr.type or "*"
-                )
+                return false,
+                    ("Instruction %s(%s,%s,%s) not found"):format(
+                        instr.name, instr.type or "*",
+                        instr.left_op
+                            and op_type.to_string(instr.left_op) or "*",
+                        instr.right_op
+                            and op_type.to_string(instr.right_op) or "*"
+                    )
             end
         end
     end
@@ -340,7 +352,7 @@ foo(1.5)
     test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
-        local ok, err = check_ins_present(f.code, f.ins)
+        local ok, err = check_ins_present(f.code, f.ins, f.opt)
         test:ok(ok, ("test_%d instructions present: %s"):format(
             i, err or "ok"
         ))
@@ -779,11 +791,60 @@ foo(false, 5.0)
         ins = {
             {type = "fal", name = "SLOAD"},
         },
+    }, {
+        code = [[
+-- CALLN test: math.* with constant argument.
+local function foo()
+  local x = 0.1
+  return math.acos(x),
+         math.asin(x),
+         math.atan(x),
+         math.cos(x),
+         math.cosh(x),
+         math.exp(x),
+         math.log(x),
+         math.log10(x),
+         math.sin(x),
+         math.sinh(x),
+         math.tan(x),
+         math.tanh(x)
+end
+foo(1)
+foo(1)
+foo(1)
+foo(1)
+foo(1)
+]],
+        ins = {
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "acos")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "asin")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "atan")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "cos")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "cosh")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "exp")},
+            {type = "num", name = "FPMATH"}, -- log
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "log10")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "sin")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "sinh")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "tan")},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "tanh")},
+        },
     }}
     test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
-        local ok, err = check_ins_present(f.code, f.ins)
+        local ok, err = check_ins_present(f.code, f.ins, f.opt)
         test:ok(ok, ("test_%d instructions present: %s"):format(
             i, err or "ok"
         ))
