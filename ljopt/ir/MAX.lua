@@ -3,7 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMAXNum = { op_str = 'fp.max', ignore_rounding = true }
+impls.IRNodeMAXNum = {
+    op_str = 'fp.max', ignore_rounding = true,
+    const_fn = function(a, b) return math.max(a, b) end,
+}
 ir_node.extended(impls.IRNodeMAXNum, bin_op.BinOpNum)
 
 impls.IRNodeMAXInt = {}

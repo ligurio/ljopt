@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local utils = require('ljopt.utils')
 
 local IRNodeBinOpBase = {}
 ir_node.extended(IRNodeBinOpBase, ir_node.ir_node_base)
@@ -28,6 +29,15 @@ function IRNodeBinOpNum:to_smt_lib(ctx)
     local data = string.format('(%s %s %s %s)',
         self.op_str, maybe_round, left_op, right_op
     )
+
+    if self.const_fn then
+        local lc = utils.resolve_const(self:get_left_op(), ctx)
+        local rc = utils.resolve_const(self:get_right_op(), ctx)
+        if lc ~= nil and rc ~= nil then
+            ctx.const_nums[self:get_ssa_reference()] = self.const_fn(lc, rc)
+        end
+    end
+
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 

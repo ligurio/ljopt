@@ -6,7 +6,7 @@ local impls = {}
 impls.IRNodeNEGInt = { op_str = 'bvneg' }
 ir_node.extended(impls.IRNodeNEGInt, un_op.UnOpInt)
 
-impls.IRNodeNEGNum = { op_str = 'fp.neg' }
+impls.IRNodeNEGNum = { op_str = 'fp.neg', const_fn = function(x) return -x end }
 ir_node.extended(impls.IRNodeNEGNum, un_op.UnOpNum)
 
 local function instance(node_str)

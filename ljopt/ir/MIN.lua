@@ -3,7 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMINNum = { op_str = 'fp.min', ignore_rounding = true }
+impls.IRNodeMINNum = {
+    op_str = 'fp.min', ignore_rounding = true,
+    const_fn = function(a, b) return math.min(a, b) end,
+}
 ir_node.extended(impls.IRNodeMINNum, bin_op.BinOpNum)
 
 impls.IRNodeMINInt = {}

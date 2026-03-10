@@ -3,7 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeDIVNum = { op_str = 'fp.div' }
+impls.IRNodeDIVNum = {
+    op_str = 'fp.div',
+    const_fn = function(a, b) return a / b end
+}
 ir_node.extended(impls.IRNodeDIVNum, bin_op.BinOpNum)
 
 impls.IRNodeDIVInt = { op_str = 'bvsdiv' }

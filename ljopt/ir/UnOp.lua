@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local utils = require('ljopt.utils')
 
 local IRNodeUnOpBase = {}
 ir_node.extended(IRNodeUnOpBase, ir_node.ir_node_base)
@@ -17,6 +18,15 @@ function IRNodeUnOpNum:to_smt_lib(ctx)
         self:get_left_op(), ctx, self:get_type()
     )
     local data = string.format('(%s %s)', self.op_str, left_op)
+
+    -- Propagate constant when operand is known.
+    if self.const_fn then
+        local lc = utils.resolve_const(self:get_left_op(), ctx)
+        if lc ~= nil then
+            ctx.const_nums[self:get_ssa_reference()] = self.const_fn(lc)
+        end
+    end
+
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
