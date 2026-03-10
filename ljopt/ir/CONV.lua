@@ -58,6 +58,19 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- to verify it safely.
         te = ctx.te_stack:store(ssa_ref, 'true') .. '\n'
     end
+
+    -- Propagate constant value through conversion.
+    local raw_left = self:get_left_op()
+    local const_val
+    if raw_left:is_num() then
+        const_val = raw_left:get_num()
+    elseif raw_left:is_ssa() then
+        const_val = ctx.const_nums[raw_left:get_ssa()]
+    end
+    if const_val ~= nil then
+        ctx.const_nums[ssa_ref] = const_val
+    end
+
     return te .. ctx.op_stack:store(
         ssa_ref, self:get_type(), data
     )

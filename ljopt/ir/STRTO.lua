@@ -21,10 +21,16 @@ function impls.IRNodeSTRTONum:to_smt_lib(ctx)
                               "for string, that is not convertible to number.")
         end
     else
-        -- Apply uninterpreted function to convert string to bv.
-        bv = ('(strto_num %s)'):format(
-            ctx.op_stack:load(left_op:get_ssa(), op_type.STR)
-        )
+        -- Check if the string is a known constant.
+        local const_str = ctx.const_strs[left_op:get_ssa()]
+        if const_str ~= nil and tonumber(const_str) then
+            bv = arith_utils.const_num_to_smt_bv(tonumber(const_str))
+            ctx.const_nums[ssa_ref] = tonumber(const_str)
+        else
+            bv = ('(strto_num %s)'):format(
+                ctx.op_stack:load(left_op:get_ssa(), op_type.STR)
+            )
+        end
     end
 
     -- Store as i64 since strto_num returns a bitvector directly.

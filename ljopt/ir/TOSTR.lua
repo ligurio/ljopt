@@ -1,5 +1,6 @@
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -22,10 +23,23 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
         bv, bv
     )
 
-    return ('%s\n%s\n%s'):format(
+    -- When the argument is a known constant, emit the exact
+    -- string value so the solver doesn't have to guess.
+    local const_axiom = ''
+    local const_val = utils.resolve_const(left_op, ctx, op_type.NUM)
+    if const_val ~= nil then
+        local str_val = tostring(const_val)
+        const_axiom = ('\n(assert (= (tostr_num %s) "%s"))'):format(
+            bv, str_val
+        )
+        ctx.const_strs[ssa_ref] = str_val
+    end
+
+    return ('%s\n%s\n%s%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.STR, str_expr),
-        roundtrip
+        roundtrip,
+        const_axiom
     )
 end
 

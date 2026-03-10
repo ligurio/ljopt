@@ -181,6 +181,7 @@ local function translate(trace_record, ctx_src,
     nodes = transform_nodes(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
+    jit.off(true, true)
     for i = 1, table.getn(nodes) do
         local parsed_ir = (nodes[i]:get_ssa_reference() or '') .. ' '
             .. (nodes[i]:get_flags().raw or '') .. ' '
@@ -192,6 +193,7 @@ local function translate(trace_record, ctx_src,
         smtlib_buf = ('%s%s ; %d   %s\n'):format(smtlib_buf,
             nodes[i]:to_smt_lib(ctx_src), i, utils.trim(parsed_ir))
     end
+    jit.on(true, true)
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
     local failed = false

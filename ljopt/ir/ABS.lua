@@ -3,7 +3,7 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeABSNum = { op_str = 'fp.abs' }
+impls.IRNodeABSNum = { op_str = 'fp.abs', const_fn = math.abs }
 ir_node.extended(impls.IRNodeABSNum, un_op.UnOpNum)
 
 impls.IRNodeABSInt = {}

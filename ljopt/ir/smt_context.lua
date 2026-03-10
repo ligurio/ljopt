@@ -582,12 +582,18 @@ function SMTContext:new(vm_stack_type, op_stack_type)
 
     -- ssa_ref -> tab_id
     self.tab_info = {}
+    -- ssa_ref -> num constant value (for constant propagation)
+    self.const_nums = {}
+    -- ssa_ref -> string constant value (for constant propagation)
+    self.const_strs = {}
 
     return self
 end
 
 function SMTContext:restart()
     self.tab_info = {}
+    self.const_nums = {}
+    self.const_strs = {}
 end
 
 return {

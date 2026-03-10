@@ -1,5 +1,6 @@
 local bit = require("bit")
 local ljopt_config = require("ljopt.config")
+local op_type = require('ljopt.ir.op_type')
 
 local string_gsub = string.gsub
 
@@ -110,6 +111,24 @@ local function enrich_snapshots_with_exits(nodes, trace_record)
     return true
 end
 
+-- Resolve constant num value from an operand.
+-- Returns these if known, nil otherwise.
+local function resolve_const(op, ctx, expected_type)
+    if expected_type ~= nil then
+        assert(op.type == expected_type or op.type == op_type.SSA,
+            ("expected %s, got %s"):format(expected_type, op.type)
+        )
+    end
+    if op:is_str() then
+        return op:get_str()
+    elseif op:is_num() then
+        return op:get_num()
+    elseif op:is_ssa() then
+        return ctx.const_nums[op:get_ssa()]
+    end
+    return nil
+end
+
 local function trim(str)
   if str == nil then return end
   local res = string_gsub(str, '^%s*(.-)%s*$', '%1')
@@ -135,6 +154,7 @@ return {
     hash = fnv1a_hash,
     join_strings = join_strings,
     merge_tables = merge_tables,
+    resolve_const = resolve_const,
     trim = trim,
     unreachable = unreachable,
 }

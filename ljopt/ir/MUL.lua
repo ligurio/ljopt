@@ -3,7 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMULNum = { op_str = 'fp.mul' }
+impls.IRNodeMULNum = {
+    op_str = 'fp.mul',
+    const_fn = function(a, b) return a * b end
+}
 ir_node.extended(impls.IRNodeMULNum, bin_op.BinOpNum)
 
 impls.IRNodeMULInt = { op_str = 'bvmul' }

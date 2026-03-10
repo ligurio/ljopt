@@ -66,7 +66,9 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     if right_op == 'str.len' then
         if left_op:is_str() then
             -- If right argument is a constant string.
-            data = arith_utils.const_i64_to_smt_bv(#left_op:get_str())
+            local len = #left_op:get_str()
+            data = arith_utils.const_i64_to_smt_bv(len)
+            ctx.const_nums[self:get_ssa_reference()] = len
         else
             data = ('((_ int2bv %d) (str.len %s))'):format(
                 64,
@@ -126,7 +128,7 @@ ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)
 function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local right_op = self:get_right_op()
-    local right_op_str = ir_node.OpType.to_string(right_op)
+    local right_op_str = op_type.to_string(right_op)
     local ssa_ref = self:get_ssa_reference()
     if right_op_str == 'tab.meta' then
         -- Left operand contains table, load it.
