@@ -290,6 +290,8 @@ local function ljopt_formatsmt(tr, idx, sn)
       const_type = "int64"
     elseif ffi.istype("uint64_t", k) then
       const_type = "uint64"
+    elseif tn == "boolean" then
+      const_type = "bool"
     end
   end
   if slot then
@@ -325,6 +327,12 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
           table.insert(snapshot, {s, {
             type = "const",
             value = smt_str,
+            const_type = const_tab.type,
+          }})
+        elseif const_tab ~= nil and const_tab.type == "bool" then
+          table.insert(snapshot, {s, {
+            type = "const",
+            value = tostring(const_tab.value),
             const_type = const_tab.type,
           }})
         end
