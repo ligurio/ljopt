@@ -167,13 +167,9 @@ end
 --    snapshot) each boolean means `have we exited by this
 --    snapshot`. Notice, that for each trace it looks like this:
 --    000001xxxxxx. Some prefix of 0-s, 1 and arbitrary values.
--- 4. The simplest way to compare these prefixes is reverse the
---    bitvector, now we're looking for their suffix of the form
---    10000. Let's introduce `lsb` - least significant bit in SMT,
---    which will return 000001000000. We can do it effectively
---    using bitwise trick `x & (-x)`.
--- 5. After that all we should do is compare these 2 values from 2
---    traces.
+-- 4. After that all we should do is compare these 2 values from 2
+--    traces with zero, to check whether both traces exited by a
+--    guard.
 --
 --
 --

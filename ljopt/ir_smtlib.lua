@@ -220,9 +220,7 @@ end
 
 local function snapshots2smt(snapshots1, snapshots2)
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
-    -- Trick to extract lowest set bit. (x & -x) reset
-    -- all bits except the lowest one. If they are equal
-    -- it means we exited on the same snapshot.
+    -- Check whether both traces exited by a guard.
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
         snapshots1.te, snapshots2.te
     )
