@@ -69,6 +69,24 @@ function impls.IRNodeSLOADCdt:to_smt_lib(ctx)
     )
 end
 
+local function bool_constant_to_smt_lib(self, ctx)
+    local ssa_ref = self:get_ssa_reference()
+    return ('%s\n%s'):format(
+        ctx.te_stack:store(ssa_ref, 'true'),
+        ctx.op_stack:store(ssa_ref, 'i64', self.hex_constant)
+    )
+end
+
+impls.IRNodeSLOADTru = {}
+ir_node.extended(impls.IRNodeSLOADTru, ir_node.ir_node_base)
+impls.IRNodeSLOADTru.hex_constant = '#xFFFFFFFD00000000'
+impls.IRNodeSLOADTru.to_smt_lib = bool_constant_to_smt_lib
+
+impls.IRNodeSLOADFal = {}
+ir_node.extended(impls.IRNodeSLOADFal, ir_node.ir_node_base)
+impls.IRNodeSLOADFal.hex_constant = '#xFFFFFFFE00000000'
+impls.IRNodeSLOADFal.to_smt_lib = bool_constant_to_smt_lib
+
 impls.IRNodeSLOADStr = {}
 ir_node.extended(impls.IRNodeSLOADStr, ir_node.ir_node_base)
 
