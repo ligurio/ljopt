@@ -48,7 +48,12 @@ local function inspect_stack_arguments(func)
     while true do
         local name, value = debug.getlocal(level, i)
         if not name then break end
-        result = result .. string.format("(%s)", type(value))
+        local tn = type(value)
+        if tn == "boolean" then
+            result = result .. string.format("(%s:%s)", tn, tostring(value))
+        else
+            result = result .. string.format("(%s)", tn)
+        end
         i = i + 1
     end
     return result

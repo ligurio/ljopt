@@ -749,6 +749,36 @@ assert(x[0.0] == "123")
             {type = "p32", name = "NEWREF"},
             {type = "str", name = "HSTORE"},
         },
+    }, {
+        code = [[
+-- SLOAD tru/fal test: boolean argument triggers
+-- SLOAD with type tru or fal.
+local function foo(b, x)
+  if b then return x + 1 end
+  return x
+end
+foo(true, 1.0)
+foo(true, 2.0)
+foo(true, 3.0)
+]],
+        ins = {
+            {type = "tru", name = "SLOAD"},
+        },
+    }, {
+        code = [[
+-- SLOAD tru/fal test: boolean argument triggers
+-- SLOAD with type tru or fal.
+local function foo(b, x)
+  if b then return x + 1 end
+  return x
+end
+foo(false, 1.0)
+foo(false, 4.0)
+foo(false, 5.0)
+]],
+        ins = {
+            {type = "fal", name = "SLOAD"},
+        },
     }}
     test:plan(3 * #srcs)
 
