@@ -241,23 +241,38 @@ end
 
 -- Recursively gather CALL* args and dump them.
 local function dumpcallargs(tr, ins)
+  local args = {}
   if ins < 0 then
+    local txt, tab = ir_dump_utils.ljopt_formatsmt(tr, ins)
+    args[#args + 1] = {txt = txt, tab = tab}
     write_out(formatk(tr, ins))
   else
     local _, ot, op1, op2 = traceir(tr, ins)
     local oidx = 6*shr(ot, 8)
     local op = sub(vmdef.irnames, oidx+1, oidx+6)
     if op == "CARG  " then
-      dumpcallargs(tr, op1)
+      local sub_args = dumpcallargs(tr, op1)
+      for i = 1, #sub_args do args[#args + 1] = sub_args[i] end
       if op2 < 0 then
 	write_out(" ", formatk(tr, op2))
+  local txt, tab = ir_dump_utils.ljopt_formatsmt(tr, op2)
+  args[#args + 1] = {txt = txt, tab = tab}
       else
 	write_out(" ", format("%04d", op2))
+  args[#args + 1] = {
+    txt = format("%04d", op2),
+    tab = {type = "ssa", value = op2}
+  }
       end
     else
       write_out(format("%04d", ins))
+      args[#args + 1] = {
+        txt = format("%04d", ins),
+        tab = {type = "ssa", value = ins}
+      }
     end
   end
+  return args
 end
 
 -- Dump IR and interleaved snapshots.
@@ -336,7 +351,13 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	else
 	  ctype = dumpcallfunc(tr, op2)
 	end
-	if op1 ~= -1 then dumpcallargs(tr, op1) end
+	if op1 ~= -1 then
+	  local call_args = dumpcallargs(tr, op1)
+	  op1_tab = {type = "carg", value = call_args}
+	  local parts = {}
+	  for ai = 1, #call_args do parts[ai] = call_args[ai].txt end
+	  op1_txt = table.concat(parts, " ")
+	end
 	write_out(")")
 	if ctype then write_out(" ctype ", ctype) end
       elseif op == "CNEW  " and op2 == -1 then

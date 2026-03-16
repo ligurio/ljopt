@@ -37,6 +37,11 @@ local LJOPT_SMTLIB = ([[
 (declare-fun math_exp ((_ BitVec 64)) (_ BitVec 64))
 (declare-fun math_log ((_ BitVec 64)) (_ BitVec 64))
 (declare-fun math_log10 ((_ BitVec 64)) (_ BitVec 64))
+(define-fun-rec str_reverse ((s String)) String
+  (ite (= (str.len s) 0)
+       ""
+       (str.++ (str_reverse (str.substr s 1 (- (str.len s) 1)))
+               (str.substr s 0 1))))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 

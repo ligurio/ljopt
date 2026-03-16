@@ -840,6 +840,19 @@ foo(1)
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "tanh")},
         },
+    }, {
+        code = [[
+x = {}
+for i = 0, 100 do
+    local x = string.reverse("ASD")
+    res = #x
+end
+]],
+        ins = {
+            {type = "p32", name = "CALLL"},
+            {type = "str", name = "BUFSTR"},
+            {type = "int", name = "FLOAD"},
+        },
     }}
     test:plan(3 * #srcs)
 
