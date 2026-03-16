@@ -28,6 +28,9 @@ function impls.IRNodeCALLNNum:to_smt_lib(ctx)
     local smt_fn = 'math_' .. fn_name
 
     local arg_op = self:get_left_op()
+    if arg_op:is_carg() then
+        arg_op = arg_op:get_carg()[1]
+    end
     local ssa_ref = self:get_ssa_reference()
 
     local arg_fp = ir_node.retrieve_num_op(arg_op, ctx, 'num')

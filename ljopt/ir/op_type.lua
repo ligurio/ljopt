@@ -11,6 +11,7 @@ TYPE constants
 --------------
   ANY  - arbitrary type, used internally.
   BOOL - boolean constant.
+  CARG - argument list to C function.
   FUN  - string description (fmtfunc output).
   I64  - int64 constant.
   IMM  - IRMlit, integer embedded to IR (#123).
@@ -28,6 +29,7 @@ local OpType = {}
 
 OpType.ANY    = 'any'
 OpType.BOOL   = 'bool'
+OpType.CARG   = 'carg'
 OpType.FUN    = 'function'
 OpType.I64    = 'i64'
 OpType.IMM    = 'imm'
@@ -44,6 +46,7 @@ local op_mt = {}
 op_mt.__index = op_mt
 
 function op_mt:is_bool()   return self.type == OpType.BOOL end
+function op_mt:is_carg()   return self.type == OpType.CARG end
 function op_mt:is_fun()    return self.type == OpType.FUN  end
 function op_mt:is_i64()    return self.type == OpType.I64  end
 function op_mt:is_imm()    return self.type == OpType.IMM  end
@@ -55,6 +58,7 @@ function op_mt:is_str()    return self.type == OpType.STR  end
 function op_mt:is_tab()    return self.type == OpType.TAB  end
 
 function op_mt:get_bool()  assert(self:is_bool()); return self._value end
+function op_mt:get_carg()  assert(self:is_carg()); return self._value end
 function op_mt:get_fun()   assert(self:is_fun());  return self._value end
 function op_mt:get_i64()   assert(self:is_i64());  return self._value end
 function op_mt:get_imm()   assert(self:is_imm());  return self._value end
@@ -73,6 +77,7 @@ function OpType.new(type, value)
     -- Map from `ir_dump` type strings to OpType.
     local supported_types = {
         bool         = OpType.BOOL,
+        carg         = OpType.CARG,
         ["function"] = OpType.FUN,
         imm          = OpType.IMM,
         int          = OpType.INT,
@@ -84,6 +89,13 @@ function OpType.new(type, value)
         table        = OpType.TAB,
     }
     assert(supported_types[type], 'Somehow this type is not exists: ' .. type)
+    if type == 'carg' then
+        local args = {}
+        for i = 1, #value do
+            args[i] = OpType.from_raw(value[i].tab, value[i].txt)
+        end
+        value = args
+    end
     return setmetatable({ type = supported_types[type], _value = value }, op_mt)
 end
 

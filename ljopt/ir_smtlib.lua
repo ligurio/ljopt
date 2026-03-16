@@ -77,14 +77,14 @@ local function construct_nodes(trace)
                 right_op
             ))
         else
-            table.insert(nodes_table, ir_node_dummy.instance(
+            table.insert(nodes_table, ir_node_dummy.instance(node.irop):new(
                 string.format('%04d', node.num),
                 {
                     irt_guard=false,
                     raw=' '
                 },
                 node.irtype,
-                node.irop,
+                node.irop .. 'dummy',
                 left_op,
                 right_op
             ))

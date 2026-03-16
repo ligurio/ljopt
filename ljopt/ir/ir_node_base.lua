@@ -83,6 +83,8 @@ local function retrieve_num_op(op, ctx, type)
         return ctx.op_stack:load(op:get_ssa(), type)
     elseif op:is_num() then
         return string.format('((_ to_fp 11 53) %s)', op_type.to_string(op))
+    elseif op:is_carg() then
+        return retrieve_num_op(op:get_carg()[1])
     elseif op:is_bool() then
         utils.unreachable('Bool cannot be argument of num')
     end

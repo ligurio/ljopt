@@ -136,10 +136,11 @@ local opcodes_table = {
     ['STRTO'] = require('ljopt.ir.STRTO'),
     -- Calls.
     ['CALLN'] = require('ljopt.ir.CALLN'),
-    ['CALLL'] = false,
+    ['CALLL'] = require('ljopt.ir.CALLL'),
     ['CALLS'] = false,
     ['CALLXS'] = false,
-    ['CARG'] = false,
+    -- CARG is indeed dummy node. Pass arguments in CALLL.
+    ['CARG'] = require('ljopt.ir.ir_node_dummy'),
     -- Miscellaneous Ops.
     ['SNAP'] = false,
     ['NOP'] = ir_node_NOP,
@@ -232,6 +233,9 @@ end
 local function raw_ssa_ref(raw_op)
     if raw_op ~= nil and raw_op.type == op_type.SSA then
         return raw_op.value
+    end
+    if raw_op ~= nil and raw_op.type == op_type.CARG then
+        return raw_ssa_ref(raw_op.value[1].tab)
     end
     return nil
 end
