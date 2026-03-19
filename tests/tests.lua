@@ -7,6 +7,7 @@ local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
+local ir_smtlib = require("ljopt.ir_smtlib")
 local test = require("tests.tap").test("ljopt")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
@@ -24,6 +25,39 @@ local function record_code(lua_code, opt)
     local traces_map = ir_dump_utils.ljopt_get_traceid_map()
     assert(type(exec_records) == 'table')
     return exec_records, traces_map
+end
+
+-- Check that expected instructions are present and implemented
+-- (not filtered as NYI) in the recorded traces.
+-- @expected_ins - array of {name, type} in expected order
+-- @lua_code - chunk to test
+-- Returns (true, nil) if all instructions found in order
+-- and (false, <err>) otherwise.
+local function check_ins_present(lua_chunk, expected_ins)
+    local exec_records = record_code(lua_chunk)
+    for _, trace in pairs(exec_records) do
+        local nodes = ir_smtlib.construct_nodes(trace)
+        local ni = 1
+        for _, instr in ipairs(expected_ins) do
+            local found = false
+            while ni <= #nodes do
+                local node = nodes[ni]
+                ni = ni + 1
+                if node:get_opcode() == instr.name
+                    and node:get_type() == instr.type
+                then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                return false, ("Instruction %s(%s) not found"):format(
+                    instr.name, instr.type or "*"
+                )
+            end
+        end
+    end
+    return true
 end
 
 test:plan(12)
@@ -165,7 +199,8 @@ end)
 
 -- Main tests for traces equivalence.
 test:test("ir_smtlib", function(test)
-    local srcs = { [[
+    local srcs = { {
+        code = [[
 local function f(y)
   return y - y, y + y, y * y, y / y
 end
@@ -177,7 +212,16 @@ f(1)
 f(1)
 f(1)
 f(1)
-]], [[
+]],
+        ins = {
+            {type = "num", name = "SLOAD"},
+            {type = "num", name = "SUB"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "MUL"},
+            {type = "num", name = "DIV"},
+        },
+    }, {
+        code = [[
 local function f(y)
   -- The numbers are arbitrary.
   local x = 11
@@ -193,7 +237,14 @@ f(1)
 f(1)
 f(1)
 ]],
-[[
+        ins = {
+            {type = "int", name = "ADDOV"},
+            {type = "num", name = "MUL"},
+            {type = "num", name = "DIV"},
+            {type = "int", name = "SUBOV"},
+        },
+    }, {
+        code = [[
 local function f(x)
   return x + 0.23, x > 0.23, x < 0.23, x >= 0.23, x <= 0.23, x - 0.23, x / 0.23, x * 0.23
 end
@@ -209,11 +260,27 @@ f(1.3)
 f(1.3)
 f(2.3)
 f(2.3)
-]]}
-    test:plan(2 * #srcs)
+]],
+        ins = {
+            {type = "num", name = "SLOAD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "LT"},
+            {type = "num", name = "UGE"},
+            {type = "num", name = "LE"},
+            {type = "num", name = "UGT"},
+            {type = "num", name = "SUB"},
+            {type = "num", name = "DIV"},
+            {type = "num", name = "MUL"},
+        },
+    }}
+    test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
-        local formulas = ljopt.ir.traces_to_smt(f)
+        local ok, err = check_ins_present(f.code, f.ins)
+        test:ok(ok, ("test_%d instructions present: %s"):format(
+            i, err or "ok"
+        ))
+        local formulas = ljopt.ir.traces_to_smt(f.code)
         for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
@@ -296,7 +363,8 @@ test:test("Tests for traces equivalence in relaxed mode", function(test)
     local strict_mode = ljopt_config.is_strict_mode()
     ljopt_config.set_strict_mode(false)
 
-    local srcs = { [[
+    local srcs = { {
+        code = [[
 local function foo(c)
   c = c + 1.1;
   -- UGE num test
@@ -309,11 +377,21 @@ foo(1.1)
 foo(1.1)
 foo(1.1)
 foo(1.1)
-]]}
-    test:plan(2 * #srcs)
+]],
+        ins = {
+            {type = "num", name = "SLOAD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "UGE"},
+        },
+    }}
+    test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
-        local formulas = ljopt.ir.traces_to_smt(f)
+        local ok, err = check_ins_present(f.code, f.ins)
+        test:ok(ok, ("test_%d instructions present: %s"):format(
+            i, err or "ok"
+        ))
+        local formulas = ljopt.ir.traces_to_smt(f.code)
         for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
