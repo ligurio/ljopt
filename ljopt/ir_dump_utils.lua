@@ -128,8 +128,8 @@ local function get_trace_id(tr)
   return traces_num[tr]
 end
 
-local function ljopt_init_new_trace(tr)
-  dev_checks("number")
+local function ljopt_init_new_trace(tr, linktype)
+  dev_checks("number", "?string")
   local tr_id = get_trace_id(tr)
   if tr_id == nil then
     return
@@ -151,6 +151,7 @@ local function ljopt_init_new_trace(tr)
   exec_record[tr_id] = {}
   exec_record[tr_id].trace = {}
   exec_record[tr_id].snapshots = {}
+  exec_record[tr_id].linktype = linktype
 end
 
 -- This function was copied from ir_dump
@@ -380,6 +381,9 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
   else
     table.insert(exec_record[tr_id].snapshots[snap_id].nins, nins)
   end
+  -- Save latest snapshot. It will be used in loops. Multiple
+  -- snapshots at the same exit may still cause problems.
+  exec_record[tr_id].snapshots[snap_id].last_slots = snapshot
 end
 
 local function trim(s)

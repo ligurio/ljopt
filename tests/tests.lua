@@ -8,6 +8,7 @@ local smt = require("tests.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local ir_smtlib = require("ljopt.ir_smtlib")
+local loop_unrolling = require("ljopt.loop_unrolling")
 local op_type = require("ljopt.ir.op_type")
 local test = require("tests.tap").test("ljopt")
 
@@ -33,6 +34,9 @@ end
 local function check_ins_present(lua_chunk, expected_ins, opt)
     local exec_records = record_code(lua_chunk, opt)
     for _, trace in pairs(exec_records) do
+        trace.trace, trace.snapshots = loop_unrolling.loop_unrooling_transform(
+            trace.trace, trace.snapshots, trace.linktype
+        )
         local nodes = ir_smtlib.construct_nodes(trace)
         local ni = 1
         for _, instr in ipairs(expected_ins) do
@@ -329,6 +333,37 @@ h(3.5)
 ]],
         ins = {
             {type = "fun", name = "EQ"},
+        },
+    }, {
+        code = [[
+local x = 12
+for i = 1, 100 do
+    x = x + 5
+end
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD",
+                -- Check that ADD argument is
+                -- previous loop iteration output.
+                left_op = op_type.new("ssa", 4)},
+        },
+    }, {
+        code = [[
+local x = 12
+for i = 1, 100 do
+    x = x + 5
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')",
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD",
+                -- Make sure phi is correct when optimizations
+                -- enabled.
+                left_op = op_type.new("ssa", 3)},
         },
 --[[
     }, {
