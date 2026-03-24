@@ -178,7 +178,7 @@ test:test("Fix FOLD rule for BUFHDR append (LuaJIT#791)", function(test)
     local chunk = read_reproducer_file("lj_791.lua")
     test:ok(reproduce_bug_in_runtime(chunk, "assertion is violated"),
         "reproduce in runtime")
-    test:skip("reproduce with SMT")
+    test:ok(reproduce_bug_using_smt(chunk), "reproduce with SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/792

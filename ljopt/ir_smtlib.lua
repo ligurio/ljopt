@@ -9,6 +9,7 @@ local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local op_type = require('ljopt.ir.op_type')
 local runtime = require('ljopt.runtime')
 local ljopt_config = require('ljopt.config')
+local loop_unrolling = require('ljopt.loop_unrolling')
 local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
 local smt_constants = require('ljopt.smt_constants')
@@ -91,41 +92,6 @@ local function construct_nodes(trace)
     return nodes_table, filtered_nodes
 end
 
--- Nodes transformers.
-local function identity_transform(nodes)
-    dev_checks('table')
-
-    return nodes
-end
-
-local function loop_unrooling_transform(nodes)
-    dev_checks('table')
-
-    return nodes -- TODO: Implement.
-end
-
-local function function_inlining_transform(nodes)
-    dev_checks('table')
-
-    return nodes -- TODO: Implement.
-end
-
-local all_node_transforms = {
-    identity_transform = identity_transform,
-    function_inlining_transform = function_inlining_transform,
-    loop_unrooling_transform = loop_unrooling_transform
-}
-
-local function transform_nodes(nodes)
-    dev_checks('table')
-
-    for i = 1, table.getn(all_node_transforms) do
-        nodes = all_node_transforms[i](nodes)
-    end
-
-    return nodes
-end
-
 local vm_stack_prefix = 'vm_'
 local mem_stack_prefix = 'mem_'
 local op_stack_prefix = 'op_'
@@ -181,13 +147,16 @@ local function translate(trace_record, ctx_src,
         ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix .. tr_id) ..
         '\n'
 
-    -- 1st stage. Constructing list of `ir_nodes`
+    -- 1st stage. Loop unrolling on raw nodes (removes LOOP/PHI).
+    trace_record.trace, trace_record.snapshots =
+        loop_unrolling.loop_unrooling_transform(
+            trace_record.trace, trace_record.snapshots,
+            trace_record.linktype
+        )
+
+    -- 2nd stage. Constructing list of `ir_nodes`
     -- from raw string data.
     local nodes, filtered_nodes = construct_nodes(trace_record)
-
-    -- 2nd stage. Transformations (loop unrooling, function
-    -- inlining, ...).
-    nodes = transform_nodes(nodes)
 
     if ljopt_config.is_narrowing() then
         ir_passes.mark_narrowed_refs(nodes, ctx_src)

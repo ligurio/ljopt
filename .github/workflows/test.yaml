@@ -58,6 +58,8 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
+          # Some of our tests require it to be >= 2.
+          LJOPT_LOOP_UNROLL_N: 2
         run: |
           eval $(luarocks path)
           make test
@@ -75,6 +77,8 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
+          # Some of our tests require it to be >= 2.
+          LJOPT_LOOP_UNROLL_N: 4
         run: |
           eval $(luarocks path)
           make coverage
