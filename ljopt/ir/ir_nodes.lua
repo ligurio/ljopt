@@ -243,16 +243,13 @@ end
 -- dependencies.
 local function get_nyi_nodes(nodes)
     local nyi_nodes = {}
-    local in_loop = false
     for i = 1, table.getn(nodes) do
         local lua_node = nodes[i]
-        in_loop = in_loop or lua_node.irop == "LOOP"
         local node = get_node(lua_node.irop, lua_node.irtype)
-        if node == nil or in_loop then
+        if node == nil then
             nyi_nodes[i] = true
-            local loop_debug_str = in_loop and 'in_loop' or 'no_loop'
-            utils.debug_msg(('%d: NYI node %s %s'):format(
-                i, 'IRNode' .. lua_node.irop .. lua_node.irtype, loop_debug_str
+            utils.debug_msg(('%d: NYI node %s'):format(
+                i, 'IRNode' .. lua_node.irop .. lua_node.irtype
             ))
         else
             -- Check whether either SSA operand
