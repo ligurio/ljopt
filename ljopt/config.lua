@@ -6,6 +6,7 @@ local is_debug_enabled = os.getenv("LJOPT_DEBUG") ~= nil
 -- if formula is SAT.
 local is_dump_model_enabled = os.getenv("LJOPT_DUMP_MODEL") ~= nil
 local is_strict_mode_enabled = os.getenv("LJOPT_STRICT") ~= nil
+local loop_unroll_n = tonumber(os.getenv("LJOPT_LOOP_UNROLL_N")) or 0
 
 -- If disabled we can miss some traces,
 -- if such traceback do not have a counterpart trace
@@ -93,10 +94,14 @@ local function get_solver_timeout_ms()
     return tostring(math.floor(get_solver_timeout() * 1000))
 end
 
+local function get_loop_unroll_limit()
+    return loop_unroll_n
+end
+
 return {
     get_smt_solver = get_smt_solver,
     get_solver_timeout_ms = get_solver_timeout_ms,
-
+    get_loop_unroll_limit = get_loop_unroll_limit,
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
     is_narrowing = is_narrowing,
