@@ -518,7 +518,7 @@ local function dumpon(outfile)
   out = outfile or io.stderr
 end
 
-local function record(lua_code, is_debug_mode)
+local function record(lua_code, opt, is_debug_mode)
   -- Lua treats any independent chunk as the body of an anonymous function.
   -- For instance, for the chunk "a = 1", loadstring returns the equivalent
   -- of `function () a = 1 end`, https://www.lua.org/pil/8.html
@@ -529,6 +529,14 @@ local function record(lua_code, is_debug_mode)
 
   debug_mode = is_debug_mode or os.getenv("LJOPT_DEBUG")
   ir_dump_utils.ljopt_init_trace_state()
+
+  -- Set LuaJIT options right before pcall, so no traces
+  -- generated between load() and pcall(), otherwise
+  -- it can affect JIT behaviour, making it non-deterministic.
+  if opt == nil then
+      opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
+  end
+  assert(load(opt))()
 
   -- This solution is not complete, issue for tracking progress
   -- on isolation: https://github.com/ligurio/ljopt/issues/35
