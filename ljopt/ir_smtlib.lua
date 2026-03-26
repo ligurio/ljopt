@@ -4,8 +4,6 @@
 -- https://github.com/tarantool/tarantool/wiki/LuaJIT-Optimizations#ssa-ir-optimizations
 -- luacheck: pop
 
-local jit = require('jit')
-
 local ir_node = require('ljopt.ir.ir_nodes')
 local ir_node_dummy = require('ljopt.ir.ir_node_dummy')
 local dump_ir = require('ljopt.ir_dump')
@@ -245,11 +243,9 @@ end
 
 -- Helper to record dump with the given optimization.
 local function record_code(lua_code, opt)
-    assert(load(opt))()
-    -- Flush JIT so we'll have consistent
-    -- trace numbers across recordings.
-    jit.flush()
-    local exec_records = dump_ir.record(lua_code, ljopt_config.is_debug_mode())
+    local exec_records = dump_ir.record(
+        lua_code, opt, ljopt_config.is_debug_mode()
+    )
     assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
     return exec_records
 end

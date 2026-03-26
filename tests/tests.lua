@@ -17,11 +17,7 @@ require("tests.coverage").enable()
 -- not call `jit.opt.*`, that's why we should wrap
 -- call to `record` with manual presetting JIT options.
 local function record_code(lua_code, opt)
-    if opt == nil then
-        opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
-    end
-    assert(load(opt))()
-    local exec_records = ljopt.ir.record(lua_code)
+    local exec_records = ljopt.ir.record(lua_code, opt)
     local traces_map = ir_dump_utils.ljopt_get_traceid_map()
     assert(type(exec_records) == 'table')
     return exec_records, traces_map
