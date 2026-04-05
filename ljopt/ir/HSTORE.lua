@@ -1,6 +1,7 @@
 local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -20,6 +21,19 @@ function impls.IRNodeHSTOREStr:to_smt_lib(ctx)
     local value = ir_node.retrieve_str_op(right_op, ctx)
 
     assert(value ~= nil)
+
+    -- Propagate constant string value through table.
+    local key = ctx.href_keys[dst_slot]
+    if key ~= nil then
+        local const_op = utils.resolve_const(right_op, ctx)
+        if const_op ~= nil then
+            if ctx.const_tab[tab_left] == nil then
+                ctx.const_tab[tab_left] = {}
+            end
+            ctx.const_tab[tab_left][key] = const_op
+        end
+    end
+
     return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.STR)
 end
 
@@ -39,6 +53,18 @@ function impls.IRNodeHSTORENum:to_smt_lib(ctx)
     local value = ir_node.retrieve_num_op(right_op, ctx, op_type.NUM)
 
     assert(tab_left ~= nil, dst_slot)
+
+    -- Propagate constant num value through table.
+    local key = ctx.href_keys[dst_slot]
+    if key ~= nil then
+        local const_op = utils.resolve_const(right_op, ctx)
+        if const_op ~= nil then
+            if ctx.const_tab[tab_left] == nil then
+                ctx.const_tab[tab_left] = {}
+            end
+            ctx.const_tab[tab_left][key] = const_op
+        end
+    end
 
     return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.NUM)
 end

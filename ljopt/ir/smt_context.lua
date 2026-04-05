@@ -586,6 +586,10 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
+    self.href_keys = {}
+    -- mem_ref -> { key -> OpKind }
+    self.const_tab = {}
 
     return self
 end
@@ -594,6 +598,8 @@ function SMTContext:restart()
     self.tab_info = {}
     self.const_nums = {}
     self.const_strs = {}
+    self.href_keys = {}
+    self.const_tab = {}
 end
 
 return {
