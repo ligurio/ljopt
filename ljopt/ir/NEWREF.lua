@@ -12,8 +12,12 @@ function impls.IRNodeNEWREFP32:to_smt_lib(ctx)
     local right_op = self:get_right_op()
     local id = ir_node.retrieve_raw_val(right_op, ctx)
     id = arith_utils.normalize_table_key(id)
-    ctx.tab_info[self:get_ssa_reference()] = ctx.tab_info[left_op:get_ssa()]
-    return ctx.op_stack:store(self:get_ssa_reference(), op_type.ANY, id)
+    local ssa_ref = self:get_ssa_reference()
+    ctx.tab_info[ssa_ref] = ctx.tab_info[left_op:get_ssa()]
+    if right_op:is_str() then
+        ctx.href_keys[ssa_ref] = right_op:get_str()
+    end
+    return ctx.op_stack:store(ssa_ref, op_type.ANY, id)
 end
 
 local function instance(node_str)

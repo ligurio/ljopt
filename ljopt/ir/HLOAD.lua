@@ -19,6 +19,13 @@ function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     assert(tab_left ~= nil, dst_slot)
 
     local ssa_ref = self:get_ssa_reference()
+
+    local key = ctx.href_keys[dst_slot]
+    local ct = ctx.const_tab[tab_left]
+    if key ~= nil and ct ~= nil and ct[key] ~= nil then
+        ctx.const_strs[ssa_ref] = ct[key]
+    end
+
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.STR,
@@ -41,6 +48,13 @@ function impls.IRNodeHLOADNum:to_smt_lib(ctx)
     local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
     local ssa_ref = self:get_ssa_reference()
     assert(tab_left ~= nil, dst_slot)
+
+    local key = ctx.href_keys[dst_slot]
+    local ct = ctx.const_tab[tab_left]
+    if key ~= nil and ct ~= nil and ct[key] ~= nil then
+        ctx.const_nums[ssa_ref] = ct[key]
+    end
+
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.NUM, ctx.mem_stack:load_index(

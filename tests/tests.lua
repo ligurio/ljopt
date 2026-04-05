@@ -853,6 +853,77 @@ end
             {type = "str", name = "BUFSTR"},
             {type = "int", name = "FLOAD"},
         },
+    }, {
+        code = [[
+-- Constant folding of table read after write.
+local sin = math.sin
+local res = 0.0
+local x = {}
+for i = 0, 100 do
+    x["z"] = 0.42
+    x[0.42] = "z"
+    res = res + sin(x["z"])
+    res = res + #(x[0.42])
+end
+]],
+        ins = {
+            {type = "p32", name = "HREFK"},
+            {type = "num", name = "HSTORE"},
+            {type = "num", name = "HLOAD"},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "sin")},
+        },
+    }, {
+        code = [[
+-- Constant folding of table read after write through HREF.
+-- HREF (not HREFK) requires the key's hash to fall outside LJ's
+-- node-array fold range. table.new(0, N) with N large pushes
+-- hmask high enough that "mykey" doesn't fit. Brittle if LJ
+-- changes the hash function or fold threshold.
+local sin = math.sin
+local res = 0.0
+local t = require('table.new')(0, 1.4e5)
+for _ = 1, 100 do
+    t["mykey"] = 0.42
+    res = res + sin(t["mykey"])
+end
+]],
+        ins = {
+            {type = "p32", name = "HREF",
+                right_op = op_type.new("string", "mykey")},
+            {type = "num", name = "HSTORE"},
+            {type = "num", name = "HLOAD"},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "sin")},
+        },
+    }, {
+        code = [[
+local sin = math.sin
+local res = 0.0
+for i = 0, 100 do
+    local x = {}
+    x["k"] = 0.42
+    res = res + sin(x["k"])
+end
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+local sin = math.sin
+local res = 0.0
+local s = "hello"
+for i = 1, 100 do
+    res = res + sin(#s)
+end
+]],
+        ins = {
+            {type = "int", name = "FLOAD"},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "sin")},
+        },
     }}
     test:plan(3 * #srcs)
 

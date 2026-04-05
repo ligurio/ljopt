@@ -23,7 +23,10 @@ function impls.IRNodeTNEWTab:to_smt_lib(ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local idx, init = ctx.mem_stack:allocate()
-    ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
+    ctx.tab_info[ssa_ref] = {
+        mem_ref = idx, meta = nil,
+        const_asize = asize, const_hmask = hsize,
+    }
 
     local smt_asize = arith_utils.const_int_to_smt_bv(asize)
     local smt_hmask = arith_utils.const_int_to_smt_bv(hsize)

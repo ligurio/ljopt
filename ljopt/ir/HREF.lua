@@ -1,6 +1,7 @@
 local arith_utils = require('ljopt.ir.arith_utils')
 local op_type = require('ljopt.ir.op_type')
 local ir_node = require('ljopt.ir.ir_node_base')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -21,6 +22,7 @@ function impls.IRNodeHREFP32:to_smt_lib(ctx)
     end
     local ssa_ref = self:get_ssa_reference()
     ctx.tab_info[ssa_ref] = ctx.tab_info[left_op:get_ssa()]
+    ctx.href_keys[ssa_ref] = utils.resolve_const(right_op, ctx)
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.ANY, id)

@@ -80,10 +80,17 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         local field_hash = arith_utils.const_str_to_memcell(
             smt_constants.FIELD_TAB_PREFIX .. right_op
         )
-        local tab_left = ctx.tab_info[left_op:get_ssa()].mem_ref
+        local tab_info = ctx.tab_info[left_op:get_ssa()]
+        local tab_left = tab_info.mem_ref
         data = ctx.mem_stack:load_index(
             tonumber(tab_left), field_hash, op_type.INT
         )
+        -- Propagate constant table metadata for const-folding.
+        if right_op == 'tab.asize' and tab_info.const_asize ~= nil then
+            ctx.const_nums[self:get_ssa_reference()] = tab_info.const_asize
+        elseif right_op == 'tab.hmask' and tab_info.const_hmask ~= nil then
+            ctx.const_nums[self:get_ssa_reference()] = tab_info.const_hmask
+        end
     else
         utils.unreachable('FLOADInt: unsupported right_op: ' .. right_op)
     end
