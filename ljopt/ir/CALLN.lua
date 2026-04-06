@@ -34,9 +34,7 @@ function impls.IRNodeCALLNNum:to_smt_lib(ctx)
     local ssa_ref = self:get_ssa_reference()
 
     local arg_fp = ir_node.retrieve_num_op(arg_op, ctx, 'num')
-    local arg_bv = ('(fp.to_ieee_bv %s)'):format(arg_fp)
-    local result_bv = ('(%s %s)'):format(smt_fn, arg_bv)
-    local result_fp = ('((_ to_fp 11 53) %s)'):format(result_bv)
+    local result_fp = ('(%s %s)'):format(smt_fn, arg_fp)
 
     local axiom = ''
     -- When argument is constant, define the actual result.
@@ -44,12 +42,10 @@ function impls.IRNodeCALLNNum:to_smt_lib(ctx)
     local lua_fn = supported_math_fns[fn_name]
     if const_val ~= nil and lua_fn then
         local result_val = lua_fn(const_val)
-        local input_bv = arith_utils.const_num_to_smt_bv(const_val)
-        local result_bv_const = arith_utils.const_num_to_smt_bv(
-            result_val
-        )
+        local input_fp = arith_utils.const_num_to_smt_fp(const_val)
+        local result_fp_const = arith_utils.const_num_to_smt_fp(result_val)
         axiom = ('\n(assert (= (%s %s) %s))'):format(
-            smt_fn, input_bv, result_bv_const
+            smt_fn, input_fp, result_fp_const
         )
         ctx.const_nums[ssa_ref] = result_val
     end

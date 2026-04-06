@@ -24,8 +24,12 @@ local function const_num_to_smt_bv(num_value)
     return string.format("#x%s", bit.tohex(u.i, 16))
 end
 
+local function const_num_to_smt_fp(num_value)
+    return string.format("((_ to_fp 11 53) %s)", const_num_to_smt_bv(num_value))
+end
+
 local function const_num_to_memcell(num_value)
-    return ("(int-val %s)"):format(const_num_to_smt_bv(num_value))
+    return ("(fp-val %s)"):format(const_num_to_smt_fp(num_value))
 end
 
 local function memcell_to_str(memcell)
@@ -76,9 +80,9 @@ end
 -- Accepts a MemCell and returns a MemCell: for int-val keys,
 -- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
 local function normalize_table_key(memcell)
-    return ('(ite ((_ is int-val) %s)' ..
-            ' (ite (fp.isZero ((_ to_fp 11 53) (get-bv %s)))' ..
-            ' (int-val #x0000000000000000) %s) %s)'):format(
+    return ('(ite ((_ is fp-val) %s)' ..
+            ' (ite (fp.isZero (get-fp %s))' ..
+            ' (fp-val ((_ to_fp 11 53) #x0000000000000000)) %s) %s)'):format(
                memcell, memcell, memcell, memcell
             )
 end
@@ -86,6 +90,7 @@ end
 return {
     i32_overflow_check = i32_overflow_check,
     const_num_to_smt_bv = const_num_to_smt_bv,
+    const_num_to_smt_fp = const_num_to_smt_fp,
     const_num_to_memcell = const_num_to_memcell,
     const_str_to_memcell = const_str_to_memcell,
     const_str_to_smt_str = const_str_to_smt_str,

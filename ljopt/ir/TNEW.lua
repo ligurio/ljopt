@@ -35,7 +35,9 @@ function impls.IRNodeTNEWTab:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, asize_id, smt_asize, op_type.INT),
         ctx.mem_stack:store_index(idx, hmask_id, smt_hmask, op_type.INT),
-        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_num_to_smt_bv(idx))
+        ctx.op_stack:store(
+            ssa_ref, op_type.INT, arith_utils.const_int_to_smt_bv(idx)
+        )
     )
 end
 

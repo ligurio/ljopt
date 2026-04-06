@@ -11,16 +11,16 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local ssa_ref = self:get_ssa_reference()
 
-    -- Get the input value as a bitvector.
-    local bv = ir_node.retrieve_i64_op(left_op, ctx, 'i64')
+    -- Get the input value as native FP.
+    local fp = ir_node.retrieve_num_op(left_op, ctx, 'num')
 
-    -- Apply uninterpreted function to convert bv to string.
-    local str_expr = ('(tostr_num %s)'):format(bv)
+    -- Apply uninterpreted function to convert FP to string.
+    local str_expr = ('(tostr_num %s)'):format(fp)
 
     -- Roundtrip axiom: strto_num(tostr_num(x)) = x.
     -- It's simpler to use `forall`, but it's hard for Z3.
     local roundtrip = ('(assert (= (strto_num (tostr_num %s)) %s))'):format(
-        bv, bv
+        fp, fp
     )
 
     -- When the argument is a known constant, emit the exact
@@ -30,7 +30,7 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
     if const_val ~= nil then
         local str_val = tostring(const_val)
         const_axiom = ('\n(assert (= (tostr_num %s) "%s"))'):format(
-            bv, str_val
+            fp, str_val
         )
         ctx.const_strs[ssa_ref] = str_val
     end

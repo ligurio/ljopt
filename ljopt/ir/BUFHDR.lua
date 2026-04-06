@@ -28,7 +28,7 @@ function impls.IRNodeBUFHDRP32:to_smt_lib(ctx)
             idx, slot_id, arith_utils.const_str_to_smt_str(''), op_type.STR
         ),
         ctx.op_stack:store(
-            ssa_ref, 'i64', arith_utils.const_num_to_smt_bv(idx)
+            ssa_ref, 'i64', arith_utils.const_int_to_smt_bv(idx)
         ),
         init
     )

@@ -44,7 +44,7 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type, op_type.I64),
         ctx.mem_stack:store_index(idx, cdt_value, smt_value, op_type.I64),
-        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_num_to_smt_bv(idx))
+        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_int_to_smt_bv(idx))
     )
 end
 
