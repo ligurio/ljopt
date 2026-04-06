@@ -53,31 +53,27 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 smt_expr = "; str, use directly"
                 slot_values[slot] = tab
             else
-                -- Snap stack stores only `num`. It will let us
-                -- support narrow in future and this inivariant
-                -- holds for real LuaJIT stack.
-                local data = ctx.op_stack:load(value_data, 'i64')
+                local data
                 if type == "int" then
-                    -- Convert int-encoded bv
-                    -- to IEEE 754 num-encoded bv.
-                    data = ('(fp.to_ieee_bv %s)'):format(
-                        arith_utils.smt_int_to_fp(data)
+                    data = arith_utils.smt_int_to_fp(
+                        ctx.op_stack:load(value_data, op_type.I64)
                     )
+                else
+                    data = ctx.op_stack:load(value_data, op_type.NUM)
                 end
-                smt_expr = ctx.snap_stack:store(slot, 'i64', data)
-                slot_values[slot] = ctx.snap_stack:load(slot, 'i64')
+                smt_expr = ctx.snap_stack:store(slot, op_type.NUM, data)
+                slot_values[slot] = ctx.snap_stack:load(slot, op_type.NUM)
             end
         elseif value_type == "const" then
             if value_data == 'true' then
-                -- 1.0 as float
-                value_data = '#x3FF0000000000000'
+                value_data = '((_ to_fp 11 53) #x3FF0000000000000)'
             elseif value_data == 'false' then
-                -- 0.0 as float
-                value_data = '#x0000000000000000'
+                value_data = '((_ to_fp 11 53) #x0000000000000000)'
+            else
+                value_data = ('((_ to_fp 11 53) %s)'):format(value_data)
             end
-            -- value_data is already a num-encoded BV64.
-            smt_expr = ctx.snap_stack:store(slot, 'i64', value_data)
-            slot_values[slot] = ctx.snap_stack:load(slot, 'i64')
+            smt_expr = ctx.snap_stack:store(slot, 'num', value_data)
+            slot_values[slot] = ctx.snap_stack:load(slot, 'num')
         elseif value_type == "softfp" then
             error("This path was not tested and never occured before.")
             local type = "num"

@@ -30,7 +30,7 @@ local type2bv = {
     ['p64'] = '%s',
     [op_type.STR] = '%s',
     [op_type.ANY] = '%s',
-    ['num'] = '(fp.to_ieee_bv %s)',
+    ['num'] = '%s',
 }
 
 local bv2type = {
@@ -48,7 +48,7 @@ local bv2type = {
     ['p64'] = '%s',
     [op_type.STR] = '%s',
     [op_type.ANY] = '%s',
-    ['num'] = '((_ to_fp 11 53) %s)',
+    ['num'] = '%s',
 }
 
 
@@ -75,6 +75,8 @@ local function create_value(memcell, type)
         return ('(str-val %s)'):format(memcell)
     elseif type == op_type.ANY then
         return memcell
+    elseif type == 'num' then
+        return ('(fp-val %s)'):format(memcell)
     else
         return ('(int-val %s)'):format(memcell)
     end
@@ -85,6 +87,8 @@ local function extract_value(memcell, type)
         return memcell
     elseif type == op_type.STR then
         return ('(get-str %s)'):format(memcell)
+    elseif type == 'num' then
+        return ('(get-fp %s)'):format(memcell)
     else
         return ('(get-bv %s)'):format(memcell)
     end

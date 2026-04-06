@@ -39,8 +39,7 @@ function impls.IRNodeFPMATHNum:to_smt_lib(ctx)
         local data = ('(fp.sqrt RNE %s)'):format(left_op)
         result = ctx.op_stack:store(ssa_ref, type, data)
     elseif uninterpreted_fns[right_op] ~= nil then
-        local arg_bv = ('(fp.to_ieee_bv %s)'):format(left_op)
-        local data = ('((_ to_fp 11 53) (math_%s %s))'):format(right_op, arg_bv)
+        local data = ('(math_%s %s)'):format(right_op, left_op)
         result = ctx.op_stack:store(ssa_ref, type, data)
     else
         utils.unreachable('It should have been marked as NYI: ' .. right_op)
@@ -56,8 +55,8 @@ function impls.IRNodeFPMATHNum:to_smt_lib(ctx)
                 result = result
                     .. ('\n(assert (= (math_%s %s) %s))'):format(
                         right_op,
-                        arith_utils.const_num_to_smt_bv(lc),
-                        arith_utils.const_num_to_smt_bv(const_result)
+                        arith_utils.const_num_to_smt_fp(lc),
+                        arith_utils.const_num_to_smt_fp(const_result)
                     )
             end
         end

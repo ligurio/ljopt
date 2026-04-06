@@ -14,6 +14,7 @@ local LJOPT_SMTLIB = ([[
 
 (declare-datatypes ((MemCell 0))
   (((int-val (get-bv (_ BitVec 64)))
+    (fp-val (get-fp (_ FloatingPoint 11 53)))
     (str-val (get-str String)))))
 (define-sort MemPtr () (Array Int (Array Int (Array MemCell MemCell))))
 
@@ -22,21 +23,21 @@ local LJOPT_SMTLIB = ([[
 (define-const zero_pointer_i_1d (Array Int Int)
   ((as const (Array Int Int)) 0))
 ; Uninterpreted functions for TOSTR/STRTO conversions.
-(declare-fun tostr_num ((_ BitVec 64)) String)
-(declare-fun strto_num (String) (_ BitVec 64))
+(declare-fun tostr_num ((_ FloatingPoint 11 53)) String)
+(declare-fun strto_num (String) (_ FloatingPoint 11 53))
 ; Uninterpreted functions for math library calls.
-(declare-fun math_sin ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_cos ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_tan ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_asin ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_acos ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_atan ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_sinh ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_cosh ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_tanh ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_exp ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_log ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun math_log10 ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun math_sin ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_cos ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_tan ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_asin ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_acos ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_atan ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_sinh ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_cosh ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_tanh ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_exp ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_log ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+(declare-fun math_log10 ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (define-fun-rec str_reverse ((s String)) String
   (ite (= (str.len s) 0)
        ""
