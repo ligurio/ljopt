@@ -47,7 +47,7 @@ function impls.IRNodeSLOADTab:to_smt_lib(ctx)
         -- It means we never exit by it.
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, 'i64',
-            arith_utils.const_num_to_smt_bv(mem_slot)
+            arith_utils.const_int_to_smt_bv(mem_slot)
         ),
         smt_fm
     )
