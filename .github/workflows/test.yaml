@@ -11,7 +11,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name != github.repository
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +27,14 @@ jobs:
       - name: Setup packages
         run: sudo apt install -y luarocks
 
+      - name: Setup Z3 (library)
+        uses: cda-tum/setup-z3@v1
+        with:
+          # Equivalence of some traces could not be proved
+          # on earlier versions.
+          version: 4.16.0
+          add_to_library_path: true
+
       - name: Setup rocks
         run: make deps
 
@@ -37,6 +45,7 @@ jobs:
         env:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
+          LJOPT_TESTS_TIMEOUT: 120
         run: |
           eval $(luarocks path)
           make test
@@ -45,6 +54,7 @@ jobs:
         env:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
+          LJOPT_TESTS_TIMEOUT: 120
         run: |
           eval $(luarocks path)
           make coverage
