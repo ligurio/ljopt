@@ -5,7 +5,7 @@
 
 local bit = require('bit');
 local res = 0
-for i = 1, 10 do
+for i = 1, 100 do
   res = tonumber(bit.rol(bit.band(i, 127LL), 32))
 end
 assert(res ~= 0, "folding bitwise rol")
