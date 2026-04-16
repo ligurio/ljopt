@@ -9,8 +9,9 @@ make build
 ```
 
 ### Requirements
-
-LuaJIT v2.1 with Lua functions `jit.util.snappc()` and `jit.util.tablesize()`.
+- LuaJIT v2.1 with Lua functions `jit.util.snappc()` and `jit.util.tablesize()`.
+- Z3 >= `4.15.3` is recommended, equivalence of some traces could not be
+proved on earlier versions.
 
 ### Usage
 

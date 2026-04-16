@@ -61,6 +61,13 @@ void Z3_solver_dec_ref(Z3_context c, Z3_solver s);
 void Z3_solver_from_string(Z3_context c, Z3_solver s, Z3_string str);
 Z3_lbool Z3_solver_check(Z3_context c, Z3_solver s);
 
+void Z3_get_version(
+    unsigned *major,
+    unsigned *minor,
+    unsigned *build_number,
+    unsigned *revision_number
+);
+
 void Z3_del_config(Z3_config c);
 void Z3_del_context(Z3_context c);
 
@@ -127,11 +134,59 @@ local mt = {
     },
 }
 
+-- Z3 solver timeout in milliseconds. Override via
+-- LJOPT_Z3_TIMEOUT environment variable (value in seconds).
+local DEFAULT_TIMEOUT_SEC = 120
+
+local function timeout_ms()
+    local env = os.getenv("LJOPT_Z3_TIMEOUT")
+    local sec = tonumber(env) or DEFAULT_TIMEOUT_SEC
+    return tostring(math.floor(sec * 1000))
+end
+
+local function get_z3_version()
+    local major = ffi.new("unsigned[1]")
+    local minor = ffi.new("unsigned[1]")
+    local build = ffi.new("unsigned[1]")
+    local revision = ffi.new("unsigned[1]")
+    z3.Z3_get_version(major, minor, build, revision)
+    major = tonumber(major[0])
+    minor = tonumber(minor[0])
+    build = tonumber(build[0])
+    revision = tonumber(revision[0])
+    local version_string = string.format("%d.%d.%d.%d",
+        major, minor, build, revision)
+    return {
+        major = major,
+        minor = minor,
+        build = build,
+        revision = revision,
+        version_string = version_string
+    }
+end
+
+local function version_lt(version1, version2)
+    if version1.major ~= version2.major then
+        return version1.major < version2.major
+    else
+        return version1.minor < version2.minor
+    end
+end
+
 local function new()
+    local z3_version = get_z3_version()
+    print("Z3 version: ", z3_version.version_string)
+    local Z3_MIN_MAJOR = 4
+    local Z3_MIN_MINOR = 15
+    if version_lt(get_z3_version(), {
+        major = Z3_MIN_MAJOR, minor = Z3_MIN_MINOR }) then
+        error(("The version of Z3 library is less than supported (%d, %d): %s"):
+            format(z3_version.version_string), Z3_MIN_MAJOR, Z3_MIN_MINOR)
+    end
     local self = {}
     local cfg = z3.Z3_mk_config()
     z3.Z3_set_param_value(cfg, ffi.cast("Z3_string", "timeout"),
-                          ffi.cast("Z3_string", "5000"))
+                          ffi.cast("Z3_string", timeout_ms()))
     self.ctx = z3.Z3_mk_context(cfg)
     z3.Z3_del_config(cfg)
 
