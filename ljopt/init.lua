@@ -6,14 +6,6 @@ if (not is_jit) then
     error("requires LuaJIT")
 end
 
-local jutil = require("jit.util")
-if not jutil.snappc or type(jutil.snappc) ~= "function" then
-    error("requires jit.util.snappc() support in LuaJIT")
-end
-if not jutil.tablesize or type(jutil.tablesize) ~= "function" then
-    error("requires jit.util.tablesize() support in LuaJIT")
-end
-
 local VERSION = "0.0.1"
 
 return {
