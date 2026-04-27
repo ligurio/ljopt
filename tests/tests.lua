@@ -1342,7 +1342,19 @@ foo()
             {type = "tab", name = "HSTORE"},
         },
     }, {
-        code=[[
+        code = [[
+local res = 0.0
+-- Force HREF with i64.
+local t = require('table.new')(0, 7e4)
+for _ = 1, 100 do
+    res = res + (t[0LL] or 0)
+end
+]],
+        ins = {
+            {type = "p32", name = "HREF"},
+        },
+    }, {
+        code = [[
 local t = {1.0}
 for i = 1, 1000 do
     if i > 1 then
