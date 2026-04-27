@@ -9,6 +9,8 @@
 -----------------------------------------------------
 
 local jutil = require("jit.util")
+local tablesize = require("ljopt.jit_util").tablesize
+local tracesnap = jutil.tracesnap
 local vmdef = require("jit.vmdef")
 local jit = require("jit")
 local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
@@ -167,14 +169,6 @@ local function ljopt_record_trace(traceno, func, pc, depth, _callee)
   end
 end
 
--- @tr - trace
--- @snapno - snapshot number within the trace
--- Returns uid for the snapshot based on BC PC
--- Note: returned ID is persistent across executions
-local function get_snap_uid(tr, snapno)
-  return jutil.snappc(tr, snapno)
-end
-
 -- Trace id is:
 -- 1. Current trace bytecode hash.
 -- 2. Parent trace bytecode hash.
@@ -195,7 +189,7 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
         local parent_trace_id = get_trace_id(otr)
         traces_num[tr] = traces_num[tr] .. parent_trace_id
         if oex >= 0 then
-          local snap_id = get_snap_uid(otr, oex)
+          local _, snap_id = tracesnap(otr, oex, true)
           if #(exec_record[parent_trace_id].snapshots[snap_id].nins) == 1 then
             traces_num[tr] = traces_num[tr] .. "_" .. snap_id
           else
@@ -237,12 +231,6 @@ local function ctlsub(c)
   end
 end
 
-local function get_hmask(t)
-  -- Count hash entries
-  local hmask, asize = jutil.tablesize(t)
-  return hmask, asize
-end
-
 -- Everything same as formatk except float conversion.
 local function ljopt_formatsmt(tr, idx, sn)
   local k, t, slot = tracek(tr, idx)
@@ -273,7 +261,7 @@ local function ljopt_formatsmt(tr, idx, sn)
     -- TODO: const value should be printed and parsed
     -- later as well. For now only asize and hmask are supported.
     const_type = "table"
-    local hmask, asize = get_hmask(k)
+    local hmask, asize = tablesize(k)
     s = format("{%p:%d:%d}", k, asize, hmask)
   elseif tn == "userdata" then
     if t == 12 then
@@ -350,7 +338,7 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
       end
     end
   end
-  local snap_id = get_snap_uid(tr, snapno)
+  local _, snap_id = jutil.tracesnap(tr, snapno, true)
   assert(snap_id >= 0, "Snapshot ID must be positive")
   if ljopt_config.is_debug_mode() then
     io.stderr:write("Snap offset: " .. snap_id .. "\n")
