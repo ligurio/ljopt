@@ -202,6 +202,8 @@ local function retrieve_raw_val(op, ctx)
         return arith_utils.const_num_to_memcell(op:get_num())
     elseif op:is_bool() then
         return arith_utils.const_num_to_memcell(op:get_bool())
+    elseif op:is_i64() then
+        return arith_utils.const_i64_to_memcell(op:get_i64())
     else
         utils.unreachable(op.type)
     end
