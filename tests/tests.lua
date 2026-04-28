@@ -836,6 +836,44 @@ s = s + f(arr, 3)
             {type = "int", name = "XLOAD"},
         },
     }, {
+        code = [==[
+local ffi = require('ffi')
+ffi.cdef[[ int abs(int); ]]
+local C = ffi.C
+local function f(i) C.abs(-i) end
+f(1)
+f(2)
+f(3)
+]==],
+        ins = {
+            {type = "int", name = "CALLXS"},
+        },
+    }, {
+        -- CALLXS i64: external C call returning int64_t
+        -- exercises the IRNodeCALLXSI64 variant (UF over the
+        -- i64 argument bitvector). The result is stored into
+        -- an int64_t cell so it reaches the memory part of the
+        -- equivalence check: a wrong result-side translation
+        -- would break UF congruence and show up as sat.
+        code = [==[
+local ffi = require('ffi')
+ffi.cdef[[ int64_t llabs(int64_t); ]]
+local C = ffi.C
+local o = ffi.new("int64_t[1]", 0)
+-- The destination cell is passed as an argument: as an upvalue
+-- its address would be baked into the trace as a constant cdata
+-- pointer, which the i64 binop translation does not accept.
+local function f(i, out) out[0] = C.llabs(-i * 1LL) end
+f(1, o)
+f(2, o)
+f(3, o)
+]==],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "i64", name = "CALLXS"},
+            {type = "i64", name = "XSTORE"},
+        },
+    }, {
         code = [[
 -- XLOAD i64 + XSTORE i64: read an int64_t* cell, store the
 -- result into another. Discarded into a cdata cell (not a Lua
