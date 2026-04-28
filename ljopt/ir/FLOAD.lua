@@ -120,7 +120,7 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
         if left_op:is_i64() then
             data = arith_utils.const_i64_to_smt_bv(left_op:get_i64())
         elseif left_op:is_ssa() then
-            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'tab')
+            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'cdt')
             local idx_left = arith_utils.const_str_to_memcell(
                 smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
             )
@@ -151,7 +151,7 @@ function impls.IRNodeFLOADU32:to_smt_lib(ctx)
     local data = ''
     if right_op_str == 'cdata.int' then
         if left_op:is_ssa() then
-            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'tab')
+            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'cdt')
             local idx_left = arith_utils.const_str_to_memcell(
                 smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
             )

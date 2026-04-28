@@ -86,7 +86,9 @@ function impls.IRNodeSLOADCdt:to_smt_lib(ctx)
         -- I suppose guard for SLOAD is always true for us.
         -- It means we never exit by it.
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(mem_slot)),
+        ctx.op_stack:store(ssa_ref, 'cdt',
+            arith_utils.const_int_to_smt_bv(tonumber(mem_slot))
+        ),
         smt_fm
     )
 end

@@ -105,6 +105,45 @@ local function smt_fp_to_int(fp_value, rounding)
     )
 end
 
+-- Raw FFI memory is modelled byte-granular as a flat array
+-- `xmem : (Array (_ BitVec 64) (_ BitVec 8))`, so overlapping,
+-- sub-word and type-punned accesses alias correctly (SMT array
+-- theory reasons about pointer equality per byte). x86-64 is
+-- little-endian: byte i of a value lives at address ptr + i.
+
+-- Address `ptr` (a BitVec 64) offset by `i` bytes.
+local function xmem_addr(ptr, i)
+    if i == 0 then
+        return ptr
+    end
+    return ('(bvadd %s #x%016x)'):format(ptr, i)
+end
+
+-- Nested `store` writing the low `nbytes` bytes of `bv`
+-- (width >= 8*nbytes) into `base` from `ptr`, little-endian.
+local function xmem_store(base, ptr, bv, nbytes)
+    local expr = base
+    for i = 0, nbytes - 1 do
+        local byte = ('((_ extract %d %d) %s)'):format(8 * i + 7, 8 * i, bv)
+        expr = ('(store %s %s %s)'):format(expr, xmem_addr(ptr, i), byte)
+    end
+    return expr
+end
+
+-- Read `nbytes` little-endian bytes from `mem` at `ptr` and
+-- concatenate them into a BitVec of width 8*nbytes (the byte at
+-- the highest address is the most significant).
+local function xmem_load(mem, ptr, nbytes)
+    local function sel(i)
+        return ('(select %s %s)'):format(mem, xmem_addr(ptr, i))
+    end
+    local expr = sel(nbytes - 1)
+    for i = nbytes - 2, 0, -1 do
+        expr = ('(concat %s %s)'):format(expr, sel(i))
+    end
+    return expr
+end
+
 -- LuaJIT treats -0.0 and +0.0 as the same table key.
 -- Accepts a MemCell and returns a MemCell: for int-val keys,
 -- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
@@ -128,6 +167,8 @@ return {
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
     normalize_table_key = normalize_table_key,
+    xmem_store = xmem_store,
+    xmem_load = xmem_load,
     smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
     smt_i64_to_fp = smt_i64_to_fp,

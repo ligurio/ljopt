@@ -17,6 +17,7 @@ end
 
 local type2bv = {
     ['tab'] = '%s',
+    ['cdt'] = '%s',
     ['flt'] = '(fp.to_ieee_bv %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
@@ -36,6 +37,15 @@ local type2bv = {
 
 local bv2type = {
     ['tab'] = '%s',
+    -- A cdata ref is the mem_stack slot as a signed 64-bit BV
+    -- in an `int-val` cell: stored as-is, read back as the Int
+    -- slot. Anonymous allocations get negative slots (see
+    -- alloc_slot) and `bv2nat` is unsigned, so subtract 2^64
+    -- when the sign bit is set to undo the two's complement
+    -- (branch-free signed decode).
+    ['cdt'] = '(let ((cdt_bv %s)) ' ..
+        '(- (bv2nat cdt_bv) (* 18446744073709551616 ' ..
+        '(bv2nat ((_ extract 63 63) cdt_bv)))))',
     ['flt'] = '((_ to_fp 9 24) %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
