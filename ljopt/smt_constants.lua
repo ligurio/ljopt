@@ -63,6 +63,16 @@ local LJOPT_SMTLIB = ([[
 
 (declare-fun math_atan2 ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 
+; Uninterpreted functions for FFI external C calls (CALLXS).
+; Indexed by arity. Both unopt and opt traces apply the same
+; function to congruent arguments, so equivalent FFI calls
+; match by congruence even though we have no semantic model
+; of the underlying C routine.
+(declare-fun callxs_1 ((_ BitVec 64)) (_ BitVec 64))
+(declare-fun callxs_2 ((_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun callxs_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun callxs_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
+
 (define-fun-rec str_reverse ((s String)) String
   (ite (= (str.len s) 0)
        ""

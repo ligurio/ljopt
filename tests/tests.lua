@@ -835,6 +835,34 @@ s = s + f(arr, 9); s = s + f(arr, 10); s = s + f(arr, 11); s = s + f(arr, 12)
             {type = "int", name = "XLOAD"},
         },
     }, {
+        code = [==[
+local ffi = require('ffi')
+ffi.cdef[[ int abs(int); ]]
+local C = ffi.C
+for i = 1, 200 do C.abs(-i) end
+]==],
+        ins = {
+            {type = "int", name = "CALLXS"},
+        },
+    }, {
+        -- CALLXS i64: external C call returning int64_t
+        -- exercises the IRNodeCALLXSI64 variant (UF over the
+        -- i64 argument bitvector). The result is stored into
+        -- an int64_t cell so it reaches the memory part of the
+        -- equivalence check: a wrong result-side translation
+        -- would break UF congruence and show up as sat.
+        code = [==[
+local ffi = require('ffi')
+ffi.cdef[[ int64_t llabs(int64_t); ]]
+local C = ffi.C
+local o = ffi.new("int64_t[1]", 0)
+for i = 1, 200 do o[0] = C.llabs(-i * 1LL) end
+]==],
+        ins = {
+            {type = "i64", name = "CALLXS"},
+            {type = "i64", name = "XSTORE"},
+        },
+    }, {
         code = [[
 -- XLOAD i64 + XSTORE i64: read an int64_t* cell, store the
 -- result into another. Discarded into a cdata cell (not a Lua
