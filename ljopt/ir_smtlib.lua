@@ -159,6 +159,12 @@ local function translate(trace_record, ctx_src,
                 mem_stack_prefix .. smt_suffix .. tr_id, shared_stacks.mem_stack
             ) ..
             '\n'
+        ctx_src.shared_xmem = shared_stacks.xmem
+        -- xmem_cur points to the latest version of raw memory.
+        -- Starts at shared_xmem (v0); XSTORE bumps it.
+        ctx_src.xmem_cur = shared_stacks.xmem
+        ctx_src.xmem_versions = 0
+        ctx_src.xmem_suffix = smt_suffix .. tr_id
     end
     smtlib_buf = smtlib_buf ..
         ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) ..
@@ -323,10 +329,20 @@ local function traces_to_smt(lua_code)
             goto continue
         end
         local shared_mem_stack = smt_context.MemoryStack:new()
-        local shared_stacks = {mem_stack = shared_mem_stack}
+        local shared_xmem_name = 'shared_xmem' .. traceno
+        local shared_stacks = {
+            mem_stack = shared_mem_stack,
+            xmem = shared_xmem_name,
+        }
         local cur_trace = shared_mem_stack:init_smt(
             'shared_mem_stack' .. traceno
         )
+        -- Raw FFI memory is byte-addressed (see ir/XLOAD.lua,
+        -- ir/XSTORE.lua) so overlapping / sub-word / type-punned
+        -- accesses alias correctly.
+        cur_trace = cur_trace .. '\n' .. (
+            '(declare-fun %s () (Array (_ BitVec 64) (_ BitVec 8)))'
+        ):format(shared_xmem_name)
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         cur_trace = cur_trace ..
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'

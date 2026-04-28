@@ -804,6 +804,154 @@ foo(5LL)
         },
     }, {
         code = [[
+-- XLOAD via FFI int* dereference. Caller hot-calls f, which
+-- reads p[0] from raw cdata memory.
+local ffi = require('ffi')
+local arr = ffi.new("int[1]", 42)
+local function f(p) return p[0] + 1 end
+local s = 0
+s = s + f(arr)
+s = s + f(arr)
+s = s + f(arr)
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+            {type = "int", name = "XLOAD"},
+        },
+    }, {
+        code = [[
+-- XSTORE then XLOAD on same cell: write v to p[0], read back.
+-- Forwarding through the xmem array gives v.
+local ffi = require('ffi')
+local arr = ffi.new("int[1]", 0)
+local function f(p, v) p[0] = v; return p[0] end
+local s = 0
+s = s + f(arr, 1)
+s = s + f(arr, 2)
+s = s + f(arr, 3)
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+            {type = "int", name = "XSTORE"},
+            {type = "int", name = "XLOAD"},
+        },
+    }, {
+        code = [[
+-- XLOAD i64 + XSTORE i64: read an int64_t* cell, store the
+-- result into another. Discarded into a cdata cell (not a Lua
+-- number) so there is no FP roundtrip.
+local ffi = require('ffi')
+local src = ffi.new("int64_t[1]", 9000000000LL)
+local dst = ffi.new("int64_t[1]", 0)
+local function f(p, o) o[0] = p[0] + 1 end
+f(src, dst)
+f(src, dst)
+f(src, dst)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "i64", name = "XLOAD"},
+            {type = "i64", name = "XSTORE"},
+        },
+    }, {
+        code = [[
+-- XLOAD num + XSTORE num: read a double* cell, store the result
+-- into another (mirrors the i64 pair above). Reading a different
+-- cell than the store keeps the XLOAD real at opt 3 — a same-cell
+-- read-back would be forwarded away.
+local ffi = require('ffi')
+local src = ffi.new("double[1]", 3.5)
+local dst = ffi.new("double[1]", 0)
+local function f(p, o) o[0] = p[0] + 1 end
+f(src, dst)
+f(src, dst)
+f(src, dst)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "num", name = "XLOAD"},
+            {type = "num", name = "XSTORE"},
+        },
+    }, {
+        code = [==[
+-- ADD p64 + MUL i64: indexing p[i] on a non-power-of-2 struct
+-- stride (i*12) needs an explicit index multiply, not a shift.
+local ffi = require('ffi')
+ffi.cdef[[ typedef struct { int a, b, c; } tri; ]]
+local arr = ffi.new("tri[4]")
+local function f(p, i) arr[i].a = i; return p[i].a end
+local s = 0
+s = s + f(arr, 0)
+s = s + f(arr, 1)
+s = s + f(arr, 2)
+]==],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "i64", name = "MUL"},
+            {type = "p64", name = "ADD"},
+        },
+    }, {
+        code = [[
+-- u32 XLOAD / XSTORE and num<->u32 CONV: read two uint32_t array
+-- cells, multiply (as num via __index), cast back to u32, store.
+-- The factors are picked so that their product exceeds 2^32: the
+-- cast back to u32 has to wrap, which is exactly what the u32
+-- model must reproduce.
+local ffi = require("ffi")
+local a = ffi.new("uint32_t[3]", 1000003, 99991, 0)
+local function f(p) p[2] = ffi.cast("uint32_t", p[0] * p[1]) end
+f(a)
+f(a)
+f(a)
+]],
+        ins = {
+            {type = "u32", name = "XLOAD"},
+            {type = "num", name = "CONV"},
+            {type = "u32", name = "CONV"},
+            {type = "u32", name = "XSTORE"},
+        },
+    }, {
+        name="u32 MUL",
+        code = [[
+-- u32 MUL: the narrowing fold turns CONV(u32, i64-MUL) into a
+-- wrapped u32 `bvmul`. The result is stored into a uint32_t array
+-- (rather than kept as a boxed cdata) so the snapshot avoids an
+-- FP<->BV roundtrip and the nonlinear-bitvector query stays
+-- tractable for z3. The factors multiply out past 2^32, so the
+-- cast back to u32 wraps.
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 1000003)
+local b = ffi.new("uint32_t", 99991)
+local o = ffi.new("uint32_t[1]", 0)
+local function f(x, y, out) out[0] = ffi.cast("uint32_t", x * y) end
+f(a, b, o)
+f(a, b, o)
+f(a, b, o)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.int")},
+            {type = "u32", name = "MUL"},
+        },
+    }, {
+        code = [[
+-- u32 NE: equality test on uint32_t cdata lowers to a u32 guard.
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local o = ffi.new("uint32_t[1]", 0)
+local function f(x, y, out) if x == y then out[0] = x else out[0] = y end end
+f(a, b, o)
+f(a, b, o)
+f(a, b, o)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "NE"},
+        },
+    }, {
+        code = [[
 -- ASTORE str
 local function foo(t)
     t[1] = "hello"
