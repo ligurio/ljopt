@@ -42,10 +42,9 @@ function impls.IRNodeHLOADNum:to_smt_lib(ctx)
     if key ~= nil and ct ~= nil and ct.content[key] ~= nil then
         ctx.const_nums[ssa_ref] = ct.content[key]
     end
-
-    return ('(assert ((_ is fp-val) %s))\n%s\n%s'):format(
-        raw_cell,
-        ctx.te_stack:store(ssa_ref, 'true'),
+    local te_guard = ('((_ is fp-val) %s)'):format(raw_cell)
+    return ('%s\n%s'):format(
+        ctx.te_stack:store(ssa_ref, te_guard),
         ctx.op_stack:store(ssa_ref, op_type.NUM, ctx.mem_stack:load_index(
             tab_left, idx_left, op_type.NUM)
         )

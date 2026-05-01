@@ -30,6 +30,7 @@ local type2bv = {
     ['p64'] = '%s',
     [op_type.STR] = '%s',
     [op_type.ANY] = '%s',
+    [op_type.NIL] = '%s',
     ['num'] = '%s',
 }
 
@@ -71,7 +72,9 @@ function StackBase:new()
 end
 
 local function create_value(memcell, type)
-    if type == op_type.STR then
+    if type == op_type.NIL then
+        return 'nil-val'
+    elseif type == op_type.STR then
         return ('(str-val %s)'):format(memcell)
     elseif type == op_type.ANY then
         return memcell
@@ -525,8 +528,7 @@ end
 
 -- Save data to ptr at new version.
 function MemoryStack.store_index(self, ptr, index, data, type)
-    dev_checks('table', 'string', 'string', 'string', 'string')
-
+    dev_checks('table', 'string', 'string', '?string', 'string')
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     data = conv:format(data)
     local old_ver = self:get_version()

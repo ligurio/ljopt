@@ -89,10 +89,7 @@ function impls.IRNodeHSTORE:to_smt_lib(ctx)
     local left_op = self:get_left_op()
 
     local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
-    -- Nil sentinel value.
-    local value = '#x0000000000000000'
-
-    return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.I64)
+    return ctx.mem_stack:store_index(tab_left, idx_left, nil, op_type.NIL)
 end
 
 local function bool_hstore_to_smt_lib(self, ctx)
