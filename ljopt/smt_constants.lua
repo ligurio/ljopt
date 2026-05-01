@@ -17,11 +17,12 @@ local LJOPT_SMTLIB = ([[
     (fp-val (get-fp (_ FloatingPoint 11 53)))
     (str-val (get-str String))
     (tab-val (get-tab Int))
-    (p32-val (get-p32-tab Int) (get-p32-idx MemCell)))))
+    (p32-val (get-p32-tab Int) (get-p32-idx MemCell))
+    (nil-val))))
 (define-sort MemPtr () (Array Int (Array Int (Array MemCell MemCell))))
 
 (define-const zero_pointer (Array MemCell MemCell)
-  ((as const (Array MemCell MemCell)) (int-val #x0000000000000000)))
+  ((as const (Array MemCell MemCell)) nil-val))
 (define-const zero_pointer_i_1d (Array Int Int)
   ((as const (Array Int Int)) 0))
 ; Uninterpreted functions for TOSTR/STRTO conversions.
