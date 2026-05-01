@@ -134,9 +134,20 @@ local function ljopt_init_new_trace(tr)
   if tr_id == nil then
     return
   end
-  assert(exec_record[tr_id] == nil,
-    "Trace with exactly this bytecode already exists " .. tr_id
-  )
+  if exec_record[tr_id] ~= nil then
+    -- Fingerprint collision: two LJ traces produced the same
+    -- bytecode-hash + SLOAD-types signature. We can't pair
+    -- them safely, however traces are (expected to be)
+    -- equivalent, otherwise it's a bug in ljopt, in such
+    -- case trace fingerprint should be extended.
+    if ljopt_config.is_debug_mode() then
+      io.stderr:write(
+        "Skip duplicate trace fingerprint: " .. tr_id .. '\n'
+      )
+    end
+    traces_num[tr] = nil
+    return
+  end
   exec_record[tr_id] = {}
   exec_record[tr_id].trace = {}
   exec_record[tr_id].snapshots = {}
