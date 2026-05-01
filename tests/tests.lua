@@ -733,6 +733,23 @@ foo()
         }
     }, {
         code = [[
+-- CNEW: variable-length cdata. ffi.typeof("uint8_t[?]") boxes an
+-- aggregate whose size is only known at run time, so the size
+-- operand is an SSA value and the box lowers to CNEW (not the
+-- scalar CNEWI). Exercises CNEW's runtime-size dispatch and the
+-- ctype-id store; the unopt and opt traces must stay equivalent.
+local ffi = require('ffi')
+local vla_t = ffi.typeof("uint8_t[?]")
+local t = {}
+for i = 0, 255 do
+    t[i] = vla_t(1)
+end
+]],
+        ins = {
+            {type = "cdt", name = "CNEW"},
+        },
+    }, {
+        code = [[
 -- String concatenation (BUFHDR, BUFPUT, BUFSTR)
 local function foo(a, b)
     return a .. b
