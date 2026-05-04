@@ -180,8 +180,8 @@ local function new()
     local Z3_MIN_MINOR = 15
     if version_lt(get_z3_version(), {
         major = Z3_MIN_MAJOR, minor = Z3_MIN_MINOR }) then
-        error(("The version of Z3 library is less than supported (%d, %d): %s"):
-            format(z3_version.version_string), Z3_MIN_MAJOR, Z3_MIN_MINOR)
+        error(("The version of Z3 library is less than supported (%s, %d): %s"):
+            format(z3_version.version_string, Z3_MIN_MAJOR, Z3_MIN_MINOR))
     end
     local self = {}
     local cfg = z3.Z3_mk_config()
