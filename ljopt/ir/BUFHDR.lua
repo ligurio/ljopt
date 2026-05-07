@@ -16,8 +16,6 @@ function impls.IRNodeBUFHDRP32:to_smt_lib(ctx)
     local ssa_ref = self:get_ssa_reference()
     if mode:get_lit() == 'RESET' then
         idx, init = ctx.mem_stack:allocate(ssa_ref)
-        ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
-
         slot_id = arith_utils.const_str_to_memcell(constants.STRING_BUFF_SLOT)
     else
         utils.unreachable('is_implemented should have returned false.')
@@ -27,9 +25,7 @@ function impls.IRNodeBUFHDRP32:to_smt_lib(ctx)
         ctx.mem_stack:store_index(
             idx, slot_id, arith_utils.const_str_to_smt_str(''), op_type.STR
         ),
-        ctx.op_stack:store(
-            ssa_ref, 'i64', arith_utils.const_int_to_smt_bv(idx)
-        ),
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(idx)),
         init
     )
 end

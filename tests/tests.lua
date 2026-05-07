@@ -925,6 +925,150 @@ end
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "sin")},
         },
+    }, {
+        code = [[
+-- Store inner table, load it back, store a number into it.
+local function foo()
+    local outer = {}
+    local inner = {}
+    inner["a"] = 1
+    outer["t"] = inner
+    return outer
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Load inner table and access its field.
+local function foo()
+    local outer = {}
+    outer["inner"] = {}
+    local t = outer["inner"]
+    t["x"] = 42
+    return t["x"]
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "HREFK"},
+            {type = "tab", name = "HLOAD"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "HREFK"},
+            {type = "num", name = "HLOAD"},
+        },
+    }, {
+        code = [[
+-- Two levels of nesting.
+local function foo()
+    local a = {}
+    local b = {}
+    local c = {}
+    c["v"] = 10
+    b["c"] = c
+    a["b"] = b
+    return a
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Store two different inner tables.
+local function foo()
+    local outer = {}
+    local t1 = {}
+    local t2 = {}
+    t1["x"] = 1
+    t2["x"] = 2
+    outer["a"] = t1
+    outer["b"] = t2
+    return outer
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        name = "read string global variable",
+        code = [[
+function m()
+  v = "hello"
+  return v
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+            {type = "str", name = "HLOAD"},
+        },
+    }, {
+        name = "read nested global through math",
+        code = [[
+local function m()
+  local x = math.pi
+  return x + 1
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+        },
     }}
     test:plan(3 * #srcs)
 

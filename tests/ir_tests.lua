@@ -548,7 +548,7 @@ test:test("Shared memory stack", function(test)
             no_base_stack1:init_smt("no_base1"),
             no_base_stack2:init_smt("no_base2"),
             ("(assert (not (= %s %s)))"):format(
-                no_base_stack1:load(1), no_base_stack2:load(1)
+                no_base_stack1:load("1"), no_base_stack2:load("1")
             ),
         })
         -- If no base stack => unequal.

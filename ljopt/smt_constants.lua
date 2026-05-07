@@ -15,7 +15,9 @@ local LJOPT_SMTLIB = ([[
 (declare-datatypes ((MemCell 0))
   (((int-val (get-bv (_ BitVec 64)))
     (fp-val (get-fp (_ FloatingPoint 11 53)))
-    (str-val (get-str String)))))
+    (str-val (get-str String))
+    (tab-val (get-tab Int))
+    (p32-val (get-p32-tab Int) (get-p32-idx MemCell)))))
 (define-sort MemPtr () (Array Int (Array Int (Array MemCell MemCell))))
 
 (define-const zero_pointer (Array MemCell MemCell)

@@ -21,11 +21,17 @@ function impls.IRNodeHREFP32:to_smt_lib(ctx)
         id = arith_utils.normalize_table_key(id)
     end
     local ssa_ref = self:get_ssa_reference()
-    ctx.tab_info[ssa_ref] = ctx.tab_info[left_op:get_ssa()]
+    local tab_ssa = left_op:get_ssa()
+    if ctx.const_tabs[tab_ssa] == nil then
+        ctx.const_tabs[tab_ssa] = {content = {}}
+    end
+    ctx.const_tabs[ssa_ref] = ctx.const_tabs[tab_ssa]
     ctx.href_keys[ssa_ref] = utils.resolve_const(right_op, ctx)
+    local tab_id = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
+    local p32 = ir_node.make_tab_ref(tab_id, id)
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, op_type.ANY, id)
+        ctx.op_stack:store(ssa_ref, op_type.ANY, p32)
     )
 end
 

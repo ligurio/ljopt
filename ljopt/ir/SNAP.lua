@@ -39,12 +39,12 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
             end
             local type = trace[value_data]:get_type()
             if type == "tab" then
-                local tab_left = ctx.tab_info[value_data].mem_ref
+                local tab_left = ctx.op_stack:load(value_data, op_type.TAB)
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Table, use directly"
                 slot_values[slot] = tab
             elseif type == "cdt" then
-                local tab_left = ctx.tab_info[value_data].mem_ref
+                local tab_left = ctx.op_stack:load(value_data, op_type.TAB)
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Cdt, use directly"
                 slot_values[slot] = tab

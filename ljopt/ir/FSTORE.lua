@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local op_type = require('ljopt.ir.op_type')
 
 local impls = {}
 
@@ -9,10 +10,8 @@ function impls.IRNodeFSTORETab:to_smt_lib(ctx)
     local dst_slot = self:get_left_op():get_ssa()
     local src_slot = self:get_right_op():get_ssa()
 
-    local tab_left = ctx.tab_info[dst_slot].mem_ref
-    assert(tab_left ~= nil, dst_slot)
-    local tab_right = ctx.tab_info[src_slot].mem_ref
-    assert(tab_right ~= nil, src_slot)
+    local tab_left = ctx.op_stack:load(dst_slot, op_type.TAB)
+    local tab_right = ctx.op_stack:load(src_slot, op_type.TAB)
 
     return ctx.mem_stack:store(tab_left, ctx.mem_stack:load(tab_right))
 end

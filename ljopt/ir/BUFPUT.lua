@@ -14,14 +14,16 @@ function impls.IRNodeBUFPUTP32:to_smt_lib(ctx)
     local right = ir_node.retrieve_str_op(self:get_right_op(), ctx)
 
     local ssa_ref = self:get_ssa_reference()
-    local idx = ctx.tab_info[ref:get_ssa()].mem_ref
-    ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
+    local idx = ctx.op_stack:load(ref:get_ssa(), op_type.TAB)
 
     local slot_id = arith_utils.const_str_to_memcell(constants.STRING_BUFF_SLOT)
 
     local prev = ctx.mem_stack:load_index(idx, slot_id, op_type.STR)
     local res = ("(str.++ %s %s)"):format(prev, right)
-    return ctx.mem_stack:store_index(idx, slot_id, res, op_type.STR)
+    return ('%s\n%s'):format(
+        ctx.mem_stack:store_index(idx, slot_id, res, op_type.STR),
+        ctx.op_stack:store(ssa_ref, op_type.TAB, idx)
+    )
 end
 
 local function instance(node_str)
