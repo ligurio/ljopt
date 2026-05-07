@@ -58,6 +58,10 @@ local function hex_double_to_i64_hex(hex_str)
     return string.format("#x%016x", tonumber(int64_val))
 end
 
+local function make_tab_ref(tab_id, idx)
+    return ('(p32-val %s %s)'):format(tab_id, idx)
+end
+
 -- All retrieve_* functions below accept an
 -- OpType object (or nil) as their first argument.
 
@@ -182,6 +186,32 @@ local function retrieve_raw_val(op, ctx)
     end
 end
 
+local function retrieve_tab_id(op, ctx)
+    return ('(get-p32-tab %s)'):format(retrieve_raw_val(op, ctx))
+end
+
+local function retrieve_tab_ptr(op, ctx)
+    return ('(get-p32-idx %s)'):format(retrieve_raw_val(op, ctx))
+end
+
+-- Loads versioned table memory + cell index for a hash/array
+-- left operand. Returns the table id, the cell index and the
+-- raw memcell expression `(select <versioned-tab-mem> <idx>)`.
+local function retrieve_tab_ref(op, ctx)
+    local tab_id = retrieve_tab_id(op, ctx)
+    local tab_ptr = retrieve_tab_ptr(op, ctx)
+    local raw_cell = ('(select %s %s)'):format(
+        ctx.mem_stack:load(tab_id), tab_ptr
+    )
+    return tab_id, tab_ptr, raw_cell
+end
+
+local function get_table_uid(raw_cell, fresh_slot)
+    return ('(ite ((_ is tab-val) %s) (get-tab %s) %s)'):format(
+        raw_cell, raw_cell, fresh_slot
+    )
+end
+
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks(
@@ -230,9 +260,14 @@ end
 return {
     ir_node_base = ir_node_base,
     extended = extended,
+    make_tab_ref = make_tab_ref,
     retrieve_slot_op = retrieve_slot_op,
     retrieve_tab_op = retrieve_tab_op,
     retrieve_raw_val = retrieve_raw_val,
+    retrieve_tab_id = retrieve_tab_id,
+    retrieve_tab_ptr = retrieve_tab_ptr,
+    retrieve_tab_ref = retrieve_tab_ref,
+    get_table_uid = get_table_uid,
     retrieve_num_op = retrieve_num_op,
     retrieve_str_op = retrieve_str_op,
     retrieve_int_op = retrieve_int_op,

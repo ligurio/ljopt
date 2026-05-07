@@ -325,20 +325,20 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
       local ref = band(sn, 0xffff) - 0x8000 -- REF_BIAS
       if ref < 0 then
         -- Type 1: Constant.
-        local smt_str, const_tab = ljopt_formatsmt(tr, ref, sn)
-        if const_tab ~= nil
-          and const_tab.type == "number"
+        local smt_str, const_tabs = ljopt_formatsmt(tr, ref, sn)
+        if const_tabs ~= nil
+          and const_tabs.type == "number"
           and string.sub(smt_str, 1, 2) == "#x" then
           table.insert(snapshot, {s, {
             type = "const",
             value = smt_str,
-            const_type = const_tab.type,
+            const_type = const_tabs.type,
           }})
-        elseif const_tab ~= nil and const_tab.type == "bool" then
+        elseif const_tabs ~= nil and const_tabs.type == "bool" then
           table.insert(snapshot, {s, {
             type = "const",
-            value = tostring(const_tab.value),
-            const_type = const_tab.type,
+            value = tostring(const_tabs.value),
+            const_type = const_tabs.type,
           }})
         end
       elseif band(sn, 0x80000) ~= 0 then

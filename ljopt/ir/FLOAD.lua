@@ -80,16 +80,18 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         local field_hash = arith_utils.const_str_to_memcell(
             smt_constants.FIELD_TAB_PREFIX .. right_op
         )
-        local tab_info = ctx.tab_info[left_op:get_ssa()]
-        local tab_left = tab_info.mem_ref
+        local ct = ctx.const_tabs[left_op:get_ssa()]
+        local tab_left = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
         data = ctx.mem_stack:load_index(
             tonumber(tab_left), field_hash, op_type.INT
         )
         -- Propagate constant table metadata for const-folding.
-        if right_op == 'tab.asize' and tab_info.const_asize ~= nil then
-            ctx.const_nums[self:get_ssa_reference()] = tab_info.const_asize
-        elseif right_op == 'tab.hmask' and tab_info.const_hmask ~= nil then
-            ctx.const_nums[self:get_ssa_reference()] = tab_info.const_hmask
+        if ct ~= nil then
+            if right_op == 'tab.asize' and ct.asize ~= nil then
+                ctx.const_nums[self:get_ssa_reference()] = ct.asize
+            elseif right_op == 'tab.hmask' and ct.hmask ~= nil then
+                ctx.const_nums[self:get_ssa_reference()] = ct.hmask
+            end
         end
     else
         utils.unreachable('FLOADInt: unsupported right_op: ' .. right_op)
@@ -109,9 +111,7 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
         if left_op:is_i64() then
             data = arith_utils.const_i64_to_smt_bv(left_op:get_i64())
         elseif left_op:is_ssa() then
-            -- Table pointer. Compile time.
-            local tab_left = ctx.tab_info[left_op:get_ssa()].mem_ref
-            -- Table index. Runtime.
+            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'tab')
             local idx_left = arith_utils.const_str_to_memcell(
                 smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
             )
@@ -132,35 +132,6 @@ end
 impls.IRNodeFLOADTab = {}
 ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)
 
-function impls.IRNodeFLOADTab:to_smt_lib(ctx)
-    local left_op = self:get_left_op()
-    local right_op = self:get_right_op()
-    local right_op_str = op_type.to_string(right_op)
-    local ssa_ref = self:get_ssa_reference()
-    if right_op_str == 'tab.meta' then
-        -- Left operand contains table, load it.
-        local table_info = ctx.tab_info[left_op:get_ssa()]
-        assert(table_info.mem_ref ~= nil)
-        local result = nil
-        if table_info.meta == nil then
-            table_info.meta, result = ctx.mem_stack:allocate_child(
-                ssa_ref, table_info.mem_ref, "__metatable"
-            )
-        end
-        ctx.tab_info[ssa_ref] = {
-            mem_ref = table_info.meta,
-            meta = nil,
-        }
-        if result then
-            return result
-        else
-            return '; ' .. table_info.mem_ref .. ' to ' .. table_info.meta
-        end
-    else
-        utils.unreachable('FLOADTab: unsupported right_op: ' .. right_op_str)
-    end
-end
-
 impls.IRNodeFLOADP32 = {}
 ir_node.extended(impls.IRNodeFLOADP32, ir_node.ir_node_base)
 
@@ -173,10 +144,15 @@ function impls.IRNodeFLOADP32:to_smt_lib(ctx)
     local right_op_str = op_type.to_string(right_op)
 
     if right_op_str == 'tab.node' or right_op_str == 'tab.array' then
-        -- Forward id of table
         assert(left_op:is_ssa())
-        ctx.tab_info[self:get_ssa_reference()] = ctx.tab_info[left_op:get_ssa()]
-        return '; Nothing to do '
+        local tab_ssa = left_op:get_ssa()
+        local ssa_ref = self:get_ssa_reference()
+        if ctx.const_tabs[tab_ssa] == nil then
+            ctx.const_tabs[tab_ssa] = {content = {}}
+        end
+        ctx.const_tabs[ssa_ref] = ctx.const_tabs[tab_ssa]
+        local tab_val = ctx.op_stack:load(tab_ssa, op_type.TAB)
+        return ctx.op_stack:store(ssa_ref, op_type.TAB, tab_val)
     else
         utils.unreachable('FLOADP32: unsupported right_op: ' .. right_op_str)
     end
@@ -198,6 +174,7 @@ end
 
 function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
                                               _left_op, _right_op)
+    -- Metatable loads not modeled.
     return false
 end
 

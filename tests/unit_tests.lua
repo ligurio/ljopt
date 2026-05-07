@@ -167,8 +167,8 @@ test:test("Array1D", function(test)
     local init = arr:init_smt("test_arr")
 
     -- Test 1: Store a value then load it back.
-    local s1 = arr:store(5, '42')
-    local l1 = arr:load(5)
+    local s1 = arr:store("5", "42")
+    local l1 = arr:load("5")
     test:is(smt:check(utils.join_strings({
         smt_constants.LJOPT_SMTLIB,
         init,
@@ -179,7 +179,7 @@ test:test("Array1D", function(test)
 
     -- Test 2: Load from a different slot should
     -- NOT equal the stored value.
-    local l2 = arr:load(7)
+    local l2 = arr:load("7")
     test:is(smt:check(utils.join_strings({
         smt_constants.LJOPT_SMTLIB,
         init,
@@ -188,8 +188,8 @@ test:test("Array1D", function(test)
     })), smt.result.SAT, "Load from different slot can differ")
 
     -- Test 3: Overwrite slot 5 with a new value, verify update.
-    local s2 = arr:store(5, '99')
-    local l3 = arr:load(5)
+    local s2 = arr:store("5", "99")
+    local l3 = arr:load("5")
     test:is(smt:check(utils.join_strings({
         smt_constants.LJOPT_SMTLIB,
         init,

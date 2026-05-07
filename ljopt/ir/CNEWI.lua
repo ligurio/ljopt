@@ -23,7 +23,6 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local idx, init = ctx.mem_stack:allocate()
-    ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
 
     local smt_value
     if value:is_num() then
@@ -44,7 +43,7 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type, op_type.I64),
         ctx.mem_stack:store_index(idx, cdt_value, smt_value, op_type.I64),
-        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_int_to_smt_bv(idx))
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(idx))
     )
 end
 

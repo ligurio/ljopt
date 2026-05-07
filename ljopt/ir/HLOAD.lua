@@ -1,6 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
-local smt_context = require('ljopt.ir.smt_context')
 
 local impls = {}
 
@@ -9,21 +8,15 @@ ir_node.extended(impls.IRNodeHLOADStr, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
-
-    local dst_slot = left_op:get_ssa()
-
-    -- Table pointer. Compile time.
-    local tab_left = ctx.tab_info[dst_slot].mem_ref
-    -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
-    assert(tab_left ~= nil, dst_slot)
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
 
+    local dst_slot = left_op:get_ssa()
     local key = ctx.href_keys[dst_slot]
-    local ct = ctx.const_tab[tab_left]
-    if key ~= nil and ct ~= nil and ct[key] ~= nil then
-        ctx.const_strs[ssa_ref] = ct[key]
+    local ct = ctx.const_tabs[dst_slot]
+    if key ~= nil and ct ~= nil and ct.content[key] ~= nil then
+        ctx.const_strs[ssa_ref] = ct.content[key]
     end
 
     return ('%s\n%s'):format(
@@ -39,20 +32,14 @@ ir_node.extended(impls.IRNodeHLOADNum, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADNum:to_smt_lib(ctx)
     local left_op = self:get_left_op()
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
 
-    local dst_slot = left_op:get_ssa()
-
-    -- Table pointer. Compile time.
-    local tab_left = ctx.tab_info[dst_slot].mem_ref
-    -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
     local ssa_ref = self:get_ssa_reference()
-    assert(tab_left ~= nil, dst_slot)
-
+    local dst_slot = left_op:get_ssa()
     local key = ctx.href_keys[dst_slot]
-    local ct = ctx.const_tab[tab_left]
-    if key ~= nil and ct ~= nil and ct[key] ~= nil then
-        ctx.const_nums[ssa_ref] = ct[key]
+    local ct = ctx.const_tabs[dst_slot]
+    if key ~= nil and ct ~= nil and ct.content[key] ~= nil then
+        ctx.const_nums[ssa_ref] = ct.content[key]
     end
 
     return ('%s\n%s'):format(
@@ -68,24 +55,13 @@ ir_node.extended(impls.IRNodeHLOADTab, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
-
-    local dst_slot = left_op:get_ssa()
-
-    -- Table pointer. Compile time.
-    local tab_left = ctx.tab_info[dst_slot].mem_ref
-    -- Table index. Runtime.
-    local idx_left = ir_node.retrieve_raw_val(left_op, ctx)
-
-    local tab_ptr = ctx.mem_stack:load_index(tab_left, idx_left, op_type.TAB)
+    local _, _, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
-    ctx.tab_info[ssa_ref] = {
-        mem_ref = smt_context.extract_value(tab_ptr)
-    }
-    assert(tab_left ~= nil, dst_slot)
+    local tab_id = ir_node.get_table_uid(raw_cell, ctx.mem_stack:alloc_slot())
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, op_type.TAB, tab_ptr)
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tab_id)
     )
 end
 

@@ -1,6 +1,7 @@
 local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 local constants = require('ljopt.smt_constants')
+local op_type = require('ljopt.ir.op_type')
 
 local impls = {}
 
@@ -21,7 +22,6 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local idx, init = ctx.mem_stack:allocate()
-    ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
 
     local smt_cdt_size = arith_utils.const_num_to_smt_bv(
         maybe_size and maybe_size:get_num() or 0
@@ -32,7 +32,7 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type),
         ctx.mem_stack:store_index(idx, cdt_size, smt_cdt_size),
-        ctx.op_stack:store(ssa_ref, 'i64', arith_utils.const_int_to_smt_bv(idx))
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(idx))
     )
 end
 

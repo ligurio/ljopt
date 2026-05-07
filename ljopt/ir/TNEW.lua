@@ -23,10 +23,7 @@ function impls.IRNodeTNEWTab:to_smt_lib(ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local idx, init = ctx.mem_stack:allocate()
-    ctx.tab_info[ssa_ref] = {
-        mem_ref = idx, meta = nil,
-        const_asize = asize, const_hmask = hsize,
-    }
+    ctx.const_tabs[ssa_ref] = {asize = asize, hmask = hsize, content = {}}
 
     local smt_asize = arith_utils.const_int_to_smt_bv(asize)
     local smt_hmask = arith_utils.const_int_to_smt_bv(hsize)
@@ -35,9 +32,7 @@ function impls.IRNodeTNEWTab:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, asize_id, smt_asize, op_type.INT),
         ctx.mem_stack:store_index(idx, hmask_id, smt_hmask, op_type.INT),
-        ctx.op_stack:store(
-            ssa_ref, op_type.INT, arith_utils.const_int_to_smt_bv(idx)
-        )
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(idx))
     )
 end
 
