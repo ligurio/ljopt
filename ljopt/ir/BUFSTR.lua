@@ -16,7 +16,7 @@ function impls.IRNodeBUFSTRStr:to_smt_lib(ctx)
     local slot_id = arith_utils.const_str_to_memcell(constants.STRING_BUFF_SLOT)
 
     local ssa_ref = self:get_ssa_reference()
-    local idx = ctx.tab_info[mode:get_ssa()].mem_ref
+    local idx = ctx.op_stack:load(mode:get_ssa(), op_type.TAB)
     return ctx.op_stack:store(
         ssa_ref, op_type.STR,
         ctx.mem_stack:load_index(idx, slot_id, op_type.STR)

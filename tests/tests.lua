@@ -925,6 +925,125 @@ end
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "sin")},
         },
+    }, {
+        code = [[
+-- Store inner table, load it back, store a number into it.
+local function foo()
+    local outer = {}
+    local inner = {}
+    inner["a"] = 1
+    outer["t"] = inner
+    return outer
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        code = [[
+-- Load inner table and access its field.
+local function foo()
+    local outer = {}
+    outer["inner"] = {}
+    local t = outer["inner"]
+    t["x"] = 42
+    return t["x"]
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "HREFK"},
+            {type = "tab", name = "HLOAD"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "HREFK"},
+            {type = "num", name = "HLOAD"},
+        },
+    }, {
+        code = [[
+-- Two levels of nesting.
+local function foo()
+    local a = {}
+    local b = {}
+    local c = {}
+    c["v"] = 10
+    b["c"] = c
+    a["b"] = b
+    return a
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
+    }, {
+        code=[[
+local t = {1.0}
+for i = 1, 1000 do
+    if i > 1 then
+        local s = t[1]
+        return s
+    end
+end
+]],
+        ins = {
+            {type = "tab", name = "SLOAD"},
+            {type = "num", name = "ALOAD"},
+        },
+    }, {
+        code = [[
+-- Store two different inner tables.
+local function foo()
+    local outer = {}
+    local t1 = {}
+    local t2 = {}
+    t1["x"] = 1
+    t2["x"] = 2
+    outer["a"] = t1
+    outer["b"] = t2
+    return outer
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "TNEW"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "num", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+            {type = "p32", name = "NEWREF"},
+            {type = "tab", name = "HSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 

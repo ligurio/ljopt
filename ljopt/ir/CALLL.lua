@@ -11,13 +11,11 @@ ir_node.extended(impls.IRNodeCALLLP32, ir_node.ir_node_base)
 function impls.IRNodeCALLLP32:to_smt_lib(ctx)
     local cargs = self:get_left_op()
     local name = self:get_right_op()
-    local ssa_ref = self:get_ssa_reference()
 
     if name:get_lit() == 'lj_buf_putstr_reverse' then
         local args = cargs:get_carg()
         local buf = args[1]
-        local idx = ctx.tab_info[buf:get_ssa()].mem_ref
-        ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
+        local idx = ctx.op_stack:load(buf:get_ssa(), op_type.TAB)
 
         local slot_id = arith_utils.const_str_to_memcell(
             constants.FIELD_TAB_PREFIX .. 'bufhdr'

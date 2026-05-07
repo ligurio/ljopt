@@ -77,6 +77,8 @@ local function create_value(memcell, type)
         return memcell
     elseif type == 'num' then
         return ('(fp-val %s)'):format(memcell)
+    elseif type == 'tab' then
+        return ('(tab-val %s)'):format(memcell)
     else
         return ('(int-val %s)'):format(memcell)
     end
@@ -89,6 +91,8 @@ local function extract_value(memcell, type)
         return ('(get-str %s)'):format(memcell)
     elseif type == 'num' then
         return ('(get-fp %s)'):format(memcell)
+    elseif type == 'tab' then
+        return ('(get-tab %s)'):format(memcell)
     else
         return ('(get-bv %s)'):format(memcell)
     end
@@ -390,7 +394,7 @@ end
 
 -- Read data from op_num at current version.
 function Array1D.load(self, op_num)
-    dev_checks('table', 'number')
+    dev_checks('table', 'string')
 
     local val = string.format('(select %s %d)', self._name, self._version)
     val = string.format('(select %s %s)', val, op_num)
@@ -400,7 +404,7 @@ end
 -- Save data to op_num at new version.
 -- All consequent reads will read new data.
 function Array1D.store(self, op_num, data)
-    dev_checks('table', 'number', 'string')
+    dev_checks('table', 'string', 'string')
 
     local prev_version = self._version
     self._version = self._version + 1
@@ -446,7 +450,7 @@ function MemoryStack.init_smt(self, name, base_stack)
 end
 
 function MemoryStack.alloc_slot(self)
-    local current_slot = self.next_free
+    local current_slot = tostring(self.next_free)
     self.next_free = self.next_free + 1
     return current_slot
 end
@@ -486,15 +490,13 @@ function MemoryStack.allocate(self, inherited_from)
         -- memory should be equal to memory in base stack
         -- (kinda process memory state when trace begins).
         assert(self.base_stack ~= nil)
+        local str_id = tostring(inherited_from)
         result = ('(assert (= %s %s))'):format(
-            self.base_stack:load(inherited_from), self:load(current_slot)
+            self.base_stack:load(str_id), self:load(current_slot)
         )
-        self.vm_slot_map[inherited_from] = { slot = current_slot }
+        self.vm_slot_map[str_id] = { slot = current_slot }
     else
-        -- We should assign something to all values by default
-        -- to be able to compare them at the end
-        -- because we don't track used indexes.
-        result = ('\n(assert (= (select (select %s %d) 0) zero_pointer))'):
+        result = ('\n(assert (= (select (select %s %s) 0) zero_pointer))'):
             format(self._name, current_slot)
     end
     return current_slot, result
@@ -502,7 +504,7 @@ end
 
 -- Read whole table from ptr at current version.
 function MemoryStack.load(self, ptr)
-    dev_checks('table', 'number')
+    dev_checks('table', 'string')
 
     local val = ([[(let (
     (ptr %s)
@@ -515,7 +517,8 @@ end
 
 -- Read single value from ptr at current version at idx.
 function MemoryStack.load_index(self, ptr, idx, type)
-    dev_checks('table', 'number', 'string', 'string')
+    dev_checks('table', 'string', 'string', 'string')
+
     local memory_array = self:load(ptr)
     local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     return conv:format(
@@ -526,7 +529,7 @@ end
 -- Save data to ptr at new version.
 -- All consequent reads will read new data.
 function MemoryStack.store(self, ptr, data)
-    dev_checks('table', 'number', 'string')
+    dev_checks('table', 'string', 'string')
 
     local inc_ver = self:inc_version(ptr)
 
@@ -540,7 +543,7 @@ end
 -- Save data to ptr at new version.
 -- All consequent reads will read new data.
 function MemoryStack.store_index(self, ptr, index, data, type)
-    dev_checks('table', 'number', 'string', 'string', 'string')
+    dev_checks('table', 'string', 'string', 'string', 'string')
 
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     data = conv:format(data)
@@ -584,26 +587,24 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.snap_stack = SnapStack:new()
     self.snap_mapping = { cur_id = 0, map = {} }
 
-    -- ssa_ref -> tab_id
-    self.tab_info = {}
     -- ssa_ref -> num constant value (for constant propagation)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
-    -- mem_ref -> { key -> OpKind }
-    self.const_tab = {}
+    -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
+    -- Aliased via HREF/HREFK/NEWREF (same Lua table ref).
+    self.const_tabs = {}
 
     return self
 end
 
 function SMTContext:restart()
-    self.tab_info = {}
     self.const_nums = {}
     self.const_strs = {}
     self.href_keys = {}
-    self.const_tab = {}
+    self.const_tabs = {}
 end
 
 return {
