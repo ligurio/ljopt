@@ -352,17 +352,18 @@ foo(1.5)
     test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
+        local label = f.name or ("test_%d"):format(i)
         local ok, err = check_ins_present(f.code, f.ins, f.opt)
-        test:ok(ok, ("test_%d instructions present: %s"):format(
-            i, err or "ok"
+        test:ok(ok, ("%s instructions present: %s"):format(
+            label, err or "ok"
         ))
         local formulas = ljopt.ir.traces_to_smt(f.code)
         for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
-                ("test_%s trace %s parse."):format(i, j))
+                ("%s trace %s parse."):format(label, j))
             test:is(smt:check(formula), smt.result.UNSAT,
-                ("test_%d trace %s check."):format(i, j))
+                ("%s trace %s check."):format(label, j))
         end
     end
 end)
@@ -928,17 +929,18 @@ end
     test:plan(3 * #srcs)
 
     for i, f in ipairs(srcs) do
+        local label = f.name or ("test_%d"):format(i)
         local ok, err = check_ins_present(f.code, f.ins, f.opt)
-        test:ok(ok, ("test_%d instructions present: %s"):format(
-            i, err or "ok"
+        test:ok(ok, ("%s instructions present: %s"):format(
+            label, err or "ok"
         ))
         local formulas = ljopt.ir.traces_to_smt(f.code)
         for j, formula in pairs(formulas) do
             formula = smt_constants.LJOPT_SMTLIB .. formula
             test:is(smt:parse(formula), true,
-                ("test_%s trace %s parse."):format(i, j))
+                ("%s trace %s parse."):format(label, j))
             test:is(smt:check(formula), smt.result.UNSAT,
-                ("test_%d trace %s check."):format(i, j))
+                ("%s trace %s check."):format(label, j))
         end
     end
     -- Restore strict mode.
