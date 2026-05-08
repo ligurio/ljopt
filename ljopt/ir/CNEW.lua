@@ -21,7 +21,7 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
     )
 
     local ssa_ref = self:get_ssa_reference()
-    local idx, init = ctx.mem_stack:allocate(ssa_ref)
+    local idx, init = ctx.mem_stack:allocate()
 
     local smt_cdt_size = arith_utils.const_num_to_smt_bv(
         maybe_size and maybe_size:get_num() or 0

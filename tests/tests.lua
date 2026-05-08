@@ -1050,6 +1050,20 @@ m()
             },
         },
     }, {
+        code=[[
+local t = {1.0}
+for i = 1, 1000 do
+    if i > 1 then
+        local s = t[1]
+        return s
+    end
+end
+]],
+        ins = {
+            {type = "tab", name = "SLOAD"},
+            {type = "num", name = "ALOAD"},
+        },
+    }, {
         name = "read string global variable",
         code = [[
 function m()
