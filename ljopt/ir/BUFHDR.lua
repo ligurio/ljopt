@@ -15,7 +15,7 @@ function impls.IRNodeBUFHDRP32:to_smt_lib(ctx)
     local slot_id
     local ssa_ref = self:get_ssa_reference()
     if mode:get_lit() == 'RESET' then
-        idx, init = ctx.mem_stack:allocate(ssa_ref)
+        idx, init = ctx.mem_stack:allocate()
         ctx.tab_info[ssa_ref] = {mem_ref = idx, meta = nil}
 
         slot_id = arith_utils.const_str_to_memcell(constants.STRING_BUFF_SLOT)
