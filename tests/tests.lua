@@ -1031,6 +1031,25 @@ foo()
             {type = "tab", name = "HSTORE"},
         },
     }, {
+        name = "read global variable",
+        code = [[
+function m()
+  v = 1
+  return v
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+        },
+    }, {
         name = "read string global variable",
         code = [[
 function m()

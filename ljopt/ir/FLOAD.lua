@@ -132,10 +132,26 @@ end
 impls.IRNodeFLOADTab = {}
 ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)
 
-function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
-                                              _left_op, _right_op)
-    -- Metatable loads not modeled.
-    return false
+function impls.IRNodeFLOADTab:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local right_op = self:get_right_op()
+    local right_op_str = op_type.to_string(right_op)
+    local ssa_ref = self:get_ssa_reference()
+
+    if right_op_str ~= 'tab.meta' and right_op_str ~= 'func.env' then
+        utils.unreachable('FLOADTab: unsupported right_op: ' .. right_op_str)
+    end
+
+    -- Same path as HLOAD on a TAB-typed cell: read the parent's
+    -- mem slot and decode the field as a tab pointer.
+    local parent_ptr = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
+    local field_hash = arith_utils.const_str_to_memcell(
+        smt_constants.FIELD_TAB_PREFIX .. right_op_str
+    )
+    local data = ctx.mem_stack:load_index(
+        parent_ptr, field_hash, op_type.TAB
+    )
+    return ctx.op_stack:store(ssa_ref, op_type.TAB, data)
 end
 
 impls.IRNodeFLOADP32 = {}
@@ -173,6 +189,15 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
     -- See: https://github.com/ligurio/ljopt/issues/51
     local right_op = right_op_val:get_lit()
     if right_op == 'str.len' then
+        return true
+    end
+    return false
+end
+
+function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
+                                              _left_op, right_op_val)
+    local right_op = op_type.to_string(right_op_val)
+    if right_op == 'tab.meta' or right_op == 'func.env' then
         return true
     end
     return false
