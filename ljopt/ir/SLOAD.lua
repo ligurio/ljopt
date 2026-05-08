@@ -65,6 +65,20 @@ function impls.IRNodeSLOADCdt:to_smt_lib(ctx)
     )
 end
 
+impls.IRNodeSLOADFun = {}
+ir_node.extended(impls.IRNodeSLOADFun, ir_node.ir_node_base)
+
+function impls.IRNodeSLOADFun:to_smt_lib(ctx)
+    local slot = ir_node.retrieve_slot_op(self:get_left_op())
+    local ssa_ref = self:get_ssa_reference()
+    local mem_slot, smt_fm = ctx.mem_stack:allocate(slot)
+    return ('%s\n%s\n%s'):format(
+        ctx.te_stack:store(ssa_ref, 'true'),
+        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(mem_slot)),
+        smt_fm
+    )
+end
+
 local function bool_constant_to_smt_lib(self, ctx)
     local ssa_ref = self:get_ssa_reference()
     return ('%s\n%s'):format(

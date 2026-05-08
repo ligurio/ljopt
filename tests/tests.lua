@@ -1044,6 +1044,79 @@ foo()
             {type = "p32", name = "NEWREF"},
             {type = "tab", name = "HSTORE"},
         },
+    }, {
+        name = "write to global variable",
+        code = [[
+function m()
+  v = 1
+  return v
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+        },
+    }, {
+        name = "read string global variable",
+        code = [[
+function m()
+  v = "hello"
+  return v
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+            {type = "str", name = "HLOAD"},
+        },
+    }, {
+        name = "read nested global through math",
+        code = [[
+local function m()
+  local x = math.pi
+  return x + 1
+end
+
+m()
+m()
+m()
+m()
+]],
+        ins = {
+            {type = "fun", name = "SLOAD"},
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "func.env")
+            },
+        },
+    }, {
+        name = "read field through metatable __index",
+        code = [[
+local mt = {__index = {x = 42}}
+local t = setmetatable({}, mt)
+local r = 0
+for i = 1, 30 do
+    r = r + t.x
+end
+]],
+        ins = {
+            {type = "tab", name = "FLOAD",
+                right_op = op_type.new("lit", "tab.meta")
+            },
+        },
     }}
     test:plan(3 * #srcs)
 
