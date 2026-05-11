@@ -1133,6 +1133,67 @@ end
             {type = "tab", name = "HSTORE"},
             {type = "fal", name = "HSTORE"},
         },
+    }, {
+        name = "POW with constant base",
+        code = [[
+local x = 1.0
+local r = 0.0
+for i = 1, 30 do
+    r = 3.0 ^ x
+end
+]],
+        ins = {
+            {type = "num", name = "POW"},
+        },
+    }, {
+        -- POW with both operands symbolic (no const fold). Tests
+        -- the uninterpreted pow_fp path: deterministic axiom-free
+        -- semantics, both traces produce same symbolic result.
+        name = "POW symbolic base and exponent",
+        code = [[
+local function f(b, e)
+    return b ^ e
+end
+f(2.0, 3.0)
+f(2.0, 3.0)
+f(2.0, 3.0)
+f(2.0, 3.0)
+]],
+        ins = {
+            {type = "num", name = "POW"},
+        },
+    }, {
+        -- 1 ^ x: identity fold target. const_nums propagation
+        -- should yield 1.0 regardless of x.
+        name = "POW 1 ^ x",
+        code = [[
+local x = 2.0
+local r = 0.0
+for i = 1, 30 do
+    r = 1.0 ^ x
+end
+]],
+        ins = {
+            {type = "num", name = "POW"},
+        },
+    }, {
+        -- 1 ^ 1 via runtime-bound locals so LuaJIT can't
+        -- compile-time fold the operand pair. Const-fold axiom
+        -- pins pow_fp(1, 1) = 1; both traces agree.
+        name = "POW 1 ^ 1",
+        code = [[
+local f = function(x)
+    local b = 1.0
+    return b ^ b + x
+end
+f(1)
+f(2)
+f(3)
+f(4)
+]],
+        ins = {
+            {type = "num", name = "POW"},
+        },
     }}
     test:plan(3 * #srcs)
 
