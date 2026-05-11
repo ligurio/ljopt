@@ -47,6 +47,11 @@ local LJOPT_SMTLIB = ([[
 (declare-fun math_exp ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (declare-fun math_log ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (declare-fun math_log10 ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+; Uninterpreted FP power for `^`. z3 has no native FP exponent,
+; so we treat pow_fp as an opaque function — both traces feed
+; the same axioms, so deterministic input -> deterministic
+; output even though the abstract semantics are opaque.
+(declare-fun pow_fp ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (define-fun-rec str_reverse ((s String)) String
   (ite (= (str.len s) 0)
        ""

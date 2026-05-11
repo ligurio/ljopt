@@ -1121,6 +1121,27 @@ until nil;
             {type = "tab", name = "HSTORE"},
             {type = "fal", name = "HSTORE"},
         },
+    }, {
+        -- `^` translates to `num POW` in the IR. Without
+        -- the `pow_fp` UF this cascades NYI through
+        -- TOSTR/BUFPUT/BUFSTR/HSTORE, so the final write
+        -- to Name lands on the dummy path on one side
+        -- only, and the globals whole-table compare in
+        -- the equiv-check sats spuriously.
+        name = "POW + concat into global",
+        code = [[
+Name = ""
+local x = 1.0
+local counter = 0
+while '' do
+  if counter > 5 then break end
+  counter = counter + 1;
+  Name = 3.000000 .. (3.000000 ^ x) ;
+end
+]],
+        ins = {
+            {type = "num", name = "POW"},
+        },
     }}
     test:plan(3 * #srcs)
 
