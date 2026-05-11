@@ -1102,6 +1102,25 @@ m()
                 right_op = op_type.new("lit", "func.env")
             },
         },
+    }, {
+        name = "write bool + DSE",
+        code = [[
+local DEFAULT_NUMBER = 1
+
+local counter = 0
+repeat
+if counter > 5 then break end
+counter = counter + 1;
+Name = package
+-- Previous write will be DSEd, and if HSTORE for bool is not implemented
+-- formula will give SAT.
+Name = false
+until nil;
+]],
+        ins = {
+            {type = "tab", name = "HSTORE"},
+            {type = "fal", name = "HSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 
