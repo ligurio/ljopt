@@ -60,6 +60,7 @@ build = {
         ['ljopt.ir.MOD'] = 'ljopt/ir/MOD.lua',
         ['ljopt.ir.MUL'] = 'ljopt/ir/MUL.lua',
         ['ljopt.ir.MULOV'] = 'ljopt/ir/MULOV.lua',
+        ['ljopt.ir.POW'] = 'ljopt/ir/POW.lua',
         ['ljopt.ir.SUB'] = 'ljopt/ir/SUB.lua',
         ['ljopt.ir.SUBOV'] = 'ljopt/ir/SUBOV.lua',
 
