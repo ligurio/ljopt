@@ -1117,6 +1117,22 @@ end
                 right_op = op_type.new("lit", "tab.meta")
             },
         },
+    }, {
+        name = "write bool + DSE",
+        code = [[
+local t = {}
+local other = {}
+for i = 1, 30 do
+    t.k = other
+    -- Previous write will be DSEd, and if HSTORE for bool is not
+    -- implemented formula will give SAT.
+    t.k = false
+end
+]],
+        ins = {
+            {type = "tab", name = "HSTORE"},
+            {type = "fal", name = "HSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 

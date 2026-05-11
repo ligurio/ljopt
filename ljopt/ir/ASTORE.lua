@@ -47,6 +47,23 @@ function impls.IRNodeASTORETab:to_smt_lib(ctx)
     return ctx.mem_stack:store_index(tab_left, idx_left, src_tab, op_type.TAB)
 end
 
+local function bool_astore_to_smt_lib(self, ctx)
+    local left_op = self:get_left_op()
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
+    return ctx.mem_stack:store_index(tab_left, idx_left,
+        self.hex_constant, op_type.I64)
+end
+
+impls.IRNodeASTOREFal = {}
+ir_node.extended(impls.IRNodeASTOREFal, ir_node.ir_node_base)
+impls.IRNodeASTOREFal.hex_constant = '#xFFFFFFFE00000000'
+impls.IRNodeASTOREFal.to_smt_lib = bool_astore_to_smt_lib
+
+impls.IRNodeASTORETru = {}
+ir_node.extended(impls.IRNodeASTORETru, ir_node.ir_node_base)
+impls.IRNodeASTORETru.hex_constant = '#xFFFFFFFD00000000'
+impls.IRNodeASTORETru.to_smt_lib = bool_astore_to_smt_lib
+
 local function instance(node_str)
     return impls[node_str]
 end
