@@ -1161,6 +1161,31 @@ end
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "cos")},
         },
+    }, {
+        -- Two SLOADs of the same env table (one for the
+        -- global HSTORE, one inside the loop body to call
+        -- math.tan) create independent const_tabs entries.
+        -- The HSTORE writes 42 into const_tabs[t1].content
+        -- but the HLOAD reads from const_tabs[t2].content
+        -- (empty), so `tan` arg never resolves to a const,
+        -- no `(= (math_tan 42.0) <result>)` axiom emitted,
+        -- and the opt trace's FOLD-baked constant diverges
+        -- from unopt's symbolic `math_tan(HLOAD)` -> sat.
+        name = "double-SLOAD same env, HSTORE then CALLN tan",
+        code = [[
+v = 0
+local r = 0
+for i = 1, 30 do
+    v = 42
+    r = r + math.tan(v)
+end
+]],
+        ins = {
+            {type = "num", name = "HSTORE"},
+            {type = "num", name = "HLOAD"},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "tan")},
+        },
     }}
     test:plan(3 * #srcs)
 

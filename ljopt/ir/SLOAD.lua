@@ -1,6 +1,15 @@
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
 
+local function init_const_tab(ctx, slot)
+    local ct = ctx.const_tabs_by_slot[slot]
+    if ct == nil then
+        ct = {content = {}, fields = {}}
+        ctx.const_tabs_by_slot[slot] = ct
+    end
+    return ct
+end
+
 local impls = {}
 
 impls.IRNodeSLOADNum = {}
@@ -40,6 +49,7 @@ function impls.IRNodeSLOADTab:to_smt_lib(ctx)
     local slot = ir_node.retrieve_slot_op(self:get_left_op())
     local ssa_ref = self:get_ssa_reference()
     local mem_slot, smt_fm = ctx.mem_stack:allocate(slot)
+    ctx.const_tabs[ssa_ref] = init_const_tab(ctx, slot)
     return ('%s\n%s\n%s'):format(
         -- I suppose guard for SLOAD is always true for us.
         -- It means we never exit by it.
@@ -56,6 +66,7 @@ function impls.IRNodeSLOADCdt:to_smt_lib(ctx)
     local slot = ir_node.retrieve_slot_op(self:get_left_op())
     local ssa_ref = self:get_ssa_reference()
     local mem_slot, smt_fm = ctx.mem_stack:allocate(slot)
+    ctx.const_tabs[ssa_ref] = init_const_tab(ctx, slot)
     return ('%s\n%s\n%s'):format(
         -- I suppose guard for SLOAD is always true for us.
         -- It means we never exit by it.
@@ -72,6 +83,7 @@ function impls.IRNodeSLOADFun:to_smt_lib(ctx)
     local slot = ir_node.retrieve_slot_op(self:get_left_op())
     local ssa_ref = self:get_ssa_reference()
     local mem_slot, smt_fm = ctx.mem_stack:allocate(slot)
+    ctx.const_tabs[ssa_ref] = init_const_tab(ctx, slot)
     return ('%s\n%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(mem_slot)),

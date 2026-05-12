@@ -499,6 +499,11 @@ function MemoryStack.allocate(self, inherited_from)
         -- and tied to base stack.
         assert(self.base_stack ~= nil)
         local str_id = tostring(inherited_from)
+        -- Idempotent for the same `inherited_from`: a single
+        -- VM slot may be SLOAD'd multiple times in one trace
+        -- (e.g. globals-normalized FLOAD func.env collapses to
+        -- repeated `SLOAD #GLOBALS_SLOT`). Hand back the same
+        -- local slot so all uses share one version chain.
         if self.vm_slot_map[str_id] ~= nil then
             return self.vm_slot_map[str_id].slot, ''
         end
@@ -602,6 +607,11 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
     -- Aliased via HREF/HREFK/NEWREF (same Lua table ref).
     self.const_tabs = {}
+    -- vm-slot -> same dict as above; reused so two SLOADs of one
+    -- stack slot share a const_tabs entry. Otherwise an HSTORE
+    -- through the first SLOAD's chain is invisible to a later
+    -- HLOAD through the second SLOAD's chain.
+    self.const_tabs_by_slot = {}
 
     return self
 end
@@ -611,6 +621,7 @@ function SMTContext:restart()
     self.const_strs = {}
     self.href_keys = {}
     self.const_tabs = {}
+    self.const_tabs_by_slot = {}
 end
 
 return {
