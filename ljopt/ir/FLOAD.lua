@@ -142,6 +142,20 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
         utils.unreachable('FLOADTab: unsupported right_op: ' .. right_op_str)
     end
 
+    -- Share const_tabs across aliased FLOADs of the same
+    -- sub-table (e.g., two FLOADTab `func.env` from the same
+    -- SLOAD both reach the same env-table dict).
+    local parent_ssa = left_op:get_ssa()
+    if ctx.const_tabs[parent_ssa] == nil then
+        ctx.const_tabs[parent_ssa] = {content = {}, fields = {}}
+    end
+    local parent_ct = ctx.const_tabs[parent_ssa]
+    parent_ct.fields = parent_ct.fields or {}
+    if parent_ct.fields[right_op_str] == nil then
+        parent_ct.fields[right_op_str] = {content = {}, fields = {}}
+    end
+    ctx.const_tabs[ssa_ref] = parent_ct.fields[right_op_str]
+
     -- Same path as HLOAD on a TAB-typed cell: read the parent's
     -- mem slot and decode the field as a tab pointer.
     local parent_ptr = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
@@ -170,7 +184,7 @@ function impls.IRNodeFLOADP32:to_smt_lib(ctx)
         local tab_ssa = left_op:get_ssa()
         local ssa_ref = self:get_ssa_reference()
         if ctx.const_tabs[tab_ssa] == nil then
-            ctx.const_tabs[tab_ssa] = {content = {}}
+            ctx.const_tabs[tab_ssa] = {content = {}, fields = {}}
         end
         ctx.const_tabs[ssa_ref] = ctx.const_tabs[tab_ssa]
         local tab_val = ctx.op_stack:load(tab_ssa, op_type.TAB)
