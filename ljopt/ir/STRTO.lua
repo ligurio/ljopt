@@ -16,6 +16,7 @@ function impls.IRNodeSTRTONum:to_smt_lib(ctx)
     if left_op:is_str() then
         if tonumber(left_op:get_str()) then
             val = arith_utils.const_num_to_smt_fp(tonumber(left_op:get_str()))
+            ctx.const_nums[ssa_ref] = tonumber(left_op:get_str())
         else
             utils.unreachable("Apparently LuaJIT bug. LuaJIT emitted STRTO " ..
                               "for string, that is not convertible to number.")
