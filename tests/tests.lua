@@ -1194,6 +1194,25 @@ f(4)
         ins = {
             {type = "num", name = "POW"},
         },
+    }, {
+        -- Regression: STRTO with literal string must populate
+        -- ctx.const_nums so the const value propagates through
+        -- the arithmetic chain into CALLN, which then emits the
+        -- pinning axiom `(= (math_fn const) folded_const)`.
+        -- Without the axiom math_fn stays uninterpreted and the
+        -- optimized trace (which FOLDed the call to a literal)
+        -- cannot be proved equivalent => spurious sat.
+        code = [[
+local r = 0
+for i = 1, 30 do
+    r = math.cos(tonumber("0.5"))
+end
+]],
+        ins = {
+            {type = "num", name = "STRTO"},
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "cos")},
+        },
     }}
     test:plan(3 * #srcs)
 
