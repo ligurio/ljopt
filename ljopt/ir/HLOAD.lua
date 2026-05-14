@@ -8,7 +8,7 @@ ir_node.extended(impls.IRNodeHLOADStr, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
-    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
+    local tab_left, idx_left, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
 
@@ -19,7 +19,8 @@ function impls.IRNodeHLOADStr:to_smt_lib(ctx)
         ctx.const_strs[ssa_ref] = ct.content[key]
     end
 
-    return ('%s\n%s'):format(
+    return ('(assert ((_ is str-val) %s))\n%s\n%s'):format(
+        raw_cell,
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.STR,
             ctx.mem_stack:load_index(tab_left, idx_left, op_type.STR)
@@ -32,7 +33,7 @@ ir_node.extended(impls.IRNodeHLOADNum, ir_node.ir_node_base)
 
 function impls.IRNodeHLOADNum:to_smt_lib(ctx)
     local left_op = self:get_left_op()
-    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
+    local tab_left, idx_left, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local dst_slot = left_op:get_ssa()
@@ -42,7 +43,8 @@ function impls.IRNodeHLOADNum:to_smt_lib(ctx)
         ctx.const_nums[ssa_ref] = ct.content[key]
     end
 
-    return ('%s\n%s'):format(
+    return ('(assert ((_ is fp-val) %s))\n%s\n%s'):format(
+        raw_cell,
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.NUM, ctx.mem_stack:load_index(
             tab_left, idx_left, op_type.NUM)
@@ -59,7 +61,8 @@ function impls.IRNodeHLOADTab:to_smt_lib(ctx)
 
     local ssa_ref = self:get_ssa_reference()
     local tab_id = ir_node.get_table_uid(raw_cell, ctx.mem_stack:alloc_slot())
-    return ('%s\n%s'):format(
+    return ('(assert ((_ is tab-val) %s))\n%s\n%s'):format(
+        raw_cell,
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.TAB, tab_id)
     )
