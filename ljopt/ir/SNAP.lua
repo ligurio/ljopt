@@ -48,6 +48,19 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 local tab = ctx.mem_stack:load(tab_left)
                 smt_expr = "; Cdt, use directly"
                 slot_values[slot] = tab
+            elseif type == "fun" then
+                -- SLOADFun stores (tab-val mem_slot) in op_stack
+                -- (no fun-val constructor in MemCell). Falling
+                -- through to the numeric branch below would call
+                -- get-fp on a tab-val cell — unconstrained, so
+                -- z3 picks different fps cross-side and the snap
+                -- equiv check spuriously sats. Treat fun like a
+                -- table: compare the cell tied to
+                -- shared[inherited_from][0] by allocate.
+                local fun_ref = ctx.op_stack:load(value_data, op_type.TAB)
+                local fun_content = ctx.mem_stack:load(fun_ref)
+                smt_expr = "; Fun, use directly"
+                slot_values[slot] = fun_content
             elseif type == "str" then
                 local tab = ctx.op_stack:load(value_data, op_type.STR)
                 smt_expr = "; str, use directly"
