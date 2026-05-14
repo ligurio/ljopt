@@ -707,6 +707,29 @@ foo("hello", " world")
         },
     }, {
         code = [[
+local sink
+local function foo(a, b, c)
+    local x = a .. b
+    sink = x .. c
+    return sink
+end
+foo("a", "b", "c")
+foo("a", "b", "c")
+foo("a", "b", "c")
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')",
+        ins = {
+            {type = "p32", name = "BUFHDR",
+                right_op = op_type.new("lit", "RESET")},
+            {type = "p32", name = "BUFPUT"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "p32", name = "BUFHDR",
+                right_op = op_type.new("lit", "APPEND")},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
+        },
+    }, {
+        code = [[
 -- SLOAD cdt
 local function foo(x)
     return x + 1LL
