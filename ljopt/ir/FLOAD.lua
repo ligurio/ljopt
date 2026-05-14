@@ -171,10 +171,16 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local field_hash = arith_utils.const_str_to_memcell(
         smt_constants.FIELD_TAB_PREFIX .. right_op_str
     )
+    local raw_cell = ('(select %s %s)'):format(
+        ctx.mem_stack:load(parent_ptr), field_hash
+    )
     local data = ctx.mem_stack:load_index(
         parent_ptr, field_hash, op_type.TAB
     )
-    return ctx.op_stack:store(ssa_ref, op_type.TAB, data)
+    return ('(assert ((_ is tab-val) %s))\n%s'):format(
+        raw_cell,
+        ctx.op_stack:store(ssa_ref, op_type.TAB, data)
+    )
 end
 
 impls.IRNodeFLOADP32 = {}
