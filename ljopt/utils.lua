@@ -129,6 +129,20 @@ local function resolve_const(op, ctx, expected_type)
     return nil
 end
 
+-- Like `resolve_const`, but for string operands. Falls back to
+-- `ctx.const_strs` for SSA refs (e.g. TOSTR/HLOAD that have
+-- stamped a known string value). Without this,
+-- str HSTORE -> HLOAD chains lose constant forwarding and the
+-- encoder ends up reusing stale initial-table content.
+local function resolve_const_str(op, ctx)
+    if op:is_str() then
+        return op:get_str()
+    elseif op:is_ssa() then
+        return ctx.const_strs[op:get_ssa()]
+    end
+    return nil
+end
+
 local function trim(str)
   if str == nil then return end
   local res = string_gsub(str, '^%s*(.-)%s*$', '%1')
@@ -155,6 +169,7 @@ return {
     join_strings = join_strings,
     merge_tables = merge_tables,
     resolve_const = resolve_const,
+    resolve_const_str = resolve_const_str,
     trim = trim,
     unreachable = unreachable,
 }

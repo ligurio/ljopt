@@ -22,9 +22,14 @@ function impls.IRNodeHSTOREStr:to_smt_lib(ctx)
     local key = ctx.href_keys[dst_slot]
     local ct = ctx.const_tabs[dst_slot]
     if key ~= nil and ct ~= nil then
-        local const_op = utils.resolve_const(right_op, ctx)
+        local const_op = utils.resolve_const_str(right_op, ctx)
         if const_op ~= nil then
             ct.content[key] = const_op
+        else
+            -- Unknown string written: invalidate stale entry so a
+            -- subsequent HLOAD doesn't forward the initial-table
+            -- value through STRTO/FLOAD const folding.
+            ct.content[key] = nil
         end
     end
 
@@ -51,6 +56,8 @@ function impls.IRNodeHSTORENum:to_smt_lib(ctx)
         local const_op = utils.resolve_const(right_op, ctx)
         if const_op ~= nil then
             ct.content[key] = const_op
+        else
+            ct.content[key] = nil
         end
     end
 

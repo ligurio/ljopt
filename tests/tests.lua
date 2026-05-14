@@ -943,6 +943,25 @@ end
                 right_op = op_type.new("lit", "sin")},
         },
     }, {
+        name = "string const through HSTORE/HLOAD/str.len",
+        -- Without const_strs forwarding, the
+        -- opt trace folds #(t.k) to a literal while unopt keeps a
+        -- symbolic str.len, so the equiv check sats spuriously.
+        code = [[
+local t = {}
+local res = 0
+for i = 1, 30 do
+    t.k = "hello"
+    res = #(t.k)
+end
+]],
+        ins = {
+            {type = "str", name = "HSTORE"},
+            {type = "str", name = "HLOAD"},
+            {type = "int", name = "FLOAD",
+                right_op = op_type.new("lit", "str.len")},
+        },
+    }, {
         code = [[
 -- Store inner table, load it back, store a number into it.
 local function foo()

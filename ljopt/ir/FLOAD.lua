@@ -70,10 +70,19 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
             data = arith_utils.const_i64_to_smt_bv(len)
             ctx.const_nums[self:get_ssa_reference()] = len
         else
-            data = ('((_ int2bv %d) (str.len %s))'):format(
-                64,
-                ctx.op_stack:load(left_op:get_ssa(), op_type.STR)
-            )
+            -- Propagate len when the SSA string was tracked as
+            -- a known constant via HSTORE->HLOAD chains.
+            local known = ctx.const_strs[left_op:get_ssa()]
+            if known ~= nil then
+                local len = #known
+                data = arith_utils.const_i64_to_smt_bv(len)
+                ctx.const_nums[self:get_ssa_reference()] = len
+            else
+                data = ('((_ int2bv %d) (str.len %s))'):format(
+                    64,
+                    ctx.op_stack:load(left_op:get_ssa(), op_type.STR)
+                )
+            end
         end
     elseif right_op:sub(1, 3) == 'tab' then
         -- Loads tab.hmask, tab.asize, etc.
