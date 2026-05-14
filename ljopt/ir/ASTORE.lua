@@ -64,6 +64,19 @@ ir_node.extended(impls.IRNodeASTORETru, ir_node.ir_node_base)
 impls.IRNodeASTORETru.hex_constant = '#xFFFFFFFD00000000'
 impls.IRNodeASTORETru.to_smt_lib = bool_astore_to_smt_lib
 
+-- ASTORE with no type suffix writes the `nil` sentinel
+-- (LuaJIT deletes a slot). Mirrors `IRNodeHSTORE` in HSTORE.lua.
+impls.IRNodeASTORE = {}
+ir_node.extended(impls.IRNodeASTORE, ir_node.ir_node_base)
+
+function impls.IRNodeASTORE:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
+    -- Nil sentinel value.
+    local value = '#x0000000000000000'
+    return ctx.mem_stack:store_index(tab_left, idx_left, value, op_type.I64)
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
