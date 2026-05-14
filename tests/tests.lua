@@ -747,6 +747,23 @@ foo({nil}, {})
             {type = "tab", name = "ASTORE"},
         },
     }, {
+        name = "write nil to array",
+        code = [[
+-- ASTORE nil: writing nil deletes the array slot. Without
+-- the nil-ASTORE handler this lands on the dummy path and
+-- the downstream ALOAD guard sats spuriously.
+local function foo(t)
+    t[1] = nil
+    return t[1]
+end
+foo({1})
+foo({1})
+foo({1})
+]],
+        ins = {
+            {type = "nil", name = "ASTORE"},
+        },
+    }, {
         code = [[
 local x = {}
 for i = 1, 3 do
