@@ -2,6 +2,13 @@
 -- trace exits for arbitrary length.
 local MAXSNAP = 500
 
+-- Lower bound for auto-allocated MemoryStack slot ids. VM-slot
+-- ids (SLOAD-derived, non-local) live below this; TNEW/CNEW/
+-- BUFHDR locals start here. The equivalence-disjunct witness
+-- guard uses this split to compare only the non-local range,
+-- mirroring alive2's local-vs-non-local bid tagging.
+local LOCAL_SLOT_BASE = 10000000
+
 -- This variable contains SMT library helpers to be used
 -- by ljopt.
 --
@@ -60,6 +67,7 @@ local STRING_BUFF_SLOT = FIELD_TAB_PREFIX .. 'bufhdr'
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
+    LOCAL_SLOT_BASE = LOCAL_SLOT_BASE,
     FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
     STRING_BUFF_SLOT = STRING_BUFF_SLOT,
 }

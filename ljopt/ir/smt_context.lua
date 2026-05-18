@@ -417,7 +417,7 @@ function Array1D.store(self, op_num, data)
     return ('(assert (= %s %s))'):format(new_stack, updated_stack)
 end
 
--- We model memory as 3D array: [pointer][version][array].
+-- We model memory as 3D array: [versions][pointer][array].
 -- When we want to modify array we increase version.
 -- All reads happen from the latest version.
 local MemoryStack = {}
@@ -430,23 +430,32 @@ extended(MemoryStack, StackBase)
 --  optimized_stack     unoptimized_stack
 -- At 0 version they are equal. On every store we increment
 -- version of the slot, preserving old value for all others slots.
+-- mem[v+1][key] = (store mem[v] key (store mem[v][key] idx val))
 function MemoryStack.init_smt(self, name, base_stack)
     dev_checks('table', 'string', '?table')
 
     self._name = name
     self.base_stack = base_stack
     self.keys_lookup = {}
-    self.next_free = 0
+    -- Start auto-allocated slot ids well above any VM-slot id so
+    -- locals (TNEW/CNEW/BUFHDR) can be distinguished from
+    -- non-locals (SLOAD-derived) by id range in the equivalence
+    -- disjunct's witness guard.
+    self.next_free = smt_constants.LOCAL_SLOT_BASE
     -- base_slot -> { slot }
     self.vm_slot_map = {}
-    -- [Slot][Version][Data]
+    -- [Version][Slot][Data]
     local mutable_memory = string.format(
         '(declare-fun %s () MemPtr)',
         self._name
     )
-    self.versions_table = Array1D:new()
-    local ver_init = self.versions_table:init_smt('mem_ver_' .. name)
-    return mutable_memory .. '\n' .. ver_init
+    self._version = 0
+    if base_stack ~= nil then
+        mutable_memory = mutable_memory .. '\n' .. (
+            '(assert (= (select %s 0) (select %s 0)))'
+        ):format(self._name, base_stack._name)
+    end
+    return mutable_memory
 end
 
 function MemoryStack.alloc_slot(self)
@@ -470,35 +479,44 @@ function MemoryStack.key_id(self, key)
     return self.keys_lookup[key]
 end
 
-function MemoryStack.slot_version(self, slot)
-    return self.versions_table:load(slot)
+function MemoryStack.inc_version(self)
+    local old_ver = self:final_version()
+    self._version = self._version + 1
+    local new_ver = self:final_version()
+    return old_ver, new_ver
 end
 
-function MemoryStack.inc_version(self, slot)
-    return self.versions_table:store(slot, ('(+ %s 1)'):format(
-        self.versions_table:load(slot))
-    )
+function MemoryStack.final_version(self)
+    return tostring(self._version)
 end
 
 function MemoryStack.allocate(self, inherited_from)
     dev_checks('table', '?number')
 
-    local result
-    local current_slot = self:alloc_slot()
+    local current_slot
     if inherited_from ~= nil then
-        -- Non nil `id` means that allocated
-        -- memory should be equal to memory in base stack
-        -- (kinda process memory state when trace begins).
+        -- Non nil `inherited_from` means this table is non-local
+        -- and tied to base stack.
         assert(self.base_stack ~= nil)
         local str_id = tostring(inherited_from)
-        result = ('(assert (= %s %s))'):format(
-            self.base_stack:load(str_id), self:load(current_slot)
-        )
+        if self.vm_slot_map[str_id] ~= nil then
+            return self.vm_slot_map[str_id].slot, ''
+        end
+        -- Use the VM slot id itself as the local slot id so unopt
+        -- and opt stacks agree on the integer that ends up as a
+        -- `tab-val` literal. With independent alloc_slot counters
+        -- the same VM SLOAD could land at different local ids
+        -- across stacks (counter drift from differing IR length
+        -- before the SLOAD), and any downstream store that embeds
+        -- the slot id into another array makes the memory-diff
+        -- disjunct spuriously sat.
+        current_slot = str_id
         self.vm_slot_map[str_id] = { slot = current_slot }
-    else
-        result = ('\n(assert (= (select (select %s %s) 0) zero_pointer))'):
-            format(self._name, current_slot)
+        return current_slot, ''
     end
+    current_slot = self:alloc_slot()
+    local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
+        :format(self._name, current_slot)
     return current_slot, result
 end
 
@@ -506,13 +524,9 @@ end
 function MemoryStack.load(self, ptr)
     dev_checks('table', 'string')
 
-    local val = ([[(let (
-    (ptr %s)
-    (version %s)
-) (select (select %s ptr) version))]]):format(
-        ptr, self:slot_version(ptr), self._name
+    return ('(select (select %s %s) %s)'):format(
+        self._name, self:final_version(), ptr
     )
-    return val
 end
 
 -- Read single value from ptr at current version at idx.
@@ -527,43 +541,35 @@ function MemoryStack.load_index(self, ptr, idx, type)
 end
 
 -- Save data to ptr at new version.
--- All consequent reads will read new data.
 function MemoryStack.store(self, ptr, data)
     dev_checks('table', 'string', 'string')
 
-    local inc_ver = self:inc_version(ptr)
-
-    local val = string.format('(select %s %s)', self._name, ptr)
-    local new_stack = string.format('(select %s %s)',
-        val, self:slot_version(ptr)
+    local old_ver, new_ver = self:inc_version()
+    return ('(assert (= (select %s %s) (store (select %s %s) %s %s)))'):format(
+        self._name, new_ver, self._name, old_ver, ptr, data
     )
-    return string.format('%s\n(assert (= %s %s))', inc_ver, new_stack, data)
 end
 
 -- Save data to ptr at new version.
--- All consequent reads will read new data.
 function MemoryStack.store_index(self, ptr, index, data, type)
     dev_checks('table', 'string', 'string', 'string', 'string')
 
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     data = conv:format(data)
-    local old_version = self:slot_version(ptr)
-    local inc_ver = self:inc_version(ptr)
-    local new_version = self:slot_version(ptr)
+    local old_ver, new_ver = self:inc_version()
     local val = ([[(assert (let (
-    (old_version %s)
-    (new_version %s)
+    (old_version (select %s %s))
+    (key %s)
     (index %s)
     (data %s)
-    (version_array (select %s %s))
 ) (let (
-        (updated_array (store (select version_array old_version) index data))
-        (new_array (select version_array new_version))
-) (= new_array updated_array))))]]):format(
-        old_version, new_version, index,
-        create_value(data, type), self._name, ptr
+        (updated_inner (store (select old_version key) index data))
+) (= (select %s %s) (store old_version key updated_inner)))))]]):format(
+        self._name, old_ver, ptr, index,
+        create_value(data, type),
+        self._name, new_ver
     )
-    return string.format('%s\n%s', inc_ver, val)
+    return val
 end
 
 local SMTContext = {}
