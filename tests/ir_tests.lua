@@ -694,8 +694,8 @@ test:test("Memory IRs tests", function(test)
     -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (get-bv (select (select (select mem 0) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
-        "(assert (= (get-bv (select (select (select mem 0) 2) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
+        "(assert (= (get-bv (select (select (select mem 1) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
+        "(assert (= (get-bv (select (select (select mem 2) 1) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")
@@ -744,8 +744,8 @@ test:test("Array IRs tests", function(test)
     -- luacheck: push no max_line_length
     local expect_sat =
         prefix .. conv_smt ..
-        "(assert (= (get-bv (select (select (select mem 0) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
-        "(assert (= (get-bv (select (select (select mem 0) 2) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
+        "(assert (= (get-bv (select (select (select mem 1) 1) (int-val #x4026000000000000))) #x3FF0000000000000))" .. "\n" ..
+        "(assert (= (get-bv (select (select (select mem 2) 1) (int-val #x4026000000000000))) #x3F00000000000000))" .. "\n"
     -- luacheck: pop
     test:is(smt:parse(expect_sat), true, "Parse memory operations")
     test:is(smt:check(expect_sat), smt.result.SAT, "Ensure memory correct")

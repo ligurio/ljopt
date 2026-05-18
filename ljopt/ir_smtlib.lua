@@ -244,6 +244,7 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
         snapshots1.te, snapshots2.te
     )
+    smt_result = '(declare-const witness_ptr Int)\n' .. smt_result
     for _snap_id, values in pairs(merged_snaps) do
         local value1, value2 = unpack(values)
         if (value1 ~= nil) then
@@ -257,20 +258,13 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     end
     smt_result = smt_result .. '    ; Memory part\n'
 
-    -- If table was loaded from stack make sure it's
-    -- equal in both traces (or remains unchanged).
-    local merged_memory = utils.merge_tables(
-        stack1.vm_slot_map, stack2.vm_slot_map
+    smt_result = smt_result .. ([[    (and (>= witness_ptr 0)
+         (not (= (select (select %s %s) witness_ptr)
+                 (select (select %s %s) witness_ptr))))
+]]):format(
+        stack1._name, stack1:get_version(),
+        stack2._name, stack2:get_version()
     )
-    for base_id, values in pairs(merged_memory) do
-        local value1, value2 = unpack(values)
-        value1 = value1 ~= nil and stack1:load(value1.slot)
-                               or stack1.base_stack:load(base_id)
-        value2 = value2 ~= nil and stack2:load(value2.slot)
-                               or stack2.base_stack:load(base_id)
-        smt_result =
-            ('%s    (not (= %s %s))\n'):format(smt_result, value1, value2)
-    end
     smt_result = smt_result .. '))\n'
     return smt_result
 end
