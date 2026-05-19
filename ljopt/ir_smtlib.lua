@@ -239,6 +239,12 @@ local function trace2smt(trace, ctx, suffix, traceno, shared_stacks)
 end
 
 local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
+    -- Sanity mode: drop the equivalence-check disjunct so the
+    -- formula contains only the constraints accumulated during
+    -- both traces. That formula must be SAT.
+    if ljopt_config.is_verify_ljopt_correctness() then
+        return ''
+    end
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Check whether both traces exited by a guard.
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(

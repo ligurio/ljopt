@@ -13,6 +13,14 @@ local is_strict_mode_enabled = os.getenv("LJOPT_STRICT") ~= nil
 local is_strict_traces_matching_enabled =
     os.getenv("LJOPT_STRICT_TRACE_MATCHING") ~= nil
 
+-- Drops the final equivalence-check disjunct so the emitted
+-- formula is just the constraints accumulated during execution.
+-- With the check removed the formula MUST be SAT1. Used to
+-- validate that the per-trace constraints alone do not exclude
+-- the recorded execution.
+local is_verify_ljopt_correctness_enabled =
+    os.getenv("VERIFY_LJOPT_CORRECTNESS") ~= nil
+
 local function is_debug_mode()
     return is_debug_enabled
 end
@@ -53,6 +61,10 @@ local function is_dump_model()
     return is_dump_model_enabled
 end
 
+local function is_verify_ljopt_correctness()
+    return is_verify_ljopt_correctness_enabled
+end
+
 return {
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
@@ -63,4 +75,5 @@ return {
     is_coverage_mode = is_coverage_mode,
     set_coverage_mode = set_coverage_mode,
     is_dump_model = is_dump_model,
+    is_verify_ljopt_correctness = is_verify_ljopt_correctness,
 }
