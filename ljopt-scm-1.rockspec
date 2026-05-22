@@ -34,6 +34,7 @@ build = {
         ['ljopt.ir.SNAP'] = 'ljopt/ir/SNAP.lua',
         ['ljopt.ir_dump'] = 'ljopt/ir_dump.lua',
         ['ljopt.ir_dump_utils'] = 'ljopt/ir_dump_utils.lua',
+        ['ljopt.ir_passes'] = 'ljopt/ir_passes.lua',
         ['ljopt.ir_smtlib'] = 'ljopt/ir_smtlib.lua',
         ['ljopt.main'] = 'ljopt/main.lua',
         ['ljopt.runtime'] = 'ljopt/runtime.lua',

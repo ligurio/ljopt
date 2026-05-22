@@ -830,6 +830,29 @@ foo(false, 5.0)
         },
     }, {
         code = [[
+-- FORL narrowing: IV becomes int SLOAD with CI guard,
+-- step becomes int ADD, and the array write goes through
+-- CONV num.int to widen back to a num cell.
+local function foo()
+    local t = {}
+    for i = 1, 50 do t[i] = i end
+    return t[10]
+end
+foo()
+foo()
+foo()
+]],
+        ins = {
+            -- Instructions are checked against the unopt trace
+            -- (level 0). The narrowed opt trace turns SLOAD into
+            -- int+CI and ADD into int; the equivalence check
+            -- (traces_to_smt) verifies both.
+            {type = "num", name = "SLOAD"},
+            {type = "int", name = "CONV"},
+            {type = "num", name = "ADD"},
+        },
+    }, {
+        code = [[
 -- CALLN test: math.* with constant argument.
 local function foo()
   local x = 0.1

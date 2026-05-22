@@ -17,7 +17,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(4)
+test:plan(5)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -155,6 +155,58 @@ test:test("arith_utils conversion functions", function(test)
             arith_utils.const_num_to_smt_fp(-2^31)
         )), smt.result.SAT, "i32 sign-extend 0x80000000 -> FP -2^31"
     )
+end)
+
+test:test("mark_narrowed_refs", function(test)
+    local ir_passes = require("ljopt.ir_passes")
+
+    test:plan(3)
+
+    local function ssa(n) return { _is_ssa = true, _v = n,
+        is_ssa = function(self) return self._is_ssa end,
+        get_ssa = function(self) return self._v end } end
+    local function lit(s) return { _is_ssa = false, _v = s,
+        is_ssa = function(self) return self._is_ssa end,
+        get_lit = function(self) return self._v end } end
+    local function node(opcode, type, sref, left, right)
+        return {
+            _sref = sref, _op = opcode, _type = type,
+            _left = left, _right = right,
+            get_ssa_reference = function(self) return self._sref end,
+            get_opcode = function(self) return self._op end,
+            get_type = function(self) return self._type end,
+            get_left_op = function(self) return self._left end,
+            get_right_op = function(self) return self._right end,
+        }
+    end
+    local function fresh_ctx()
+        return {
+            te_stack = { narrowed_refs = {} }
+        }
+    end
+
+    -- SLOAD-C -> LE -> LE. Only the first LE (direct SLOAD-C
+    -- operand) is marked; the chained LE on its result is not
+    -- (mark_narrowed_refs only propagates one hop from SLOAD-C).
+    local ctx = fresh_ctx()
+    ir_passes.mark_narrowed_refs({
+        node('SLOAD', 'int', 1, lit('#5'), lit('CRI')),
+        node('LE', 'int', 2, ssa(1), lit('#x7ffffffe')),
+        node('LE', 'int', 3, ssa(2), lit('#x7ffffffe')),
+    }, ctx)
+    test:is(ctx.te_stack.narrowed_refs[2], true,
+        "LE on SLOAD-C + const marked")
+    test:is(ctx.te_stack.narrowed_refs[3], nil,
+        "chained LE on non-SLOAD-C operand not marked")
+
+    -- LE whose operand is a stray SSA ref (no SLOAD-C anywhere):
+    -- not marked.
+    ctx = fresh_ctx()
+    ir_passes.mark_narrowed_refs({
+        node('LE', 'int', 1, ssa(99), lit('#x7ffffffe')),
+    }, ctx)
+    test:is(ctx.te_stack.narrowed_refs[1], nil,
+        "LE on stray ref not marked")
 end)
 
 require("tests.coverage").shutdown()

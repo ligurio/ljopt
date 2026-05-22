@@ -21,6 +21,9 @@ local is_strict_traces_matching_enabled =
 local is_verify_ljopt_correctness_enabled =
     os.getenv("VERIFY_LJOPT_CORRECTNESS") ~= nil
 
+-- When disabled, narrowing-related logic is skipped end-to-end:
+local is_narrowing_enabled = os.getenv("LJOPT_DISABLE_NARROWING") == nil
+
 local function is_debug_mode()
     return is_debug_enabled
 end
@@ -65,9 +68,20 @@ local function is_verify_ljopt_correctness()
     return is_verify_ljopt_correctness_enabled
 end
 
+local function is_narrowing()
+    return is_narrowing_enabled
+end
+
+local function set_narrowing(val)
+    dev_checks("boolean")
+    is_narrowing_enabled = val
+end
+
 return {
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
+    is_narrowing = is_narrowing,
+    set_narrowing = set_narrowing,
     is_strict_mode = is_strict_mode,
     set_strict_mode = set_strict_mode,
     is_strict_traces_matching = is_strict_traces_matching,
