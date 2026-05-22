@@ -261,6 +261,22 @@ end
 
 function TEStackBV.store(self, op_num, data)
     dev_checks('table', 'number', 'string')
+    -- Narrowed guards (those whose operands trace back only to
+    -- C-flagged SLOAD inputs and constants) are domain
+    -- preconditions LJ's narrower introduces. Lift them to
+    -- top-level asserts and store `true` for the TE slot so they
+    -- don't show up in the snap exit bitvector (where they'd
+    -- produce a spurious te-diff against unopt, which has no
+    -- analogous IR).
+    if self.narrowed_refs and self.narrowed_refs[op_num] and data ~= 'true' then
+        return ('(assert %s)\n%s'):format(
+            data,
+            string.format(
+                '(assert (let ((a!1 true)) (= (select %s %d) a!1)))',
+                self._name, op_num
+            )
+        )
+    end
     return string.format('(assert (let ((a!1 %s)) (= (select %s %d) a!1)))',
         data, self._name, op_num
     )
@@ -565,6 +581,11 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- through the first SLOAD's chain is invisible to a later
     -- HLOAD through the second SLOAD's chain.
     self.const_tabs_by_slot = {}
+    -- ssa_ref -> true when value is derived purely from narrowed
+    -- (C-flagged) SLOAD inputs and constants. Guards on such refs
+    -- are narrowing preconditions and lift to top-level asserts
+    -- (see TEStackBV.store).
+    self.te_stack.narrowed_refs = {}
 
     return self
 end
@@ -575,6 +596,7 @@ function SMTContext:restart()
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
+    self.te_stack.narrowed_refs = {}
 end
 
 return {
