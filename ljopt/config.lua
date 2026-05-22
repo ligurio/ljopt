@@ -65,6 +65,18 @@ local function is_verify_correctness()
     return is_verify_correctness_enabled
 end
 
+-- When disabled, narrowing-related logic is skipped end-to-end:
+local is_narrowing_enabled = true
+
+local function is_narrowing()
+    return is_narrowing_enabled
+end
+
+local function set_narrowing(val)
+    dev_checks("boolean")
+    is_narrowing_enabled = val
+end
+
 return {
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
@@ -76,4 +88,6 @@ return {
     set_coverage_mode = set_coverage_mode,
     is_dump_model = is_dump_model,
     is_verify_correctness = is_verify_correctness,
+    is_narrowing = is_narrowing,
+    set_narrowing = set_narrowing,
 }

@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local arith_utils = require('ljopt.ir.arith_utils')
 
 local IRNodeTOBIT = {}
 ir_node.extended(IRNodeTOBIT, ir_node.ir_node_base)
@@ -9,10 +10,7 @@ function IRNodeTOBIT:to_smt_lib(ctx)
     -- Left operand is the num value; right operand is the TOBIT
     -- constant (ignored for SMT purposes).
     local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
-    -- fp.to_sbv 32 with RNE, then sign-extend to 64-bit.
-    local data = string.format(
-        '((_ sign_extend 32) ((_ fp.to_sbv 32) RNE %s))', left_op
-    )
+    local data = arith_utils.smt_fp_to_int(left_op, 'RNE')
 
     local ssa_ref = self:get_ssa_reference()
     local te = ""

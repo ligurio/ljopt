@@ -13,16 +13,12 @@ local smt_context = require('ljopt.ir.smt_context')
 local dev_checks = require('ljopt.dev_checks')
 local smt_constants = require('ljopt.smt_constants')
 local smt_snapshot = require('ljopt.ir.SNAP')
+local ir_passes = require('ljopt.ir_passes')
 local utils = require('ljopt.utils')
 
 -- Documentation: https://luajit.org/running.html
---
--- We disable `narrow` because sometimes it changes behaviour
--- of the trace, and we can't easily verify it.
--- See issue for tracking `narrow` implementation progress:
--- https://github.com/ligurio/ljopt/issues/34
 local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
-local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')"
+local lj_optimized = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')"
 
 local dev_trace_dump = function() end
 
@@ -179,6 +175,10 @@ local function translate(trace_record, ctx_src,
     -- 2nd stage. Transformations (loop unrooling, function
     -- inlining, ...).
     nodes = transform_nodes(nodes)
+
+    if ljopt_config.is_narrowing() then
+        ir_passes.mark_narrowed_refs(nodes, ctx_src)
+    end
 
     -- 3rd stage. Converting to SMT-LIB.
     jit.off(true, true)
