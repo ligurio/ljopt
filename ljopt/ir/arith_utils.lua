@@ -76,6 +76,15 @@ local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
 
+-- Convert FP `num` to int. Currently returns bv64 (32-bit signed
+-- value sign-extended to 64 bits); will become real Int when
+-- op-stack widens.
+local function smt_fp_to_int(fp_value, rounding)
+    return ('((_ sign_extend 32) ((_ fp.to_sbv 32) %s %s))'):format(
+        rounding or 'RTZ', fp_value
+    )
+end
+
 -- LuaJIT treats -0.0 and +0.0 as the same table key.
 -- Accepts a MemCell and returns a MemCell: for int-val keys,
 -- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
@@ -99,6 +108,7 @@ return {
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
     normalize_table_key = normalize_table_key,
+    smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
     smt_i64_to_fp = smt_i64_to_fp,
 }
