@@ -6,6 +6,7 @@ local supported_math_fns = {
     ['acos'] = math.acos,
     ['asin'] = math.asin,
     ['atan'] = math.atan,
+    ['atan2'] = math.atan2,
     ['cos'] = math.cos,
     ['cosh'] = math.cosh,
     ['exp'] = math.exp,
@@ -17,35 +18,55 @@ local supported_math_fns = {
     ['tanh'] = math.tanh,
 }
 
+-- math fns taking 2 args; left_op is a CARG holding both.
+local two_arg_fns = {
+    ['atan2'] = true,
+}
+
 local impls = {}
 
 impls.IRNodeCALLNNum = {}
 ir_node.extended(impls.IRNodeCALLNNum, ir_node.ir_node_base)
 
 function impls.IRNodeCALLNNum:to_smt_lib(ctx)
-    local fn_name_op = self:get_right_op()
-    local fn_name = fn_name_op:get_lit()
+    local fn_name = self:get_right_op():get_lit()
     local smt_fn = 'math_' .. fn_name
-
-    local arg_op = self:get_left_op()
-    if arg_op:is_carg() then
-        arg_op = arg_op:get_carg()[1]
-    end
     local ssa_ref = self:get_ssa_reference()
 
-    local arg_fp = ir_node.retrieve_num_op(arg_op, ctx, 'num')
-    local result_fp = ('(%s %s)'):format(smt_fn, arg_fp)
+    local raw_left = self:get_left_op()
+    local arg_ops
+    if two_arg_fns[fn_name] then
+        assert(raw_left:is_carg(),
+            'two-arg CALLN expects CARG left_op, got: ' .. raw_left.type
+        )
+        local carg = raw_left:get_carg()
+        arg_ops = { carg[1], carg[2] }
+    else
+        local single = raw_left:is_carg() and raw_left:get_carg()[1] or raw_left
+        arg_ops = { single }
+    end
+
+    local arg_fps = {}
+    local arg_consts = {}
+    local all_const = true
+    for i, op in ipairs(arg_ops) do
+        arg_fps[i] = ir_node.retrieve_num_op(op, ctx, 'num')
+        arg_consts[i] = utils.resolve_const(op, ctx)
+        if arg_consts[i] == nil then all_const = false end
+    end
+    local result_fp = ('(%s %s)'):format(smt_fn, table.concat(arg_fps, ' '))
 
     local axiom = ''
-    -- When argument is constant, define the actual result.
-    local const_val = utils.resolve_const(arg_op, ctx)
     local lua_fn = supported_math_fns[fn_name]
-    if const_val ~= nil and lua_fn then
-        local result_val = lua_fn(const_val)
-        local input_fp = arith_utils.const_num_to_smt_fp(const_val)
-        local result_fp_const = arith_utils.const_num_to_smt_fp(result_val)
+    if all_const and lua_fn then
+        local result_val = lua_fn((unpack or table.unpack)(arg_consts))
+        local const_args = {}
+        for i, v in ipairs(arg_consts) do
+            const_args[i] = arith_utils.const_num_to_smt_fp(v)
+        end
         axiom = ('\n(assert (= (%s %s) %s))'):format(
-            smt_fn, input_fp, result_fp_const
+            smt_fn, table.concat(const_args, ' '),
+            arith_utils.const_num_to_smt_fp(result_val)
         )
         ctx.const_nums[ssa_ref] = result_val
     end

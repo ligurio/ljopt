@@ -215,6 +215,14 @@ test:test("IR arithmetic tests", function(test)
                         result = bit.tobit(-2.3), error = 1.},
         {node = create_node("int", "TOBIT", num(2147483647)),
                         result = bit.tobit(2147483647), error = 1.},
+        -- Fractional power: RTZ truncates 2.5 -> 2, matching
+        -- C's ldexp(double, int) cast that Lua dispatches to.
+        {node = create_node("num", "LDEXP", num(3.0), num(2.5)),
+                        result = math.ldexp(3.0, 2.5), error = 1.},
+        {node = create_node("num", "LDEXP", num(3.0), num(-2.5)),
+                        result = math.ldexp(3.0, -2.5), error = 1.},
+        {node = create_node("num", "LDEXP", num(2.5), num(0)),
+                        result = 2.5, error = 1.},
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.

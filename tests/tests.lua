@@ -1297,6 +1297,42 @@ end
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "tan")},
         },
+    }, {
+        name = "LDEXP with constant operands",
+        code = [[
+local r = 0.0
+for i = 1, 30 do
+    r = math.ldexp(3.0, 4.0)
+end
+]],
+        ins = {
+            {type = "num", name = "LDEXP"},
+        },
+    }, {
+        -- LDEXP identity fold: ldexp(x, 0) = x. Mirrors POW's
+        -- x^1 fold so const_nums propagation survives.
+        name = "LDEXP identity (exponent 0)",
+        code = [[
+local r = 0.0
+for i = 1, 30 do
+    r = math.ldexp(2.5, 0)
+end
+]],
+        ins = {
+            {type = "num", name = "LDEXP"},
+        },
+    }, {
+        name = "CALLN atan2 with constant operands",
+        code = [[
+local r = 0.0
+for i = 1, 30 do
+    r = math.atan2(3.0, 4.0)
+end
+]],
+        ins = {
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "atan2")},
+        },
     }}
     test:plan(3 * #srcs)
 
