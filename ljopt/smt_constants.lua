@@ -40,11 +40,28 @@ local LJOPT_SMTLIB = ([[
 (declare-fun math_exp ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (declare-fun math_log ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 (declare-fun math_log10 ((_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+
 ; Uninterpreted FP power for `^`. z3 has no native FP exponent,
 ; so we treat pow_fp as an opaque function — both traces feed
 ; the same axioms, so deterministic input -> deterministic
 ; output even though the abstract semantics are opaque.
 (declare-fun pow_fp ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+
+; ldexp(x, n) = x * 2^n. Pure FP: encode 2^n by building the
+; IEEE biased exponent directly. Under-specs IEEE for n outside
+; [-1022, 1023] (overflow/subnormal collapse), but both traces
+; use the same definition, so equivalence holds.
+(define-fun smt_ldexp ((x (_ FloatingPoint 11 53))
+                      (n (_ FloatingPoint 11 53)))
+                     (_ FloatingPoint 11 53)
+    (fp.mul RNE x
+        (fp #b0
+            ((_ extract 10 0)
+                (bvadd ((_ fp.to_sbv 16) RTZ n) #x03ff))
+            (_ bv0 52))))
+
+(declare-fun math_atan2 ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
+
 (define-fun-rec str_reverse ((s String)) String
   (ite (= (str.len s) 0)
        ""
