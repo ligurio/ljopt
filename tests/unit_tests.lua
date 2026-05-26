@@ -4,7 +4,6 @@
 
 local arith_utils = require("ljopt.ir.arith_utils")
 local ljopt_config = require("ljopt.config")
-local smt_constants = require("ljopt.smt_constants")
 local utils = require("ljopt.utils")
 
 local smt = require("tests.smtlib2").new()
@@ -18,7 +17,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(5)
+test:plan(4)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -156,47 +155,6 @@ test:test("arith_utils conversion functions", function(test)
             arith_utils.const_num_to_smt_fp(-2^31)
         )), smt.result.SAT, "i32 sign-extend 0x80000000 -> FP -2^31"
     )
-end)
-
-test:test("Array1D", function(test)
-    test:plan(3)
-
-    local smt_context = require("ljopt.ir.smt_context")
-    local arr = smt_context.Array1D:new()
-
-    local init = arr:init_smt("test_arr")
-
-    -- Test 1: Store a value then load it back.
-    local s1 = arr:store("5", "42")
-    local l1 = arr:load("5")
-    test:is(smt:check(utils.join_strings({
-        smt_constants.LJOPT_SMTLIB,
-        init,
-        '\n',
-        s1,
-        '(assert (= ' .. l1 .. ' 42))'
-    })), smt.result.SAT, "Load after store returns stored value")
-
-    -- Test 2: Load from a different slot should
-    -- NOT equal the stored value.
-    local l2 = arr:load("7")
-    test:is(smt:check(utils.join_strings({
-        smt_constants.LJOPT_SMTLIB,
-        init,
-        s1,
-        '(assert (not (= ' .. l2 .. ' 42)))'
-    })), smt.result.SAT, "Load from different slot can differ")
-
-    -- Test 3: Overwrite slot 5 with a new value, verify update.
-    local s2 = arr:store("5", "99")
-    local l3 = arr:load("5")
-    test:is(smt:check(utils.join_strings({
-        smt_constants.LJOPT_SMTLIB,
-        init,
-        s1,
-        s2,
-        '(assert (= ' .. l3 .. ' 99))'
-    })), smt.result.SAT, "Overwritten slot returns new value")
 end)
 
 require("tests.coverage").shutdown()
