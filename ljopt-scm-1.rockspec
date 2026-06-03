@@ -6,9 +6,9 @@ source = {
 }
 
 description = {
-    summary = 'Translate LuaJIT BC and IR to SMT-LIB',
+    summary = 'Translate LuaJIT IR to SMT-LIB',
     detailed = [[
-ljopt is a bounded translation validation tool for the LuaJIT bytecode and
+ljopt is a bounded translation validation tool for the LuaJIT
 intermediate representation (IR). It limits resource consumption by, for
 example, unrolling loops up to some bound, which means there are circumstances
 in which it misses bugs. ljopt is designed to avoid false alarms, is fully
@@ -29,8 +29,6 @@ build = {
     type = 'builtin',
     modules = {
         ljopt = 'ljopt/init.lua',
-        ['ljopt.bc_dump'] = 'ljopt/bc_dump.lua',
-        ['ljopt.bc_smtlib'] = 'ljopt/bc_smtlib.lua',
         ['ljopt.config'] = 'ljopt/config.lua',
         ['ljopt.dev_checks'] = 'ljopt/dev_checks.lua',
         ['ljopt.ir.SNAP'] = 'ljopt/ir/SNAP.lua',

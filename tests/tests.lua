@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(12)
+test:plan(10)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -92,10 +92,6 @@ test:test("ir_dump", function(test)
         "for i = 1, 100 do local a, b = 23, 11; y = a + b end"
     )
     test:isnt(next(traces), nil, "lua code with traces")
-end)
-
-test:test("bc_dump", function(_test)
-    -- Empty.
 end)
 
 test:test("ir_smtlib", function(test)
@@ -1353,10 +1349,6 @@ end
     end
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
-end)
-
-test:test("bc_smtlib", function(_test)
-    -- Empty.
 end)
 
 require("tests.coverage").shutdown()

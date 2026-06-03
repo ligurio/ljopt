@@ -68,18 +68,3 @@ jit.flush()
 local result = ljopt.ir.translate_to_smt(lua_code, true)
 io.stdout:write(result)
 os.exit(exit_codes.OK)
-
-local bc = ljopt.bc.record(lua_code) -- TODO: Wrap with pcall.
-if #bc == 0 then
-  io.stderr:write("no bytecode\n")
-  -- os.exit(exit_codes.errors)
-end
-
-local bc_smtlib = ljopt.bc.translate(bc) -- TODO: Wrap with pcall.
-if not bc_smtlib or #bc_smtlib == 0 then
-  io.stderr:write("translation BC to SMT-LIB has failed\n")
-  -- os.exit(exit_codes.errors)
-else
-  io.stdout:write("BC SMT-LIB:\n")
-  io.stdout:write(bc_smtlib)
-end
