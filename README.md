@@ -1,4 +1,4 @@
-## Translate LuaJIT BC and IR to SMT-LIB
+## Translate LuaJIT IR to SMT-LIB
 
 is an implementation of translation validation for LuaJIT.
 

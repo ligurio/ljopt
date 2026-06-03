@@ -1,6 +1,4 @@
 local runtime = require("ljopt.runtime")
-local dump_bc = require("ljopt.bc_dump")
-local smtlib_bc = require("ljopt.bc_smtlib")
 local smtlib_ir = require("ljopt.ir_smtlib")
 local is_jit = (tostring(getmetatable):match("builtin") ~= nil)
 
@@ -23,10 +21,6 @@ return {
 	    record = runtime.record_sandboxed,
 	    traces_to_smt = smtlib_ir.traces_to_smt,
 	    translate_to_smt = smtlib_ir.translate_to_smt,
-    },
-    bc = {
-	    record = dump_bc.record,
-	    translate = smtlib_bc.translate,
     },
 
     VERSION = VERSION,
