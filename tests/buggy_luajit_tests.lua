@@ -20,7 +20,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(33)
+test:plan(34)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -53,7 +53,11 @@ ljopt_config.set_strict_mode(false)
 -- The function returns true if everything was succeed and false
 -- otherwise. The function triggers an assertion if no SMT
 -- formulas were produced.
-local function reproduce_bug_using_smt(chunk)
+-- `force_sat` is for bugs that are still OPEN upstream: the
+-- optimised trace diverges from the unoptimised one on every
+-- build (no fix exists yet), so ljopt reports SAT regardless of
+-- which LuaJIT build records the traces.
+local function reproduce_bug_using_smt(chunk, force_sat)
     -- Enabled code coverage breaks LuaJIT compilation,
     -- `toggle_debug_hook()` disables using `debug.sethook()` in
     -- <ljopt/ir_dump.lua>.
@@ -64,7 +68,8 @@ local function reproduce_bug_using_smt(chunk)
         if not smt:parse(smt_formula) then
             return false
         end
-        local smt_res = buggy_build and smt.result.SAT or smt.result.UNSAT
+        local smt_res = (buggy_build or force_sat)
+            and smt.result.SAT or smt.result.UNSAT
         if smt:check(smt_formula) ~= smt_res then
             return false
         end
@@ -203,6 +208,38 @@ test:test("pow() inaccuracy (LuaJIT#817)", function(test)
     test:skip("reproduce in runtime")
     local chunk = read_reproducer_file("lj_817.lua")
     test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
+end)
+
+-- Incorrect narrowing for huge numbers (LuaJIT#1236).
+-- https://github.com/LuaJIT/LuaJIT/issues/1236
+-- Still OPEN upstream: narrowing backpropagates an i64
+-- conversion across ADD/SUB, but doubles lose integer precision
+-- for |x| >= 2^52, so the narrowed trace diverges from the
+-- unoptimised one. The divergence surfaces as a Lua `assert`, so
+-- it is reproducible in runtime. Because no fix exists yet, ljopt
+-- reports SAT on every build (force_sat).
+-- Two reproducers from #1236: the plain `s+1-0LL-s` loop and the
+-- ffi int64-cast `s+s+s` loop.
+test:test("Incorrect narrowing for huge numbers (LuaJIT#1236)",
+function(test)
+    test:plan(4)
+    local err_msg = "incorrect narrowing for huge numbers: "
+    local chunk1 = read_reproducer_file("lj_1236.lua")
+    test:ok(reproduce_bug_in_popen("lj_1236.lua", err_msg .. "plain loop"),
+        "plain `s+1-0LL-s` loop: reproduce in runtime")
+    test:ok(reproduce_bug_using_smt(chunk1, true),
+        "plain `s+1-0LL-s` loop: reproduce using SMT")
+    test:ok(reproduce_bug_in_popen("lj_1236_2.lua",
+        err_msg .. "ffi int64 cast loop"),
+        "ffi int64-cast `s+s+s` loop: reproduce in runtime")
+    -- The ffi variant boxes its result into a cdata whose
+    -- trace-local fresh-slot id differs across the two traces, so
+    -- the memory-diff disjunct is SAT regardless of value (false
+    -- positive), not a genuine narrowing check. This is the
+    -- boxed-local identity gap tracked in
+    -- https://github.com/ligurio/ljopt/issues/38; until it is fixed
+    -- the ffi variant cannot be reproduced via SMT.
+    test:skip("ffi int64-cast `s+s+s` loop: reproduce using SMT")
 end)
 
 -- Fix FOLD rules for math.abs() and FP negation.

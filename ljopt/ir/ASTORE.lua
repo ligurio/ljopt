@@ -47,6 +47,22 @@ function impls.IRNodeASTORETab:to_smt_lib(ctx)
     return ctx.mem_stack:store_index(tab_left, idx_left, src_tab, op_type.TAB)
 end
 
+-- A cdata box (from CNEWI) is referenced the same way a table is:
+-- its allocation index is stored as a `tab-val` ref. So storing a
+-- cdt into an array mirrors IRNodeASTORETab.
+impls.IRNodeASTORECdt = {}
+ir_node.extended(impls.IRNodeASTORECdt, ir_node.ir_node_base)
+
+function impls.IRNodeASTORECdt:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local right_op = self:get_right_op()
+    local src_slot = right_op:get_ssa()
+
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
+    local src_cdt = ctx.op_stack:load(src_slot, 'tab')
+    return ctx.mem_stack:store_index(tab_left, idx_left, src_cdt, op_type.TAB)
+end
+
 local function bool_astore_to_smt_lib(self, ctx)
     local left_op = self:get_left_op()
     local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
