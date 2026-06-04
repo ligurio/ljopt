@@ -12,7 +12,7 @@ LUA_PATH="${LUA_PATH_ROCKS};./?/init.lua;;"
 
 # Don't forget to update the commit hash in .envrc.
 LUAJIT_TAG ?= af5d38f109b6a7f714b41f92a57e2bd67d14955a
-LUAJIT_BUGGY_TAG ?= ab0c0793a43fc0fb0c7b71b6250339117d99254a~
+LUAJIT_BUGGY_TAG ?= 203a98682e925d3740291db26184b8a847857943~
 BUILD_DIR := $(PROJECT_DIR)/build
 LUA_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_TAG)/src/luajit
 LUA_BUGGY_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_BUGGY_TAG)/src/luajit
