@@ -196,8 +196,13 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/commit/9512d5c1aced61e13e7be2d3208ec7ae3516b458
 test:test("pow() inaccuracy (LuaJIT#817)", function(test)
     test:plan(2)
+    -- The `2.0 ^ i ==> ldexp(1.0, i)` divergence is a
+    -- JIT-vs-interpreter numeric inaccuracy; it is libm-dependent
+    -- and not raised as a Lua error, so there is no runtime
+    -- assertion to match. ljopt catches it symbolically instead.
     test:skip("reproduce in runtime")
-    test:skip("reproduce using SMT")
+    local chunk = read_reproducer_file("lj_817.lua")
+    test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
 end)
 
 -- Fix FOLD rules for math.abs() and FP negation.
