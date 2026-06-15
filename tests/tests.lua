@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(10)
+test:plan(11)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -425,6 +425,53 @@ f()
     test:is(smt:check(formula), smt.result.UNSAT, "Stitching test checking.")
 
     ljopt_config.set_strict_mode(strict_mode)
+end)
+
+-- The `narrow` optimization loads a number-typed slot as `int`
+-- at -O3 but `num` at -O0. Unless the trace ID (derived from
+-- SLOAD IR types) treats the two as equivalent, the -O0 and -O3
+-- traces get different IDs and the pair is silently dropped.
+-- See: https://github.com/ligurio/ljopt/issues/34
+test:test("Trace IDs match across narrowing (LJOPT#34)", function(test)
+    test:plan(2)
+    local narrowing = [[
+local function foo(n)
+    local s = 0
+    for i = 1, n do
+        s = s + i
+    end
+    return s
+end
+for k = 1, 100 do foo(200) end
+]]
+
+    local function trace_id_set(opt)
+        local exec_records = ljopt.ir.record(narrowing, opt)
+        local ids = {}
+        for id in pairs(exec_records) do
+            ids[id] = true
+        end
+        return ids
+    end
+
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+
+    local unopt = trace_id_set("jit.opt.start(0, 'hotloop=1', 'hotexit=1')")
+    -- Narrowing left enabled on purpose - that's the whole point.
+    local opt = trace_id_set("jit.opt.start(3, 'hotloop=1', 'hotexit=1')")
+
+    ljopt_config.set_strict_mode(strict_mode)
+
+    test:ok(next(unopt) ~= nil, "recorded at least one trace")
+
+    local matched = true
+    for id in pairs(unopt) do
+        if not opt[id] then
+            matched = false
+        end
+    end
+    test:ok(matched, "every -O0 trace id is present in -O3 (narrowing)")
 end)
 
 -- Relaxed mode tests, which means any code or

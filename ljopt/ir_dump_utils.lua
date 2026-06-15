@@ -30,35 +30,55 @@ jit.off(true, true)
 -- have to isolate global variables by making their local copy.
 local type = type
 
-local function inspect_stack_arguments(func)
-    -- Get information about the function,
-    -- including its current line.
-    local info = debug.getinfo(func, "S")
-    if not info then return end
+-- IRT_NUM/IRT_INT are derived from the irtype_text table owned by
+-- ir_dump.lua and handed over via ljopt_init(), so the numbers
+-- stay in sync with that table instead of being hardcoded.
+-- See IRType and IRSLOAD_CONVERT in LuaJIT's lj_ir.h.
+local IRT_NUM, IRT_INT
+local IRSLOAD_CONVERT = 0x08
 
-    -- Get the active local variables (including arguments)
-    -- at the given PC. Note: maybe we should track the
-    -- whole stack not just single function.
-    --
-    -- level 1 is current function (inspect_stack_arguments)
-    -- level 2 is previous function from ir_dump_utils
-    -- level 3 is previous function from ir_dump
-    -- level 4 is actual function caused trace recording
-    local level = 4
-    local i = 1
-    local result = ""
-    while true do
-        local name, value = debug.getlocal(level, i)
-        if not name then break end
-        local tn = type(value)
-        if tn == "boolean" then
-            result = result .. string.format("(%s:%s)", tn, tostring(value))
-        else
-            result = result .. string.format("(%s)", tn)
-        end
-        i = i + 1
+-- Receive tables owned by ir_dump.lua. Must be called before any
+-- trace is processed.
+local function ljopt_init(deps)
+  -- Reverse map: type name -> IRType number.
+  local irtypes = {}
+  for num, name in ipairs(deps.irtype_text) do
+    irtypes[name] = num
+  end
+  IRT_NUM = irtypes.num
+  IRT_INT = irtypes.int
+end
+
+-- A narrowed slot is loaded as IRT_INT at -O3 (with the CONVERT
+-- flag) but IRT_NUM at -O0, though the stack slot is a number in
+-- both. Treat the two as equivalent only for such converting
+-- loads, so the trace IDs match across opt levels without
+-- conflating genuinely integer-typed slots.
+-- See: https://github.com/ligurio/ljopt/issues/34
+local function sload_type_token(irt, mode)
+  if irt == IRT_INT and band(mode, IRSLOAD_CONVERT) ~= 0 then
+    return IRT_NUM
+  end
+  return irt
+end
+
+-- Build type signature from SLOAD guards - these are the types
+-- LJ specialized on at trace entry. Stable across opt levels for
+-- the same Lua program.
+local function sload_type_sig(tr)
+  local info = jutil.traceinfo(tr)
+  if not info then return "" end
+  local sig = ""
+  for i = 1, info.nins do
+    local _, ot, op1, op2 = jutil.traceir(tr, i)
+    local oidx = 6 * shr(ot, 8)
+    local op = sub(vmdef.irnames, oidx + 1, oidx + 6)
+    if op == "SLOAD " then
+      local irt = sload_type_token(band(ot, 31), op2)
+      sig = sig .. "_" .. tostring(op1) .. "t" .. tostring(irt)
     end
-    return result
+  end
+  return sig
 end
 
 -- A table with recorded execution.
@@ -176,13 +196,11 @@ end
 -- All of the above together gives unique ID
 -- (except for cases, when there's multiple snapshots
 --  with same ID, we'll ignore them for now).
-local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
+local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
   if what == "start" then
-    local stringify_arguments = inspect_stack_arguments(func, pc)
     trace_bc_hash[tr] = ""
     dev_checks("number", "function", "number", "string")
-
-    traces_num[tr] = tostring(fnv1a_hash(stringify_arguments))
+    traces_num[tr] = ""
     if otr then
       if traces_num[otr] ~= nil then
         -- Set parent <trace_id>_<snap_id>
@@ -209,7 +227,7 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   elseif what == "stop" or what == "abort" then
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
-      traces_num[tr] = traces_num[tr] .. "_" .. bc_hash
+      traces_num[tr] = traces_num[tr] .. sload_type_sig(tr) .. "_" .. bc_hash
       if ljopt_config.is_debug_mode() then
         io.stderr:write("Cur trace id: " .. traces_num[tr] .. "\n")
       end
@@ -419,4 +437,5 @@ return {
   ljopt_record_trace = ljopt_record_trace,
   ljopt_savetrace = ljopt_savetrace,
   ljopt_formatsmt = ljopt_formatsmt,
+  ljopt_init = ljopt_init,
 }
