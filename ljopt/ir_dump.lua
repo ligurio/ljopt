@@ -72,6 +72,10 @@ local irtype_text = {
   "sfp",
 }
 
+-- Hand the IR type table to ir_dump_utils so it can derive its
+-- IRT_* constants instead of hardcoding the numbers.
+ir_dump_utils.ljopt_init({ irtype_text = irtype_text })
+
 local function colorize_text(s)
   return s
 end
