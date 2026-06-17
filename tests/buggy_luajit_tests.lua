@@ -286,7 +286,8 @@ test:test("IR_NEWREF is missing a NaN check (LuaJIT#1069)", function(test)
     local filename = "lj_1069.lua"
     test:ok(reproduce_bug_in_popen(filename, "function returns an error"),
         "reproduce in runtime")
-    test:skip("reproduce with SMT")
+    test:ok(reproduce_bug_using_smt(read_reproducer_file(filename)),
+        "reproduce using SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/6163
