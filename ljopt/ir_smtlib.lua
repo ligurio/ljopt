@@ -151,6 +151,11 @@ local function translate(trace_record, ctx_src,
     smt_suffix = smt_suffix or 'src'
     tr_id = tr_id or '0'
     ctx_src = ctx_src or smt_context.SMTContext:new('BV', 'BV')
+    -- The unopt trace is the "reference" side: opcodes that model
+    -- a mandatory lowering guard (e.g. NEWREF's NaN-key check)
+    -- emit it unconditionally here, so the equivalence check
+    -- spots an opt trace missing the guard. See ir/NEWREF.lua.
+    ctx_src.is_reference = (smt_suffix == 'unopt')
     -- 0 stage. Create 'smt-context'.
     if shared_stacks then
         -- Otherwise memory shouldn't be used.
