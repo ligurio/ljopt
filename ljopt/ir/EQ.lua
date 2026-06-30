@@ -17,6 +17,9 @@ ir_node.extended(impls.IRNodeEQInt, bin_op.BinOpGuardInt)
 impls.IRNodeEQI64 = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQI64, bin_op.BinOpGuardI64)
 
+impls.IRNodeEQU32 = { op_str = '=' }
+ir_node.extended(impls.IRNodeEQU32, bin_op.BinOpGuardU32)
+
 local function instance(node_str)
     return impls[node_str]
 end
