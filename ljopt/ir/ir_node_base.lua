@@ -117,6 +117,27 @@ local function retrieve_int_op(op, ctx, _type)
     )
 end
 
+-- Loads an unsigned 32-bit (u32) value.
+-- Stored as a zero-extended 64-bit BV (canonical, high bits 0).
+-- OpType.SSA - load from op_stack as 'u32'.
+-- OpType.NUM - reinterpret the double bit-pattern as i64 hex
+--   (positive u32 constants round-trip correctly).
+local function retrieve_u32_op(op, ctx, _type)
+    if op == nil then
+        utils.unreachable('retrieve_u32_op: op is nil')
+    end
+    if op:is_ssa() then
+        return ctx.op_stack:load(op:get_ssa(), 'u32')
+    elseif op:is_num() then
+        return hex_double_to_i64_hex(op_type.to_string(op))
+    elseif op:is_bool() then
+        utils.unreachable('Bool cannot be argument of u32')
+    end
+    utils.unreachable(
+        'retrieve_u32_op: unsupported op type: ' .. tostring(op and op.type)
+    )
+end
+
 -- Loads a strings value,
 -- reinterpreting floats if needed.
 -- OpType.SSA - load from op_stack as 'str'.
@@ -272,4 +293,5 @@ return {
     retrieve_str_op = retrieve_str_op,
     retrieve_int_op = retrieve_int_op,
     retrieve_i64_op = retrieve_i64_op,
+    retrieve_u32_op = retrieve_u32_op,
 }

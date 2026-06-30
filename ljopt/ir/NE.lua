@@ -6,6 +6,9 @@ local impls = {}
 impls.IRNodeNEInt = { op_str = 'distinct' }
 ir_node.extended(impls.IRNodeNEInt, bin_op.BinOpGuardInt)
 
+impls.IRNodeNEU32 = { op_str = 'distinct' }
+ir_node.extended(impls.IRNodeNEU32, bin_op.BinOpGuardU32)
+
 impls.IRNodeNENum = {}
 ir_node.extended(impls.IRNodeNENum, ir_node.ir_node_base)
 
