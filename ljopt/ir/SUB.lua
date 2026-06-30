@@ -13,6 +13,9 @@ ir_node.extended(impls.IRNodeSUBInt, bin_op.BinOpInt)
 impls.IRNodeSUBI64 = { op_str = 'bvsub' }
 ir_node.extended(impls.IRNodeSUBI64, bin_op.BinOpI64)
 
+impls.IRNodeSUBU32 = { op_str = 'bvsub' }
+ir_node.extended(impls.IRNodeSUBU32, bin_op.BinOpU32)
+
 local function instance(node_str)
     return impls[node_str]
 end

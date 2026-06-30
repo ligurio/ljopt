@@ -76,6 +76,26 @@ local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
 
+-- Canonicalize a 64-bit BV holding a u32 result: keep the low 32
+-- bits and zero-extend. This both wraps unsigned 32-bit
+-- arithmetic at 2^32 (correct overflow) and keeps the value in
+-- canonical form (high 32 bits = 0), so it stays a non-negative
+-- 64-bit integer and unsigned compares / FP conversions behave
+-- correctly.
+local function wrap_u32(bv_value)
+    return ('((_ zero_extend 32) ((_ extract 31 0) %s))'):format(bv_value)
+end
+
+-- Convert a u32 value (stored as a zero-extended 64-bit BV) to a
+-- floating-point `num`. The canonical u32 is always non-negative,
+-- so the signed bitvector-to-FP conversion gives the unsigned
+-- value.
+local function smt_u32_to_fp(u32_value)
+    return string.format(
+        "((_ to_fp 11 53) RNE %s)", wrap_u32(u32_value)
+    )
+end
+
 -- Convert FP `num` to int. Currently returns bv64 (32-bit signed
 -- value sign-extended to 64 bits); will become real Int when
 -- op-stack widens.
@@ -111,4 +131,6 @@ return {
     smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
     smt_i64_to_fp = smt_i64_to_fp,
+    smt_u32_to_fp = smt_u32_to_fp,
+    wrap_u32 = wrap_u32,
 }

@@ -1399,6 +1399,171 @@ end
             {type = "num", name = "CALLN",
                 right_op = op_type.new("lit", "atan2")},
         },
+    }, {
+        code = [[
+local ffi = require("ffi")
+local s = ffi.new("uint32_t", 0)
+local k = ffi.new("uint32_t", 7)
+for _ = 1, 60 do s = ffi.cast("uint32_t", s + k) end
+]],
+        -- u32 ops only appear after narrowing (opt level 3).
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "FLOAD"},
+            {type = "u32", name = "ADD"},
+        },
+    }, {
+        code = [[
+local ffi = require("ffi")
+local s = ffi.new("uint32_t", 1000000)
+local k = ffi.new("uint32_t", 7)
+for _ = 1, 60 do s = ffi.cast("uint32_t", s - k) end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "SUB"},
+        },
+    }, {
+        code = [[
+-- u32 NE: `~=` on uint32_t cdata lowers to a u32 inequality guard.
+-- The branch result is a plain number (not a boxed u32 cdata), so
+-- there is no FP<->BV roundtrip and z3 stays tractable.
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local s = 0
+local function f(x, y) if x ~= y then s = s + 1 else s = s + 2 end end
+for _ = 1, 200 do f(a, b) end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "NE"},
+        },
+    }, {
+        code = [[
+-- CONV num->u32 (and u32->num): cast a double to uint32_t, then
+-- read it back via tonumber. Both directions are converted back
+-- to a plain num for accumulation, so no boxed cdata roundtrip.
+local ffi = require("ffi")
+local s = 0
+for i = 1, 200 do
+    local u = ffi.cast("uint32_t", i * 1.5)
+    s = s + tonumber(u)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+            {type = "num", name = "CONV",
+                right_op = op_type.new("lit", "num.u32")},
+        },
+    }, {
+        code = [[
+-- CONV u32->num: use a uint32_t cdata in floating-point arithmetic
+-- via tonumber, forcing an unsigned-to-float conversion.
+local ffi = require("ffi")
+local k = ffi.new("uint32_t", 7)
+local s = 0.0
+for i = 1, 200 do s = s + tonumber(k) * 1.5 end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "num", name = "CONV",
+                right_op = op_type.new("lit", "num.u32")},
+        },
+    }, {
+        code = [[
+local ffi = require("ffi")
+local function f(x, y) return ffi.cast("uint32_t", x * y) end
+local a = ffi.new("uint32_t", 1000003)
+local b = ffi.new("uint32_t", 99991)
+for _ = 1, 80 do f(a, b) end
+]],
+        ins = {
+            {type = "i64", name = "CONV",
+                right_op = op_type.new("lit", "i64.int")},
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.i64")},
+        },
+    }, {
+        name = "u32 UGT (<)",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local s = 0
+local function f(x, y) if x < y then s = s + 1 else s = s + 2 end end
+for _ = 1, 200 do f(a, b) end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "UGT"},
+        },
+    }, {
+        name = "u32 UGE (<=)",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local s = 0
+local function f(x, y) if x <= y then s = s + 1 else s = s + 2 end end
+f(a, b)
+f(a, b)
+f(a, b)
+f(a, b)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "UGE"},
+        },
+    }, {
+        name = "u32 ULE (>)",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local s = 0
+local function f(x, y) if x > y then s = s + 1 else s = s + 2 end end
+for _ = 1, 200 do f(a, b) end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "ULE"},
+        },
+    }, {
+        name = "u32 ULT (>=)",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint32_t", 3)
+local b = ffi.new("uint32_t", 5)
+local s = 0
+local function f(x, y) if x >= y then s = s + 1 else s = s + 2 end end
+for _ = 1, 200 do f(a, b) end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "ULT"},
+        },
+    }, {
+        name = "CONV i64->u32 truncation",
+        code = [[
+local ffi = require("ffi")
+local x = ffi.new("int64_t", 123456789012345)
+local s = 0
+for i = 1, 200 do
+    local u = ffi.cast("uint32_t", x + i)
+    s = s + tonumber(u)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.i64")},
+            {type = "u32", name = "ADD"},
+            {type = "num", name = "CONV",
+                right_op = op_type.new("lit", "num.u32")},
+        },
     }}
     test:plan(3 * #srcs)
 
