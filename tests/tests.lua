@@ -427,6 +427,21 @@ f(7)
         ins = {
             {type = "int", name = "BSHR"},
         },
+    }, {
+        name = "MIN/MAX keep the fold's sign of zero",
+        code = [[
+local min, max = math.min, math.max
+local function f(x)
+  return min(-0.0, 0.0), max(-0.0, 0.0), x
+end
+f(1.5)
+f(1.5)
+f(1.5)
+]],
+        ins = {
+            {type = "num", name = "MIN"},
+            {type = "num", name = "MAX"},
+        },
     }}
     test:plan(3 * #srcs)
 
