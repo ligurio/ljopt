@@ -2,13 +2,16 @@
 --
 -- Usage:
 --   luajit ljopt/irfuzz/fuzz.lua --show SEED
---       Dump the unopt trace, opt trace and both SMT formulas for one
---       seed (the artifacts the equivalence check is built from).
+--       Dump the unopt trace, opt trace and both SMT
+--       formulas for one seed (the artifacts the
+--       equivalence check is built from).
 --
---   luajit ljopt/irfuzz/fuzz.lua [--seed S] [--count N] [--insns K]
---       Generate N traces starting at seed S, check each with z3, and
---       report any SAT (candidate miscompile) with its seed so it
---       reproduces exactly.
+--   luajit ljopt/irfuzz/fuzz.lua
+--       [--seed S] [--count N] [--insns K]
+--       Generate N traces starting at seed S, check
+--       each with z3, and report any SAT (candidate
+--       miscompile) with its seed so it reproduces
+--       exactly.
 --
 -- Needs z3 on LD_LIBRARY_PATH (see CLAUDE.md: ../z3/build).
 
@@ -40,7 +43,7 @@ end
 
 local function parse_args(argv)
   local o = { seed = 1, count = 1, insns = nil, show = nil, ints = true,
-              include_gaps = false }
+              include_gaps = false, tables = false }
   local i = 1
   while i <= #argv do
     local a = argv[i]
@@ -55,9 +58,14 @@ local function parse_args(argv)
     elseif a == "--no-ints" then
       o.ints = false; i = i + 1
     elseif a == "--include-gaps" then
-      -- Also generate ops ljopt models incompletely (e.g. POW), to
-      -- hunt ljopt coverage gaps rather than LuaJIT miscompiles.
+      -- Also generate ops ljopt models incompletely (e.g. POW),
+      -- to hunt ljopt coverage gaps rather than LuaJIT
+      -- miscompiles.
       o.include_gaps = true; i = i + 1
+    elseif a == "--tables" then
+      -- Also generate table/array memory ops (SLOAD tab, FLOAD
+      -- tab.array, AREF/HREF, ALOAD/HLOAD, ASTORE/HSTORE).
+      o.tables = true; i = i + 1
     else
       error("unknown argument: " .. tostring(a))
     end
@@ -66,7 +74,8 @@ local function parse_args(argv)
 end
 
 local function gen_opts(o)
-  return { insns = o.insns, ints = o.ints, exclude_gaps = not o.include_gaps }
+  return { insns = o.insns, ints = o.ints, exclude_gaps = not o.include_gaps,
+           tables = o.tables }
 end
 
 local function show(seed, o)
@@ -86,7 +95,9 @@ local function show(seed, o)
     io.write("(no comparable outputs -- nothing to check)\n")
     return
   end
-  io.write(bar, "\n=== Full equivalence query (SAT => not equivalent)\n", bar, "\n")
+  io.write(
+    bar, "\n=== Full equivalence query (SAT => not equivalent)\n", bar, "\n"
+  )
   io.write(r.formula, "\n")
 end
 
@@ -113,8 +124,10 @@ local function run(o)
     local res = z3_solve(r.formula, timeout_sec)
     if res == "sat" then
       n_sat = n_sat + 1
-      io.write(("SAT   seed=%d  LuaJIT-BUG CANDIDATE (all outputs modeled) -- inspect: --show %d\n")
-        :format(seed, seed))
+      io.write((
+        "SAT   seed=%d  LuaJIT-BUG CANDIDATE (all outputs "
+        .. "modeled) -- inspect: --show %d\n"
+      ):format(seed, seed))
     elseif res == "unsat" then
       n_unsat = n_unsat + 1
     else
@@ -123,12 +136,16 @@ local function run(o)
     end
     ::continue::
   end
-  io.write(("\ndone: %d unsat, %d SAT(bug candidates), %d unknown, %d gap-seeds, %d skipped (of %d)\n")
-    :format(n_unsat, n_sat, n_unknown, n_gap, n_skip, o.count))
+  io.write((
+    "\ndone: %d unsat, %d SAT(bug candidates), %d unknown, "
+    .. "%d gap-seeds, %d skipped (of %d)\n"
+  ):format(n_unsat, n_sat, n_unknown, n_gap, n_skip, o.count))
   if next(gap_ops) then
     io.write("ljopt coverage gaps by op: ")
     local parts = {}
-    for op, c in pairs(gap_ops) do parts[#parts + 1] = ("%s x%d"):format(op, c) end
+    for op, c in pairs(gap_ops) do
+      parts[#parts + 1] = ("%s x%d"):format(op, c)
+    end
     io.write(table.concat(parts, ", "), "\n")
   end
   return n_sat
