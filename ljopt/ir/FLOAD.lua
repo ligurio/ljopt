@@ -120,7 +120,7 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
         if left_op:is_i64() then
             data = arith_utils.const_i64_to_smt_bv(left_op:get_i64())
         elseif left_op:is_ssa() then
-            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'tab')
+            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'cdt')
             local idx_left = arith_utils.const_str_to_memcell(
                 smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
             )
@@ -137,6 +137,42 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
+
+impls.IRNodeFLOADU32 = {}
+ir_node.extended(impls.IRNodeFLOADU32, ir_node.ir_node_base)
+
+-- Reads the scalar value out of a cdata box as an unsigned 32-bit
+-- integer (e.g. `ffi.cast("uint32_t", x)` boxes). Mirrors
+-- IRNodeFLOADI64's `cdata.value` access, then canonicalizes to a
+-- zero-extended u32.
+function impls.IRNodeFLOADU32:to_smt_lib(ctx)
+    local left_op = self:get_left_op()
+    local right_op_str = op_type.to_string(self:get_right_op())
+    local data = ''
+    if right_op_str == 'cdata.int' then
+        if left_op:is_ssa() then
+            local tab_left = ctx.op_stack:load(left_op:get_ssa(), 'cdt')
+            local idx_left = arith_utils.const_str_to_memcell(
+                smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
+            )
+            data = arith_utils.wrap_u32(
+                ctx.mem_stack:load_index(tab_left, idx_left, op_type.I64)
+            )
+        else
+            utils.unreachable(
+                'FLOADU32: unsupported left_op: ' .. left_op.type
+            )
+        end
+    else
+        utils.unreachable('FLOADU32: unsupported right_op: ' .. right_op_str)
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), 'u32', data)
+end
+
+function impls.IRNodeFLOADU32.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    return op_type.to_string(right_op_val) == 'cdata.int' and left_op:is_ssa()
+end
 
 impls.IRNodeFLOADTab = {}
 ir_node.extended(impls.IRNodeFLOADTab, ir_node.ir_node_base)

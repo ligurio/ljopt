@@ -151,6 +151,11 @@ local function translate(trace_record, ctx_src,
     smt_suffix = smt_suffix or 'src'
     tr_id = tr_id or '0'
     ctx_src = ctx_src or smt_context.SMTContext:new('BV', 'BV')
+    -- The unopt trace is the "reference" side: opcodes that model
+    -- a mandatory lowering guard (e.g. NEWREF's NaN-key check)
+    -- emit it unconditionally here, so the equivalence check
+    -- spots an opt trace missing the guard. See ir/NEWREF.lua.
+    ctx_src.is_reference = (smt_suffix == 'unopt')
     -- 0 stage. Create 'smt-context'.
     if shared_stacks then
         -- Otherwise memory shouldn't be used.
@@ -159,6 +164,12 @@ local function translate(trace_record, ctx_src,
                 mem_stack_prefix .. smt_suffix .. tr_id, shared_stacks.mem_stack
             ) ..
             '\n'
+        ctx_src.shared_xmem = shared_stacks.xmem
+        -- xmem_cur points to the latest version of raw memory.
+        -- Starts at shared_xmem (v0); XSTORE bumps it.
+        ctx_src.xmem_cur = shared_stacks.xmem
+        ctx_src.xmem_versions = 0
+        ctx_src.xmem_suffix = smt_suffix .. tr_id
     end
     smtlib_buf = smtlib_buf ..
         ctx_src.op_stack:init_smt(op_stack_prefix .. smt_suffix .. tr_id) ..
@@ -286,28 +297,15 @@ local function record_code(lua_code, opt)
     return exec_records
 end
 
--- Runs Lua code twice with different level of optimizations
--- and translates obtained JIT traces to SMT-LIB formulas.
---
--- What's matter in formulas is the snapshot-related part,
--- it looks like
---
--- assert(not (snap1 = snap2))
---
--- Without snapshot related part formula is always SAT -
--- it's just a set of constraints stating valid states
--- of program during execution (and since execution
--- happened there's always at least one valid state).
---
--- When we add Snapshot comparison part this formula
--- becomes UNSAT, unless solver can find an input
--- where snap1 != snap2, which means these 2 traces
--- are not equivalent.
-local function traces_to_smt(lua_code)
-    local rec_unopt = record_code(lua_code, lj_unoptimized)
-    utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized)
-
+-- Given two already-built trace_record maps (traceno ->
+-- trace_record, each with .trace and optional .snapshots),
+-- emit the per-trace equivalence SMT (unopt + opt
+-- translation plus the snapshot comparison disjunct). Shared
+-- by the recorded path (traces_to_smt) and any client that
+-- constructs trace_records directly, e.g. the IR fuzzer -- so
+-- equivalence is always computed one way, through the
+-- snapshot oracle.
+local function compare_trace_records(rec_unopt, rec_opt)
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
             format(table.getn(rec_unopt), table.getn(rec_opt)))
@@ -323,10 +321,20 @@ local function traces_to_smt(lua_code)
             goto continue
         end
         local shared_mem_stack = smt_context.MemoryStack:new()
-        local shared_stacks = {mem_stack = shared_mem_stack}
+        local shared_xmem_name = 'shared_xmem' .. traceno
+        local shared_stacks = {
+            mem_stack = shared_mem_stack,
+            xmem = shared_xmem_name,
+        }
         local cur_trace = shared_mem_stack:init_smt(
             'shared_mem_stack' .. traceno
         )
+        -- Raw FFI memory is byte-addressed (see ir/XLOAD.lua,
+        -- ir/XSTORE.lua) so overlapping / sub-word / type-punned
+        -- accesses alias correctly.
+        cur_trace = cur_trace .. '\n' .. (
+            '(declare-fun %s () (Array (_ BitVec 64) (_ BitVec 8)))'
+        ):format(shared_xmem_name)
         local ctx_src = smt_context.SMTContext:new('BV', 'BV')
         cur_trace = cur_trace ..
             ctx_src.vm_stack:init_smt(vm_stack_prefix .. traceno) .. '\n'
@@ -363,6 +371,30 @@ local function traces_to_smt(lua_code)
     return traces_smtlib
 end
 
+-- Runs Lua code twice with different level of optimizations
+-- and translates obtained JIT traces to SMT-LIB formulas.
+--
+-- What's matter in formulas is the snapshot-related part,
+-- it looks like
+--
+-- assert(not (snap1 = snap2))
+--
+-- Without snapshot related part formula is always SAT -
+-- it's just a set of constraints stating valid states
+-- of program during execution (and since execution
+-- happened there's always at least one valid state).
+--
+-- When we add Snapshot comparison part this formula
+-- becomes UNSAT, unless solver can find an input
+-- where snap1 != snap2, which means these 2 traces
+-- are not equivalent.
+local function traces_to_smt(lua_code)
+    local rec_unopt = record_code(lua_code, lj_unoptimized)
+    utils.debug_msg(string.rep('=', 60))
+    local rec_opt = record_code(lua_code, lj_optimized)
+    return compare_trace_records(rec_unopt, rec_opt)
+end
+
 
 -- Generates SMT formula that should be UNSAT (if optimizations
 -- are correct).
@@ -395,5 +427,6 @@ return {
     translate_to_smt = translate_to_smt,
     translate = translate,
     traces_to_smt = traces_to_smt,
+    compare_trace_records = compare_trace_records,
     construct_nodes = construct_nodes,
 }

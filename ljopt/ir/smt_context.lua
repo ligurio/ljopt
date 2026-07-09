@@ -17,6 +17,7 @@ end
 
 local type2bv = {
     ['tab'] = '%s',
+    ['cdt'] = '%s',
     ['flt'] = '(fp.to_ieee_bv %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
@@ -30,11 +31,21 @@ local type2bv = {
     ['p64'] = '%s',
     [op_type.STR] = '%s',
     [op_type.ANY] = '%s',
+    [op_type.NIL] = '%s',
     ['num'] = '%s',
 }
 
 local bv2type = {
     ['tab'] = '%s',
+    -- A cdata ref is the mem_stack slot as a signed 64-bit BV
+    -- in an `int-val` cell: stored as-is, read back as the Int
+    -- slot. Anonymous allocations get negative slots (see
+    -- alloc_slot) and `bv2nat` is unsigned, so subtract 2^64
+    -- when the sign bit is set to undo the two's complement
+    -- (branch-free signed decode).
+    ['cdt'] = '(let ((cdt_bv %s)) ' ..
+        '(- (bv2nat cdt_bv) (* 18446744073709551616 ' ..
+        '(bv2nat ((_ extract 63 63) cdt_bv)))))',
     ['flt'] = '((_ to_fp 9 24) %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
@@ -71,7 +82,9 @@ function StackBase:new()
 end
 
 local function create_value(memcell, type)
-    if type == op_type.STR then
+    if type == op_type.NIL then
+        return 'nil-val'
+    elseif type == op_type.STR then
         return ('(str-val %s)'):format(memcell)
     elseif type == op_type.ANY then
         return memcell
@@ -525,8 +538,7 @@ end
 
 -- Save data to ptr at new version.
 function MemoryStack.store_index(self, ptr, index, data, type)
-    dev_checks('table', 'string', 'string', 'string', 'string')
-
+    dev_checks('table', 'string', 'string', '?string', 'string')
     local conv = assert(type2bv[type], 'Unsupported load op type ' .. type)
     data = conv:format(data)
     local old_ver = self:get_version()

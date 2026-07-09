@@ -105,14 +105,14 @@ local opcodes_table = {
     ['HLOAD'] = require('ljopt.ir.HLOAD'),
     ['ULOAD'] = false,
     ['FLOAD'] = ir_node_FLOAD,
-    ['XLOAD'] = false,
+    ['XLOAD'] = require('ljopt.ir.XLOAD'),
     ['SLOAD'] = ir_node_SLOAD,
     ['VLOAD'] = false,
     ['ASTORE'] = require('ljopt.ir.ASTORE'),
     ['HSTORE'] = require('ljopt.ir.HSTORE'),
     ['USTORE'] = false,
     ['FSTORE'] = require('ljopt.ir.FSTORE'),
-    ['XSTORE'] = false,
+    ['XSTORE'] = require('ljopt.ir.XSTORE'),
     -- Allocations.
     ['SNEW'] = false,
     ['XSNEW'] = false,
@@ -137,7 +137,7 @@ local opcodes_table = {
     ['CALLN'] = require('ljopt.ir.CALLN'),
     ['CALLL'] = require('ljopt.ir.CALLL'),
     ['CALLS'] = false,
-    ['CALLXS'] = false,
+    ['CALLXS'] = require('ljopt.ir.CALLXS'),
     -- CARG is indeed dummy node. Pass arguments in CALLL.
     ['CARG'] = require('ljopt.ir.ir_node_dummy'),
     -- Miscellaneous Ops.

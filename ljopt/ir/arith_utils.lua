@@ -76,6 +76,26 @@ local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
 
+-- Canonicalize a 64-bit BV holding a u32 result: keep the low 32
+-- bits and zero-extend. This both wraps unsigned 32-bit
+-- arithmetic at 2^32 (correct overflow) and keeps the value in
+-- canonical form (high 32 bits = 0), so it stays a non-negative
+-- 64-bit integer and unsigned compares / FP conversions behave
+-- correctly.
+local function wrap_u32(bv_value)
+    return ('((_ zero_extend 32) ((_ extract 31 0) %s))'):format(bv_value)
+end
+
+-- Convert a u32 value (stored as a zero-extended 64-bit BV) to a
+-- floating-point `num`. The canonical u32 is always non-negative,
+-- so the signed bitvector-to-FP conversion gives the unsigned
+-- value.
+local function smt_u32_to_fp(u32_value)
+    return string.format(
+        "((_ to_fp 11 53) RNE %s)", wrap_u32(u32_value)
+    )
+end
+
 -- Convert FP `num` to int. Currently returns bv64 (32-bit signed
 -- value sign-extended to 64 bits); will become real Int when
 -- op-stack widens.
@@ -83,6 +103,45 @@ local function smt_fp_to_int(fp_value, rounding)
     return ('((_ sign_extend 32) ((_ fp.to_sbv 32) %s %s))'):format(
         rounding or 'RTZ', fp_value
     )
+end
+
+-- Raw FFI memory is modelled byte-granular as a flat array
+-- `xmem : (Array (_ BitVec 64) (_ BitVec 8))`, so overlapping,
+-- sub-word and type-punned accesses alias correctly (SMT array
+-- theory reasons about pointer equality per byte). x86-64 is
+-- little-endian: byte i of a value lives at address ptr + i.
+
+-- Address `ptr` (a BitVec 64) offset by `i` bytes.
+local function xmem_addr(ptr, i)
+    if i == 0 then
+        return ptr
+    end
+    return ('(bvadd %s #x%016x)'):format(ptr, i)
+end
+
+-- Nested `store` writing the low `nbytes` bytes of `bv`
+-- (width >= 8*nbytes) into `base` from `ptr`, little-endian.
+local function xmem_store(base, ptr, bv, nbytes)
+    local expr = base
+    for i = 0, nbytes - 1 do
+        local byte = ('((_ extract %d %d) %s)'):format(8 * i + 7, 8 * i, bv)
+        expr = ('(store %s %s %s)'):format(expr, xmem_addr(ptr, i), byte)
+    end
+    return expr
+end
+
+-- Read `nbytes` little-endian bytes from `mem` at `ptr` and
+-- concatenate them into a BitVec of width 8*nbytes (the byte at
+-- the highest address is the most significant).
+local function xmem_load(mem, ptr, nbytes)
+    local function sel(i)
+        return ('(select %s %s)'):format(mem, xmem_addr(ptr, i))
+    end
+    local expr = sel(nbytes - 1)
+    for i = nbytes - 2, 0, -1 do
+        expr = ('(concat %s %s)'):format(expr, sel(i))
+    end
+    return expr
 end
 
 -- LuaJIT treats -0.0 and +0.0 as the same table key.
@@ -108,7 +167,11 @@ return {
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
     normalize_table_key = normalize_table_key,
+    xmem_store = xmem_store,
+    xmem_load = xmem_load,
     smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
     smt_i64_to_fp = smt_i64_to_fp,
+    smt_u32_to_fp = smt_u32_to_fp,
+    wrap_u32 = wrap_u32,
 }

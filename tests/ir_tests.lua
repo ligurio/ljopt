@@ -31,7 +31,7 @@ local bit = require("bit")
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
-test:plan(10)
+test:plan(11)
 
 -- Get float in SMT format.
 local function f2bv(x)
@@ -849,6 +849,51 @@ test:test("CONV from i64", function(test)
         )
     test:is(smt:check(expect_unsat), smt.result.UNSAT,
         "SMT-LIB checking CONV i64.num -> num.i64 wrong is UNSAT"
+    )
+end)
+
+-- Exercises the `nil-val` MemCell: a value cell is not nil-val,
+-- and storing nil over a key makes it read back as nil-val.
+test:test("Nil memory cell", function(test)
+    test:plan(5)
+
+    -- create_value maps the nil op-type to the 0-arg nil-val
+    -- constructor.
+    test:is(smt_context.create_value("ignored", op_type.NIL), "nil-val",
+        "create_value NIL -> nil-val"
+    )
+
+    local mem_stack = smt_context.MemoryStack:new()
+    local init_smt = mem_stack:init_smt("nilstack")
+    local pointer, alloc_formula = mem_stack:allocate()
+    local key = smt_context.create_value("#x0000000000000001", op_type.I64)
+    local value = "#x0000000000000005"
+
+    -- Write a real value to the key.
+    local base = utils.join_strings({
+        smt_constants.LJOPT_SMTLIB,
+        init_smt,
+        alloc_formula,
+        mem_stack:store_index(pointer, key, value, op_type.I64),
+    })
+    local value_cell = ("(select %s %s)"):format(mem_stack:load(pointer), key)
+    -- The int-val cell is not nil-val, so asserting it is unsat.
+    local non_nil = ("(assert ((_ is nil-val) %s))"):format(value_cell)
+    test:is(smt:parse(base .. non_nil), true, "Parse value cell")
+    test:is(smt:check(base .. non_nil), smt.result.UNSAT,
+        "Value cell is not nil-val"
+    )
+
+    -- Overwrite the key with nil; the cell now reads back as
+    -- nil-val.
+    local with_nil = base .. utils.join_strings({
+        mem_stack:store_index(pointer, key, "nil-val", op_type.NIL),
+    })
+    local nil_cell = ("(select %s %s)"):format(mem_stack:load(pointer), key)
+    local is_nil = ("(assert (not ((_ is nil-val) %s)))"):format(nil_cell)
+    test:is(smt:parse(with_nil .. is_nil), true, "Parse nil cell")
+    test:is(smt:check(with_nil .. is_nil), smt.result.UNSAT,
+        "Deleted cell reads back as nil-val"
     )
 end)
 
