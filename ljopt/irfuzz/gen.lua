@@ -159,9 +159,36 @@ local function rng_new(seed)
   end
 end
 
--- A few "interesting" numeric constants fold rules care about.
-local NUM_CONSTS = { 0.0, 1.0, -1.0, 2.0, 0.5, -0.0, 3.14, 1e308 }
-local INT_CONSTS = { 0, 1, -1, 2, 7, 31, 32, 0x7fffffff, -0x80000000 }
+-- The constants LuaJIT's fold rules hard-code, so that every
+-- constant-triggered arithmetic optimization actually fires. A
+-- fold rule that special-cases `x + 0.0` is only exercised if the
+-- fuzzer emits `+ 0.0`, so we embed the exact literals from
+-- lj_opt_fold.c rather than sampling "interesting" values.
+--
+-- num (lj_opt_fold.c simplify_num*, simplify_pow):
+--   0.0 / -0.0  x -+ 0        (fold.c:1008-1019)
+--   1.0         x o 1 -> x    (1037)
+--   -1.0        x * -1 -> -x  (1039)
+--   2.0         x * 2 -> x+x; x^2 -> x*x (1045, 1090)
+--   0.5 0.25 4.0 8.0  x / 2^k -> x * (1/2^k) reciprocal (1050-1055)
+-- 3.14 / 1e308 are deliberately NON-special (a generic value and
+-- an overflow-prone one) so we also cover the "no fold" paths.
+local NUM_CONSTS = {
+  0.0, -0.0, 1.0, -1.0, 2.0, 0.5, 0.25, 4.0, 8.0, 3.14, 1e308,
+}
+-- int (lj_opt_fold.c simplify_int*, simplify_band/bor/bxor/shift):
+--   0            identity/absorbing for +,-,*,band,bor,bxor,shift
+--   1            i*1->i; i<<1->i+i           (1319, 1578)
+--   2 4 8 16     i*2->i+i; i*2^k->i<<k; i%2^k->i&(2^k-1) (1321,1380,1413)
+--   -1           i&-1->i; i|-1->-1; i xor -1 -> ~i        (1531-1559)
+--   3 7 15 31 63 masks 2^k-1 for i%2^k -> i & mask         (1413)
+--   31 32 33 63 64  shift-count boundaries (count masked & 31/& 63,
+--                fold.c:275/380/1814 -- the x<<33 == x<<1 case)
+--   0x7fffffff / -0x80000000  int max/min (overflow boundaries)
+local INT_CONSTS = {
+  0, 1, -1, 2, 4, 8, 16, 3, 7, 15, 31, 32, 33, 63, 64,
+  0x7fffffff, -0x80000000,
+}
 
 -- Generate an instruction stream from a seed.
 --
@@ -188,6 +215,20 @@ local function gen(seed, opts)
   -- instruction index).
   local pool = { [IRT_NUM] = {}, [IRT_INT] = {} }
 
+  -- Every computed value-typed result, in emission order, together
+  -- with the set of refs consumed as an operand by some later
+  -- instruction. The comparable outputs are the results that are
+  -- NOT consumed -- the roots of the trace's dataflow, i.e. the
+  -- only observable values. In `a=b+c; d=a+c; e=d+d` only `e` is a
+  -- root: `a` and `d` are dead intermediates. The optimizer is
+  -- free to restructure how a root is computed (CSE, reassoc,
+  -- folding intermediates away), so asserting equality on a
+  -- consumed intermediate would over-constrain it and could flag a
+  -- legal transform as a miscompile. This mirrors a real snapshot,
+  -- which captures live stack slots, not dead temporaries.
+  local results = {}
+  local consumed = {}
+
   -- Stores are typed by their value operand (e.g. `num ASTORE`)
   -- but produce NO usable value, so they must never enter the
   -- value pool or be picked as a comparable output.
@@ -197,10 +238,21 @@ local function gen(seed, opts)
   local function emit(op, t, ak, av, bk, bv)
     insns[#insns + 1] = { op = irop_num[op], t = t, ak = ak, av = av,
                           bk = bk, bv = bv }
+    -- Any ref used as an operand here is a consumed intermediate,
+    -- so it is not an observable output (a store value operand
+    -- counts too: its effect is observed through memory, not a
+    -- snapshot slot).
+    if ak == K_REF then consumed[av] = true end
+    if bk == K_REF then consumed[bv] = true end
     -- Only value-typed results feed later arithmetic operand
     -- picks; table/pointer refs (tab, p32) and stores are
     -- tracked elsewhere.
-    if pool[t] and not STORE_OPS[op] then table.insert(pool[t], #insns) end
+    if pool[t] and not STORE_OPS[op] then
+      table.insert(pool[t], #insns)
+      -- SLOAD inputs are tied to shared pre-trace memory (trivially
+      -- equal across passes), so they never need comparing.
+      if op ~= "SLOAD" then results[#results + 1] = #insns end
+    end
     return #insns
   end
 
@@ -323,14 +375,14 @@ local function gen(seed, opts)
     ::continue::
   end
 
-  -- Outputs: the last live ref of each type (what we prove
-  -- equal).
+  -- Outputs: the roots of the dataflow -- every computed result no
+  -- later instruction consumed. These are the only observable
+  -- values, so they are what the two traces must agree on. See
+  -- `results`/`consumed` above.
   local outputs = {}
-  for _, t in ipairs(types) do
-    local refs = pool[t]
-    if #refs > 0 then outputs[#outputs + 1] = refs[#refs] end
+  for _, ref in ipairs(results) do
+    if not consumed[ref] then outputs[#outputs + 1] = ref end
   end
-
   return insns, outputs
 end
 
