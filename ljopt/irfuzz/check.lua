@@ -68,12 +68,63 @@ local function gap_op(trace, nyi, ref)
   return nil
 end
 
+-- Human-readable render of a decoded trace (one line per
+-- instruction), in the style of luajit -jdump's IR view. Constants
+-- render as exact 64-bit hex (float_to_smt_bv), so two traces with
+-- equal renders translate to identical SMT.
+local function render_trace(trace)
+  local out = {}
+  for i, n in ipairs(trace.trace) do
+    out[#out + 1] = ("%04d %s%-6s %-6s %-16s %s"):format(
+      i, n.flags.raw or "  ", n.irtype, n.irop,
+      n.op1_txt or "", n.op2_txt or "")
+  end
+  return table.concat(out, "\n")
+end
+
+-- Serialize a record's final-snapshot slot assignments, for the
+-- same equality comparison.
+local function snap_txt(rec)
+  local parts = {}
+  for _, s in ipairs(rec.snapshots[1].slots) do
+    local v = s[2]
+    parts[#parts + 1] = ("%d=%s:%s"):format(s[1], v.type, tostring(v.value))
+  end
+  return table.concat(parts, ";")
+end
+
+-- Ops whose ljopt SMT encoding is provably commutative (fp.add /
+-- fp.mul under one rounding mode, and the bitwise int ops), so a
+-- pure operand swap cannot change the result. NOT MIN/MAX: SMT
+-- fp.min/fp.max are underspecified on (+0,-0), so operand order
+-- there must go to z3. Used to render a trace with these ops'
+-- operands sorted: if BOTH traces normalize to the same text, the
+-- opt trace differs only by swaps of these ops and is equivalent
+-- by commutativity alone -- z3 spends ~30s re-proving exactly
+-- that, so the driver may skip it.
+local COMMUT_SMT = {
+  ADD = true, MUL = true, BAND = true, BOR = true, BXOR = true,
+}
+local function render_commut_norm(trace)
+  local out = {}
+  for i, n in ipairs(trace.trace) do
+    local a, b = n.op1_txt or "", n.op2_txt or ""
+    if COMMUT_SMT[n.irop] and b < a then a, b = b, a end
+    out[#out + 1] = ("%04d %s%-6s %-6s %-16s %s"):format(
+      i, n.flags.raw or "  ", n.irtype, n.irop, a, b)
+  end
+  return table.concat(out, "\n")
+end
+
 -- Build the full SMT query for one seed. Returns the intermediate
 -- artifacts so callers (driver, tests) can inspect traces and
 -- formula.
-local function build(seed, opts)
+-- Build the SMT query from an explicit instruction stream and its
+-- output (root) refs. Shared by the random path (build, via
+-- gen.gen) and the exhaustive path (enum). `seed` is only carried
+-- through for reporting and may be nil.
+local function build_from(insns, outputs, opts, seed)
   opts = opts or {}
-  local insns, outputs = gen.gen(seed, opts)
 
   -- Replay through the fold engine twice (unopt + opt).
   local unopt_pass, opt_pass = jutil.irfuzz(gen.to_spec(insns))
@@ -98,10 +149,23 @@ local function build(seed, opts)
     end
   end
 
-  local formula, skipped = nil, (#cmp == 0)
+  local formula, identical, commut_only = nil, false, false
+  local skipped = (#cmp == 0)
   if not skipped then
     attach_snapshot(trace_u, unopt_pass, cmp)
     attach_snapshot(trace_o, opt_pass, cmp)
+    -- The optimized pass changed nothing: both traces render (and
+    -- thus translate) identically, so equivalence is trivially
+    -- unsat and a driver may skip z3. Exact because constants
+    -- render as full-precision hex.
+    identical = render_trace(trace_u) == render_trace(trace_o)
+      and snap_txt(trace_u) == snap_txt(trace_o)
+    -- Weaker but still sound: identical after sorting the
+    -- operands of provably-commutative ops (fold canonicalizes
+    -- `k + x` to `x + k`), see render_commut_norm.
+    commut_only = not identical
+      and render_commut_norm(trace_u) == render_commut_norm(trace_o)
+      and snap_txt(trace_u) == snap_txt(trace_o)
     -- One synthetic trace pair, keyed identically on both sides.
     local smt = ir_smtlib.compare_trace_records({ trace_u }, { trace_o })
     formula = PREAMBLE .. smt[1] .. "\n(check-sat)\n"
@@ -110,6 +174,8 @@ local function build(seed, opts)
   return {
     seed = seed,
     skipped = skipped,
+    identical = identical,
+    commut_only = commut_only,
     gaps = gaps,
     insns = insns,
     outputs = outputs,
@@ -120,19 +186,15 @@ local function build(seed, opts)
   }
 end
 
--- Human-readable render of a decoded trace (one line per
--- instruction), in the style of luajit -jdump's IR view.
-local function render_trace(trace)
-  local out = {}
-  for i, n in ipairs(trace.trace) do
-    out[#out + 1] = ("%04d %s%-6s %-6s %-16s %s"):format(
-      i, n.flags.raw or "  ", n.irtype, n.irop,
-      n.op1_txt or "", n.op2_txt or "")
-  end
-  return table.concat(out, "\n")
+-- Random path: derive the instruction stream from a seed, then run
+-- the shared pipeline.
+local function build(seed, opts)
+  local insns, outputs = gen.gen(seed, opts or {})
+  return build_from(insns, outputs, opts, seed)
 end
 
 return {
   build = build,
+  build_from = build_from,
   render_trace = render_trace,
 }
