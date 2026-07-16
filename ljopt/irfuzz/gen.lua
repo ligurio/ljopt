@@ -190,6 +190,44 @@ local INT_CONSTS = {
   0x7fffffff, -0x80000000,
 }
 
+-- Numeric opcodes for the ops roots() must recognise: SLOAD
+-- inputs and the stores produce no comparable value.
+local SLOAD_OP = irop_num.SLOAD
+local STORE_OP_NUM = {
+  [irop_num.ASTORE] = true, [irop_num.HSTORE] = true,
+  [irop_num.FSTORE] = true, [irop_num.XSTORE] = true,
+}
+
+-- The roots of a trace's dataflow: every computed value-typed
+-- result that no later instruction consumes as an operand. These
+-- are the only observable values, so they are the ones the two
+-- traces must agree on. In `a=b+c; d=a+c; e=d+d` only `e` is a
+-- root -- `a` and `d` are dead intermediates. The optimizer is
+-- free to restructure how a root is computed (CSE, reassoc,
+-- folding intermediates away), so asserting equality on a consumed
+-- intermediate would over-constrain it and could flag a legal
+-- transform as a miscompile. This mirrors a real snapshot, which
+-- captures live stack slots, not dead temporaries. SLOAD inputs
+-- (tied to shared pre-trace memory) and stores (no value) never
+-- qualify. Shared by the random (gen) and exhaustive (enum) paths.
+local function roots(insns)
+  local consumed = {}
+  for _, ins in ipairs(insns) do
+    if ins.ak == K_REF then consumed[ins.av] = true end
+    if ins.bk == K_REF then consumed[ins.bv] = true end
+  end
+  local out = {}
+  for i, ins in ipairs(insns) do
+    if (ins.t == IRT_NUM or ins.t == IRT_INT)
+      and ins.op ~= SLOAD_OP and not STORE_OP_NUM[ins.op]
+      and not consumed[i]
+    then
+      out[#out + 1] = i
+    end
+  end
+  return out
+end
+
 -- Generate an instruction stream from a seed.
 --
 -- @seed    integer seed.
@@ -215,44 +253,19 @@ local function gen(seed, opts)
   -- instruction index).
   local pool = { [IRT_NUM] = {}, [IRT_INT] = {} }
 
-  -- Every computed value-typed result, in emission order, together
-  -- with the set of refs consumed as an operand by some later
-  -- instruction. The comparable outputs are the results that are
-  -- NOT consumed -- the roots of the trace's dataflow, i.e. the
-  -- only observable values. In `a=b+c; d=a+c; e=d+d` only `e` is a
-  -- root: `a` and `d` are dead intermediates. The optimizer is
-  -- free to restructure how a root is computed (CSE, reassoc,
-  -- folding intermediates away), so asserting equality on a
-  -- consumed intermediate would over-constrain it and could flag a
-  -- legal transform as a miscompile. This mirrors a real snapshot,
-  -- which captures live stack slots, not dead temporaries.
-  local results = {}
-  local consumed = {}
-
   -- Stores are typed by their value operand (e.g. `num ASTORE`)
   -- but produce NO usable value, so they must never enter the
-  -- value pool or be picked as a comparable output.
+  -- value pool.
   local STORE_OPS = { ASTORE = true, HSTORE = true,
                       FSTORE = true, XSTORE = true }
 
   local function emit(op, t, ak, av, bk, bv)
     insns[#insns + 1] = { op = irop_num[op], t = t, ak = ak, av = av,
                           bk = bk, bv = bv }
-    -- Any ref used as an operand here is a consumed intermediate,
-    -- so it is not an observable output (a store value operand
-    -- counts too: its effect is observed through memory, not a
-    -- snapshot slot).
-    if ak == K_REF then consumed[av] = true end
-    if bk == K_REF then consumed[bv] = true end
     -- Only value-typed results feed later arithmetic operand
     -- picks; table/pointer refs (tab, p32) and stores are
     -- tracked elsewhere.
-    if pool[t] and not STORE_OPS[op] then
-      table.insert(pool[t], #insns)
-      -- SLOAD inputs are tied to shared pre-trace memory (trivially
-      -- equal across passes), so they never need comparing.
-      if op ~= "SLOAD" then results[#results + 1] = #insns end
-    end
+    if pool[t] and not STORE_OPS[op] then table.insert(pool[t], #insns) end
     return #insns
   end
 
@@ -375,15 +388,8 @@ local function gen(seed, opts)
     ::continue::
   end
 
-  -- Outputs: the roots of the dataflow -- every computed result no
-  -- later instruction consumed. These are the only observable
-  -- values, so they are what the two traces must agree on. See
-  -- `results`/`consumed` above.
-  local outputs = {}
-  for _, ref in ipairs(results) do
-    if not consumed[ref] then outputs[#outputs + 1] = ref end
-  end
-  return insns, outputs
+  -- Outputs: the roots of the dataflow (see roots()).
+  return insns, roots(insns)
 end
 
 -- Pack an instruction stream into the flat spec table
@@ -406,6 +412,18 @@ end
 return {
   gen = gen,
   to_spec = to_spec,
+  roots = roots,
+  menu_for = menu_for,
+  op_num = function(name) return irop_num[name] end,
   IRT_NUM = IRT_NUM,
   IRT_INT = IRT_INT,
+  NUM_CONSTS = NUM_CONSTS,
+  INT_CONSTS = INT_CONSTS,
+  FPMATH_MODES = FPMATH_MODES,
+  LDEXP_EXPS = LDEXP_EXPS,
+  UNARY_OPS = UNARY_OPS,
+  UNARY_NO_OP2 = UNARY_NO_OP2,
+  -- Operand kinds (mirror the IRFUZZ_OPND_* enum in lib_jit.c).
+  kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4 },
+  SLOAD_TYPECHECK = SLOAD_TYPECHECK,
 }

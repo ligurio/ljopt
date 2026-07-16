@@ -85,16 +85,49 @@ luajit ljopt/irfuzz/fuzz.lua --tables --seed 1 --count 2000
 # Also generate ops ljopt models incompletely, to hunt ljopt gaps
 # rather than LuaJIT miscompiles.
 luajit ljopt/irfuzz/fuzz.lua --include-gaps --seed 1 --count 2000
+
+# Exhaustive mode: walk EVERY depth-D op chain over the SLOAD inputs
+# and the fold-rule constants (enum.lua), instead of random seeds.
+luajit ljopt/irfuzz/fuzz.lua --enum --type int --depth 1
+luajit ljopt/irfuzz/fuzz.lua --enum --type num --depth 2 --limit 20000
+
+# Reproduce an exhaustive-mode finding by its enumeration index.
+luajit ljopt/irfuzz/fuzz.lua --enum --type num --depth 2 --show 1234
 ```
 
 Flags: `--seed S`, `--count N`, `--insns K` (body length), `--no-ints`
 (num only), `--include-gaps`, `--tables`, `--show SEED`.
+Exhaustive mode: `--enum`, `--type num|int`, `--depth D` (chain
+length), `--ninputs N` (#SLOADs), `--limit L`, `--skip K` (resume
+offset), `--show I` (I = enumeration index).
 
 Tuning env vars: `LJOPT_Z3_BIN` (default `../z3/build/z3`),
 `LJOPT_Z3_TIMEOUT` (seconds, default 15).
 
 Every seed is a pure function of its number, so any `SAT seed=N`
-reproduces exactly with `--show N`.
+reproduces exactly with `--show N`. Enumeration order is likewise
+deterministic for fixed `--type/--depth/--ninputs`, so `SAT #I`
+reproduces with the printed `--enum ... --show I`.
+
+### Exhaustive mode (`--enum`)
+
+Random sampling only fires a constant-guarded fold when the dice land
+on the right constant; `enum.lua` instead walks the full cross product
+of (op, operands) for a linear chain of `--depth` ops, where operands
+are the `--ninputs` SLOADs plus every fold-rule constant. Every
+constant-triggered fold in that space fires at least once. The space
+is `|ops|^depth * |leaves|^(depth+1)` and explodes fast (num depth=3
+is ~12.5M), so the driver prints the total up front and `--limit` /
+`--skip` bound and resume a run.
+
+Two sound filters keep z3 out of the no-op cases: traces the
+optimizer left **byte-identical** are counted and skipped, as are
+traces differing **only by operand swaps of provably-commutative ops**
+(fp.add/fp.mul under one rounding mode, int ADD/MUL/BAND/BOR/BXOR —
+fold's `k + x -> x + k` canonicalization; z3 burns ~30s per FP query
+re-proving commutativity). MIN/MAX are *not* in that set: SMT
+`fp.min`/`fp.max` are underspecified on `(+0,-0)`, so their operand
+order still goes to z3.
 
 ## Instruction coverage
 
