@@ -46,10 +46,11 @@ local function attach_snapshot(rec, pass, cmp)
     if ref > 0 then
       slots[#slots + 1] = { slot, { type = "ssa", value = ref } }
     else
+      local bv, const_type = decode.const_smt_bv(pass, ref)
       slots[#slots + 1] = { slot, {
         type = "const",
-        value = decode.const_smt_bv(pass, ref),
-        const_type = "number",
+        value = bv,
+        const_type = const_type,
       } }
     end
   end

@@ -21,11 +21,22 @@ local vmdef = require("jit.vmdef")
 -- Double -> SMT bitvector literal. A self-contained copy of the
 -- same one-liner ir_dump_utils and tests/ir_tests.lua use;
 -- kept local so the fuzzer does not reach into ljopt internals
--- to format operands.
+-- to format operands. The union cdata is created ONCE and
+-- reused: ffi.new on an anonymous type interns a fresh ctype
+-- per call, and LuaJIT's ctype table overflows at 2^16 entries
+-- (= a few thousand decoded traces in an enum sweep).
+local double_bits = ffi.new("union { double d; uint64_t i; }")
 local function float_to_smt_bv(x)
-  local u = ffi.new("union { double d; uint64_t i; }")
-  u.d = x
-  return ("#x%s"):format(bit.tohex(u.i, 16))
+  double_bits.d = x
+  return ("#x%s"):format(bit.tohex(double_bits.i, 16))
+end
+
+-- int64/uint64 cdata -> SMT 64-bit bitvector literal. Same
+-- create-once-and-reuse discipline as double_bits.
+local i64_bits = ffi.new("union { int64_t i; uint64_t u; }")
+local function i64_to_smt_bv(k)
+  i64_bits.i = k
+  return ("#x%s"):format(bit.tohex(i64_bits.u, 16))
 end
 
 -- IRT byte -> short type string (ORDER LJ_T, same as
@@ -85,6 +96,13 @@ local function decode_const(pass, v)
   local k = pass.kval[idx]
   if type(k) == "number" then
     return float_to_smt_bv(k), { type = "number", value = k }
+  end
+  if type(k) == "cdata" then
+    -- KINT64 constant (int64/uint64 cdata, e.g. 5LL). Emit an
+    -- int64-typed operand so retrieve_i64_op formats it as a
+    -- 64-bit BV literal; tostring is the deterministic display /
+    -- identical-comparison text.
+    return tostring(k), { type = "int64", value = k }
   end
   -- Non-numeric constants are outside the v1 op set; fall back
   -- to a literal string so translation can mark the node NYI
@@ -160,16 +178,18 @@ local function decode(pass)
   return { trace = nodes }
 end
 
--- SMT bitvector literal (#x...) for a folded-constant ref (< 0)
--- in a pass buffer. Used to materialize a constant output into a
--- snapshot slot; ljopt's snap_to_smt_lib wraps it in
--- ((_ to_fp 11 53) ...), so an int constant k round-trips
--- through fp exactly (int32 fits in a double), matching the
--- int-node side's smt_int_to_fp.
+-- SMT bitvector literal (#x...) for a folded-constant ref (< 0) in
+-- a pass buffer, used to materialize a constant output into a
+-- snapshot slot. Returns (bv, const_type): a "number" bv is the
+-- double bit-pattern (snap wraps it in to_fp directly); an "i64" bv
+-- is the raw 64-bit integer (snap must value-convert via
+-- smt_i64_to_fp, matching the i64-node side, so a folded constant
+-- and a computed i64 compare equal).
 local function const_smt_bv(pass, ref)
   local k = pass.kval[-ref]
-  assert(type(k) == "number", "irfuzz: non-numeric constant output")
-  return float_to_smt_bv(k)
+  if type(k) == "number" then return float_to_smt_bv(k), "number" end
+  if type(k) == "cdata" then return i64_to_smt_bv(k), "i64" end
+  assert(false, "irfuzz: non-numeric constant output")
 end
 
 return {

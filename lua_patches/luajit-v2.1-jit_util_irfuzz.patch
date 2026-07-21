@@ -2,7 +2,7 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 index 5a0d3861..a647dd0a 100644
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -393,6 +393,224 @@ LJLIB_CF(jit_util_tracemc)
+@@ -393,6 +393,230 @@ LJLIB_CF(jit_util_tracemc)
    return 0;
  }
  
@@ -14,7 +14,8 @@ index 5a0d3861..a647dd0a 100644
 +  IRFUZZ_OPND_REF,    /* Reference to an earlier stream instruction. */
 +  IRFUZZ_OPND_KINT,   /* int32 constant, interned via lj_ir_kint(). */
 +  IRFUZZ_OPND_KNUM,   /* FP constant, interned via lj_ir_knum(). */
-+  IRFUZZ_OPND_LIT     /* Raw literal (slot number, mode bits, ...). */
++  IRFUZZ_OPND_LIT,    /* Raw literal (slot number, mode bits, ...). */
++  IRFUZZ_OPND_KINT64  /* int64 constant, interned via lj_ir_kint64(). */
 +};
 +
 +/* Pseudo-trace initialization, mirroring trace_start() and
@@ -82,6 +83,11 @@ index 5a0d3861..a647dd0a 100644
 +  }
 +  case IRFUZZ_OPND_KINT:
 +    return lj_ir_kint(J, (int32_t)v);
++  case IRFUZZ_OPND_KINT64:
++    /* v arrives as a double: exact for every fold-trigger i64
++    ** constant (all small); constants above 2^53 are not
++    ** representable and must not be requested here. */
++    return lj_ir_kint64(J, (uint64_t)(int64_t)v);
 +  case IRFUZZ_OPND_KNUM:
 +    return lj_ir_knum(J, v);
 +  case IRFUZZ_OPND_LIT:

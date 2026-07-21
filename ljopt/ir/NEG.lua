@@ -6,6 +6,9 @@ local impls = {}
 impls.IRNodeNEGInt = { op_str = 'bvneg' }
 ir_node.extended(impls.IRNodeNEGInt, un_op.UnOpInt)
 
+impls.IRNodeNEGI64 = { op_str = 'bvneg' }
+ir_node.extended(impls.IRNodeNEGI64, un_op.UnOpI64)
+
 impls.IRNodeNEGNum = { op_str = 'fp.neg', const_fn = function(x) return -x end }
 ir_node.extended(impls.IRNodeNEGNum, un_op.UnOpNum)
 
