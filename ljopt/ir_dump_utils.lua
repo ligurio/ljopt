@@ -98,9 +98,13 @@ local dev_checks = require('ljopt.dev_checks')
 -- This is the most convenient way to store float, moreover,
 -- float format used by ir_dump uses some rounding behaviour,
 -- which is lead to incorrect verification
+-- The union cdata is created once and reused: ffi.new on an
+-- anonymous type interns a fresh ctype per call, and LuaJIT's
+-- ctype table overflows at 2^16 entries.
+local double_bits = ffi.new("union { double d; uint64_t i; }")
 local function float_to_smt_bv(x)
   dev_checks("number")
-  local u = ffi.new("union { double d; uint64_t i; }")
+  local u = double_bits
   u.d = x
   return string.format("#x%s", bit.tohex(u.i, 16))
 end
