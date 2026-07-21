@@ -18,10 +18,13 @@ local function i32_overflow_check(value)
     return overflow_check
 end
 
+-- Shared conversion union: ffi.new on an anonymous type interns a
+-- fresh ctype per call, and LuaJIT's ctype table overflows at 2^16
+-- entries.
+local num_bits = ffi.new("union { double d; uint64_t i; }")
 local function const_num_to_smt_bv(num_value)
-    local u = ffi.new("union { double d; uint64_t i; }")
-    u.d = num_value
-    return string.format("#x%s", bit.tohex(u.i, 16))
+    num_bits.d = num_value
+    return string.format("#x%s", bit.tohex(num_bits.i, 16))
 end
 
 local function const_num_to_smt_fp(num_value)
@@ -61,14 +64,15 @@ local function const_int_to_smt_bv(int_value)
     return string.format("#x%016X", int_value)
 end
 
+-- Separate union (different field layout from num_bits above).
+local i64_bits = ffi.new("union { int64_t i; uint64_t u; }")
 local function const_i64_to_smt_bv(int_value)
-    local u = ffi.new("union { int64_t i; uint64_t u; }")
-    u.i = int_value
+    i64_bits.i = int_value
 
     -- Convert uint64_t cdata to hex string without
     -- using string.format on cdata.
-    local lo = tonumber(ffi.cast("uint32_t", bit.band(u.u, 0xFFFFFFFF)))
-    local hi = tonumber(ffi.cast("uint32_t", bit.rshift(u.u, 32)))
+    local lo = tonumber(ffi.cast("uint32_t", bit.band(i64_bits.u, 0xFFFFFFFF)))
+    local hi = tonumber(ffi.cast("uint32_t", bit.rshift(i64_bits.u, 32)))
 
     return string.format("#x%08X%08X", hi, lo)
 end

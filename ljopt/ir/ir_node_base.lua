@@ -46,12 +46,16 @@ end
 
 local ffi = require("ffi")
 
+-- One shared conversion union: ffi.new on an anonymous type
+-- interns a fresh ctype per call, and LuaJIT's ctype table
+-- overflows at 2^16 entries.
+local converter = ffi.new("union { double d; uint64_t i; }")
+
 -- Convert the bit pattern of a double stored
 -- as #x<hex> to an int64 #x<hex>.
 local function hex_double_to_i64_hex(hex_str)
     local clean_hex = hex_str:gsub("^#x", "")
     local hex_num = tonumber(clean_hex, 16)
-    local converter = ffi.new("union { double d; uint64_t i; }")
     converter.i = hex_num
     local double_val = converter.d
     local int64_val = ffi.cast("int64_t", double_val)
