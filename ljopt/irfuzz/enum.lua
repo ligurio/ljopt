@@ -30,7 +30,7 @@
 local gen = require("ljopt.irfuzz.gen")
 
 local K = gen.kinds
-local IRT_NUM, IRT_INT = gen.IRT_NUM, gen.IRT_INT
+local IRT_NUM, IRT_INT, IRT_I64 = gen.IRT_NUM, gen.IRT_INT, gen.IRT_I64
 
 -- Per-type op descriptors. `arity` is the number of *value*
 -- operands. Special forms mirror gen.lua's emit handling:
@@ -72,17 +72,65 @@ local OPS = {
     { name = "BNOT", arity = 1, no_op2 = true },
     { name = "BSWAP", arity = 1, no_op2 = true },
   },
+  -- i64: inputs are int SLOADs widened via CONV int->i64 (see
+  -- prologue_for); constants are KINT64. Only ops ljopt models for
+  -- i64 AND the recorder emits via FFI 64-bit arithmetic/bitwise:
+  -- ADD/SUB/MUL/BAND/BOR/BXOR. Excluded: DIV/MOD (recorder lowers
+  -- 64-bit div/mod to CALL helpers, no IR_DIV), NEG/BSWAP (no ljopt
+  -- I64 translator), shifts (same count-mask gap as int shifts,
+  -- needs separate verification first).
+  [IRT_I64] = {
+    { name = "ADD", arity = 2, commut = true },
+    { name = "SUB", arity = 2 },
+    { name = "MUL", arity = 2, commut = true },
+    { name = "BAND", arity = 2, commut = true },
+    { name = "BOR", arity = 2, commut = true },
+    { name = "BXOR", arity = 2, commut = true },
+  },
 }
 
 -- The leaf operand universe for a type: `ninputs` SLOAD refs
 -- (1-based stream indices) followed by the fold-rule constants.
-local function leaves_for(t, ninputs)
-  local out = {}
-  for i = 1, ninputs do
-    out[#out + 1] = { k = K.REF, v = i, txt = ("%04d"):format(i) }
+-- The fixed prologue that sources `ninputs` typed input values,
+-- plus the stream refs those values live at. num/int read a Lua
+-- stack slot directly (SLOAD); i64 has no direct stack form, so it
+-- reads an int SLOAD and widens it with CONV int->i64 SEXT -- the
+-- recorder's own way to get an i64 from a Lua number
+-- (lj_opt_narrow.c). Returns (insns, input_refs).
+local function prologue_for(t, ninputs)
+  local insns, input_refs = {}, {}
+  if t == IRT_I64 then
+    for slot = 1, ninputs do
+      insns[#insns + 1] = { op = gen.op_num("SLOAD"), t = IRT_INT,
+        ak = K.LIT, av = slot, bk = K.LIT, bv = gen.SLOAD_TYPECHECK }
+    end
+    for slot = 1, ninputs do
+      insns[#insns + 1] = { op = gen.op_num("CONV"), t = IRT_I64,
+        ak = K.REF, av = slot, bk = K.LIT, bv = gen.CONV_I64_INT_SEXT }
+      input_refs[#input_refs + 1] = ninputs + slot  -- the CONV result
+    end
+  else
+    for slot = 1, ninputs do
+      insns[#insns + 1] = { op = gen.op_num("SLOAD"), t = t,
+        ak = K.LIT, av = slot, bk = K.LIT, bv = gen.SLOAD_TYPECHECK }
+      input_refs[#input_refs + 1] = slot
+    end
   end
-  local consts = (t == IRT_NUM) and gen.NUM_CONSTS or gen.INT_CONSTS
-  local ck = (t == IRT_NUM) and K.KNUM or K.KINT
+  return insns, input_refs
+end
+
+-- The leaf operand universe for a type: the input value refs (from
+-- prologue_for) followed by the fold-rule constants of that type.
+local function leaves_for(t, ninputs)
+  local _, input_refs = prologue_for(t, ninputs)
+  local out = {}
+  for _, r in ipairs(input_refs) do
+    out[#out + 1] = { k = K.REF, v = r, txt = ("%04d"):format(r) }
+  end
+  local consts, ck
+  if t == IRT_NUM then consts, ck = gen.NUM_CONSTS, K.KNUM
+  elseif t == IRT_I64 then consts, ck = gen.I64_CONSTS, K.KINT64
+  else consts, ck = gen.INT_CONSTS, K.KINT end
   for _, c in ipairs(consts) do
     out[#out + 1] = { k = ck, v = c, txt = tostring(c) }
   end
@@ -153,12 +201,9 @@ local function iter(opts)
   local ops = opts.ops or OPS[t]
   local leaves = leaves_for(t, ninputs)
 
-  -- Fixed prologue: the typed SLOAD inputs. Body refs follow.
-  local prologue = {}
-  for slot = 1, ninputs do
-    prologue[slot] = { op = gen.op_num("SLOAD"), t = t,
-      ak = K.LIT, av = slot, bk = K.LIT, bv = gen.SLOAD_TYPECHECK }
-  end
+  -- Fixed prologue (SLOADs, plus CONVs for i64); body refs follow.
+  local prologue = prologue_for(t, ninputs)
+  local nprologue = #prologue
 
   local body = {}   -- current chain being built (partial insns)
 
@@ -168,10 +213,14 @@ local function iter(opts)
       local insns = {}
       for _, x in ipairs(prologue) do insns[#insns + 1] = x end
       for _, x in ipairs(body) do insns[#insns + 1] = x end
-      coroutine.yield({ insns = insns, outputs = gen.roots(insns) })
+      -- Strict linear chain: the sole observable value is the last
+      -- op (level `depth`). Using it directly rather than roots()
+      -- keeps a dead input source (e.g. an unused i64 CONV) from
+      -- being compared as a spurious extra output.
+      coroutine.yield({ insns = insns, outputs = { nprologue + depth } })
       return
     end
-    local this_ref = ninputs + level
+    local this_ref = nprologue + level
     for _, op in ipairs(ops) do
       each_application(t, leaves, op, level, prev, function(insn)
         body[level] = insn

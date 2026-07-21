@@ -75,6 +75,15 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                     data = arith_utils.smt_int_to_fp(
                         ctx.op_stack:load(value_data, op_type.I64)
                     )
+                elseif type == "i64" then
+                    -- Full 64-bit value -> fp (smt_int_to_fp would
+                    -- truncate to 32 bits). Deterministic, so a
+                    -- folded i64 constant and a computed i64 slot
+                    -- compare equal; only distinct 64-bit results
+                    -- that round to the same double are missed.
+                    data = arith_utils.smt_i64_to_fp(
+                        ctx.op_stack:load(value_data, op_type.I64)
+                    )
                 else
                     data = ctx.op_stack:load(value_data, op_type.NUM)
                 end
@@ -90,6 +99,11 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 value_data = arith_utils.const_num_to_smt_fp(
                     value_data == "true"
                 )
+            elseif pair[2].const_type == "i64" then
+                -- i64 constant output: value-convert the 64-bit BV,
+                -- matching the i64 SSA path so a folded constant and
+                -- a computed i64 slot compare equal.
+                value_data = arith_utils.smt_i64_to_fp(value_data)
             else
                 value_data = ('((_ to_fp 11 53) %s)'):format(value_data)
             end

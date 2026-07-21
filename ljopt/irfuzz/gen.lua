@@ -18,13 +18,20 @@ local vmdef = require("jit.vmdef")
 -- IR types (indexes into irtype_text / IRT enum).
 local IRT_NUM = 14
 local IRT_INT = 19
+local IRT_I64 = 21
 local IRT_TAB = 11   -- table pointer
 -- 32-bit GC pointer (AREF/HREF/FLOAD tab.array result)
 local IRT_P32 = 5
 
 -- Operand kinds -- must match the IRFUZZ_OPND_* enum in
 -- lib_jit.c.
-local K_NONE, K_REF, K_KINT, K_KNUM, K_LIT = 0, 1, 2, 3, 4
+local K_NONE, K_REF, K_KINT, K_KNUM, K_LIT, K_KINT64 = 0, 1, 2, 3, 4, 5
+
+-- CONV mode literal (op2) for int -> i64 sign-extend: the
+-- recorder's own way of widening a Lua-number int to i64
+-- (lj_opt_narrow.c: (IRT_I64<<IRCONV_DSH)|IRT_INT|IRCONV_SEXT).
+-- IRCONV_DSH = 5, IRCONV_SEXT = 0x800.
+local CONV_I64_INT_SEXT = (IRT_I64 * 32) + IRT_INT + 0x800
 
 -- SLOAD flags: TYPECHECK (a plain typed slot read).
 local SLOAD_TYPECHECK = 4
@@ -188,6 +195,15 @@ local NUM_CONSTS = {
 local INT_CONSTS = {
   0, 1, -1, 2, 4, 8, 16, 3, 7, 15, 31, 32, 33, 63, 64,
   0x7fffffff, -0x80000000,
+}
+-- i64 (lj_opt_fold.c KINT64 rules: ADD/SUB/MUL/BAND/BOR/BXOR
+-- KINT64 KINT64 at 393-398, reassoc ADD/MUL/BAND/BOR/BXOR . KINT64
+-- at 1748-1752). Same identity/absorbing triggers as int, plus one
+-- value past 2^31 to exercise genuinely-64-bit arithmetic (not just
+-- the sign-extended int range). All are exactly representable as a
+-- double, which is how the harness marshals a KINT64 operand.
+local I64_CONSTS = {
+  0, 1, -1, 2, 4, 8, 3, 7, 4294967296,
 }
 
 -- Numeric opcodes for the ops roots() must recognise: SLOAD
@@ -417,13 +433,16 @@ return {
   op_num = function(name) return irop_num[name] end,
   IRT_NUM = IRT_NUM,
   IRT_INT = IRT_INT,
+  IRT_I64 = IRT_I64,
   NUM_CONSTS = NUM_CONSTS,
   INT_CONSTS = INT_CONSTS,
+  I64_CONSTS = I64_CONSTS,
+  CONV_I64_INT_SEXT = CONV_I64_INT_SEXT,
   FPMATH_MODES = FPMATH_MODES,
   LDEXP_EXPS = LDEXP_EXPS,
   UNARY_OPS = UNARY_OPS,
   UNARY_NO_OP2 = UNARY_NO_OP2,
   -- Operand kinds (mirror the IRFUZZ_OPND_* enum in lib_jit.c).
-  kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4 },
+  kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4, KINT64 = 5 },
   SLOAD_TYPECHECK = SLOAD_TYPECHECK,
 }
