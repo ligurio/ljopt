@@ -90,6 +90,15 @@ function IRNodeCONV:to_smt_lib(ctx)
         data = ('((_ zero_extend 32) ((_ fp.to_ubv 32) RTZ %s))'):format(
             left_op
         )
+    elseif parsed_right_op[1] == 'flt.num' then
+        -- num -> flt: round a double (fp 11 53) to float32 (fp 8 24).
+        -- Rounding is RNE, matching hardware cvtsd2ss.
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
+        data = ('((_ to_fp 8 24) RNE %s)'):format(left_op)
+    elseif parsed_right_op[1] == 'num.flt' then
+        -- flt -> num: widen float32 back to a double (exact).
+        left_op = ctx.op_stack:load(self:get_left_op():get_ssa(), 'flt')
+        data = ('((_ to_fp 11 53) RNE %s)'):format(left_op)
     else
         assert(false, 'Unsupported type conversion: '..right_op)
     end

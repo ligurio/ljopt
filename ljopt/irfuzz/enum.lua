@@ -266,9 +266,149 @@ local function count(opts)
   return total
 end
 
+-- ==========================================================
+-- Mixed-type CONV enumeration.
+--
+-- Where iter() builds single-type chains, iter_mixed() lets the
+-- running value change TYPE via CONV body ops, so the CONV fold
+-- rules (47 of them in lj_opt_fold.c, otherwise never exercised)
+-- fire. A chain starts as an int SLOAD; each step is either an
+-- arithmetic op combining the running value with a same-type
+-- constant, or a CONV to another modeled type. The value's type
+-- at each point determines the legal ops, constants and CONVs.
+--
+-- Only recorder-faithful CONV modes are emitted (int->i64 is
+-- sign-extended as the recorder does it, num->int uses IRCONV_ANY,
+-- etc.). Types are limited to the ones ljopt fully models
+-- (int/i64/num); u32/u64/narrow/flt are added once ljopt learns
+-- them.
+
+local IRT_FLT = 13
+
+-- Arithmetic op menus per type (same faithful sets as OPS above).
+-- flt has NONE: LuaJIT does float32 arithmetic in double and only
+-- rounds at CONV boundaries, so flt appears solely as a CONV
+-- endpoint (num<->flt).
+local MIXED_ARITH = {
+  [IRT_INT] = OPS[IRT_INT],
+  [IRT_I64] = OPS[IRT_I64],
+  [IRT_NUM] = {
+    { name = "ADD", commut = true }, { name = "SUB" },
+    { name = "MUL", commut = true }, { name = "DIV" },
+    { name = "MIN", commut = true }, { name = "MAX", commut = true },
+  },
+  [IRT_FLT] = {},
+}
+
+-- Per-type constant set + operand kind.
+local MIXED_CONST = {
+  [IRT_INT] = { consts = gen.INT_CONSTS, kind = K.KINT },
+  [IRT_I64] = { consts = gen.I64_CONSTS, kind = K.KINT64 },
+  [IRT_NUM] = { consts = gen.NUM_CONSTS, kind = K.KNUM },
+}
+
+-- CONV transitions: from-type -> list of { to = type, mode = op2 }.
+-- Mode = (dst<<IRCONV_DSH)|src [|IRCONV_SEXT for signed widen]
+-- [|IRCONV_ANY for num->int]. IRCONV_DSH=5, SEXT=0x800, ANY=0x1000.
+local SEXT, ANY = 0x800, 0x1000
+local function cmode(dst, src, extra)
+  return dst * 32 + src + (extra or 0)
+end
+local MIXED_CONV = {
+  [IRT_INT] = {
+    { to = IRT_I64, mode = cmode(IRT_I64, IRT_INT, SEXT) },
+    { to = IRT_NUM, mode = cmode(IRT_NUM, IRT_INT) },
+  },
+  [IRT_I64] = {
+    { to = IRT_INT, mode = cmode(IRT_INT, IRT_I64) },
+    { to = IRT_NUM, mode = cmode(IRT_NUM, IRT_I64) },
+  },
+  [IRT_NUM] = {
+    { to = IRT_INT, mode = cmode(IRT_INT, IRT_NUM, ANY) },
+    { to = IRT_I64, mode = cmode(IRT_I64, IRT_NUM, ANY) },
+    { to = IRT_FLT, mode = cmode(IRT_FLT, IRT_NUM) },  -- round to float32
+  },
+  [IRT_FLT] = {
+    { to = IRT_NUM, mode = cmode(IRT_NUM, IRT_FLT) },  -- widen to double
+  },
+}
+
+-- Enumerate every mixed-type chain of `depth` steps starting from a
+-- single int SLOAD. opts: { depth = 3 }. Yields
+-- { insns, outputs } like iter().
+local function iter_mixed(opts)
+  opts = opts or {}
+  local depth = opts.depth or 3
+  local body = {}
+  local prologue = { { op = gen.op_num("SLOAD"), t = IRT_INT,
+    ak = K.LIT, av = 1, bk = K.LIT, bv = gen.SLOAD_TYPECHECK } }
+
+  local function rec(level, cur_type, prev_ref)
+    if level > depth then
+      local insns = {}
+      for _, x in ipairs(prologue) do insns[#insns + 1] = x end
+      for _, x in ipairs(body) do insns[#insns + 1] = x end
+      coroutine.yield({ insns = insns, outputs = { #insns } })
+      return
+    end
+    local this_ref = 1 + level  -- prologue is 1 insn (SLOAD)
+    -- (a) arithmetic op with a same-type constant.
+    local cinfo = MIXED_CONST[cur_type]
+    for _, op in ipairs(MIXED_ARITH[cur_type]) do
+      local opnum = gen.op_num(op.name)
+      for _, c in ipairs(cinfo.consts) do
+        body[level] = { op = opnum, t = cur_type,
+          ak = K.REF, av = prev_ref, bk = cinfo.kind, bv = c }
+        rec(level + 1, cur_type, this_ref)
+        if not op.commut then
+          body[level] = { op = opnum, t = cur_type,
+            ak = cinfo.kind, av = c, bk = K.REF, bv = prev_ref }
+          rec(level + 1, cur_type, this_ref)
+        end
+      end
+    end
+    -- (b) CONV to another modeled type.
+    for _, tr in ipairs(MIXED_CONV[cur_type]) do
+      body[level] = { op = gen.op_num("CONV"), t = tr.to,
+        ak = K.REF, av = prev_ref, bk = K.LIT, bv = tr.mode }
+      rec(level + 1, tr.to, this_ref)
+    end
+    body[level] = nil
+  end
+
+  return coroutine.wrap(function() rec(1, IRT_INT, 1) end)
+end
+
+-- Count iter_mixed(opts) via DP over (level, type): completions
+-- from a state = sum over each choice of completions after it.
+local function count_mixed(opts)
+  opts = opts or {}
+  local depth = opts.depth or 3
+  local memo = {}
+  local function f(level, t)
+    if level > depth then return 1 end
+    local key = level * 100 + t
+    if memo[key] then return memo[key] end
+    local n = 0
+    local ci = MIXED_CONST[t]
+    local nconst = ci and #ci.consts or 0
+    for _, op in ipairs(MIXED_ARITH[t]) do
+      n = n + nconst * (op.commut and 1 or 2) * f(level + 1, t)
+    end
+    for _, tr in ipairs(MIXED_CONV[t]) do
+      n = n + f(level + 1, tr.to)
+    end
+    memo[key] = n
+    return n
+  end
+  return f(1, IRT_INT)
+end
+
 return {
   iter = iter,
   count = count,
+  iter_mixed = iter_mixed,
+  count_mixed = count_mixed,
   leaves_for = leaves_for,
   OPS = OPS,
 }

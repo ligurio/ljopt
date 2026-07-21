@@ -27,6 +27,13 @@
 --
 -- Needs z3 on LD_LIBRARY_PATH (see CLAUDE.md: ../z3/build).
 
+-- The irfuzz replay works in the host VM's own jit_State. If the
+-- host JIT starts recording this driver's hot loops, the replay
+-- clobbers the live recording state and segfaults after ~50k
+-- builds (long enum sweeps hit this; short random runs never got
+-- hot enough). The driver is z3-bound anyway: run interpreted.
+jit.off()
+
 local check = require("ljopt.irfuzz.check")
 local gen = require("ljopt.irfuzz.gen")
 local enum = require("ljopt.irfuzz.enum")
@@ -67,10 +74,14 @@ local function parse_args(argv)
       o.show = tonumber(argv[i + 1]); i = i + 2
     elseif a == "--enum" then
       o.enum = true; i = i + 1
+    elseif a == "--mixed" then
+      -- Mixed-type CONV enumeration (enum.iter_mixed): chains that
+      -- CONV between int/i64/num, exercising the CONV fold rules.
+      o.enum = true; o.mixed = true; i = i + 1
     elseif a == "--type" then
       o.type = argv[i + 1]
-      assert(o.type == "num" or o.type == "int",
-        "--type must be num or int")
+      assert(o.type == "num" or o.type == "int" or o.type == "i64",
+        "--type must be num, int or i64")
       i = i + 2
     elseif a == "--depth" then
       o.depth = tonumber(argv[i + 1]); i = i + 2
@@ -143,9 +154,15 @@ local function show(seed, o)
 end
 
 -- Enumeration options for enum.iter/enum.count from parsed args.
+local function enum_type(name)
+  if name == "int" then return gen.IRT_INT end
+  if name == "i64" then return gen.IRT_I64 end
+  return gen.IRT_NUM
+end
+
 local function enum_opts(o)
   return {
-    type = (o.type == "int") and gen.IRT_INT or gen.IRT_NUM,
+    type = enum_type(o.type),
     depth = o.depth,
     ninputs = o.ninputs,
   }
@@ -171,13 +188,22 @@ end
 -- Shared per-trace bookkeeping for run()/run_enum(). `c` is the
 -- mutable counter table; `label` names the trace in findings
 -- ("seed=7" / "#123"); `hint` is the reproduce command for a SAT.
-local function check_one(r, c, timeout_sec, label, hint)
+local function check_one(r, c, timeout_sec, label, hint, strict)
   if #r.gaps > 0 then
     c.gap = c.gap + 1
     local ops = {}
     for _, gp in ipairs(r.gaps) do
       c.gap_ops[gp.op] = (c.gap_ops[gp.op] or 0) + 1
       ops[#ops + 1] = gp.op
+    end
+    -- In strict mode (the default -- everything the generator
+    -- emits is supposed to be modeled, since the known-gap ops
+    -- POW/BROL/BROR are already excluded) a gap means ljopt
+    -- cannot model an op we thought it could: a real finding.
+    -- Fail loudly rather than silently dropping the output.
+    if strict then
+      error(("UNMODELED OP %s: ljopt cannot model output op(s): %s"
+        .. " -- reproduce: %s"):format(label, table.concat(ops, ", "), hint))
     end
     io.write(("GAP   %s  ljopt can't model output op(s): %s\n")
       :format(label, table.concat(ops, ", ")))
@@ -239,9 +265,10 @@ end
 local function run(o)
   local timeout_sec = tonumber(os.getenv("LJOPT_Z3_TIMEOUT")) or 15
   local c = counters()
+  local strict = not o.include_gaps
   for seed = o.seed, o.seed + o.count - 1 do
     local r = check.build(seed, gen_opts(o))
-    check_one(r, c, timeout_sec, "seed=" .. seed, "--show " .. seed)
+    check_one(r, c, timeout_sec, "seed=" .. seed, "--show " .. seed, strict)
   end
   report(c, o.count)
   return c.sat
@@ -250,26 +277,24 @@ end
 -- Exhaustive sweep over enum.lua's chain space. Reports findings
 -- by enumeration index; reproduce with the printed --show command
 -- (same --type/--depth/--ninputs).
-local function run_enum(o)
+-- Shared sweep body for both single-type (iter/count) and
+-- mixed-type (iter_mixed/count_mixed) enumeration. `make_iter`
+-- returns a fresh trace iterator; `total` is the space size;
+-- `repro` is the reproduce command prefix (index appended).
+local function sweep(o, make_iter, total, repro)
   local timeout_sec = tonumber(os.getenv("LJOPT_Z3_TIMEOUT")) or 15
-  local eo = enum_opts(o)
-  local total = enum.count(eo)
-  io.write(("enum sweep: type=%s depth=%d ninputs=%d -- %d traces in space")
-    :format(o.type, o.depth, o.ninputs, total))
   if o.skip > 0 then io.write((", skipping first %d"):format(o.skip)) end
   if o.limit then io.write((", checking at most %d"):format(o.limit)) end
   io.write("\n")
-
-  local repro = ("--enum --type %s --depth %d --ninputs %d --show")
-    :format(o.type, o.depth, o.ninputs)
+  local strict = not o.include_gaps
   local c = counters()
   local idx, checked = 0, 0
-  for tr in enum.iter(eo) do
+  for tr in make_iter() do
     idx = idx + 1
     if idx > o.skip then
       checked = checked + 1
       local r = check.build_from(tr.insns, tr.outputs, {})
-      check_one(r, c, timeout_sec, "#" .. idx, repro .. " " .. idx)
+      check_one(r, c, timeout_sec, "#" .. idx, repro .. " " .. idx, strict)
       if checked % 2000 == 0 then
         io.write(("... %d/%d checked (%d z3 calls, %d sat)\n")
           :format(checked, o.limit or total - o.skip,
@@ -282,10 +307,46 @@ local function run_enum(o)
   return c.sat
 end
 
+local function run_enum(o)
+  local eo = enum_opts(o)
+  local total = enum.count(eo)
+  io.write(("enum sweep: type=%s depth=%d ninputs=%d -- %d traces in space")
+    :format(o.type, o.depth, o.ninputs, total))
+  local repro = ("--enum --type %s --depth %d --ninputs %d --show")
+    :format(o.type, o.depth, o.ninputs)
+  return sweep(o, function() return enum.iter(eo) end, total, repro)
+end
+
+local function run_mixed(o)
+  local total = enum.count_mixed({ depth = o.depth })
+  io.write(("mixed CONV sweep: depth=%d -- %d traces in space")
+    :format(o.depth, total))
+  local repro = ("--mixed --depth %d --show"):format(o.depth)
+  return sweep(o, function() return enum.iter_mixed({ depth = o.depth }) end,
+    total, repro)
+end
+
+-- Reproduce one mixed-enumeration trace by its 1-based index.
+local function show_mixed(idx, o)
+  local i = 0
+  for tr in enum.iter_mixed({ depth = o.depth }) do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("mixed #%d (depth=%d)"):format(idx, o.depth))
+      return
+    end
+  end
+  error(("mixed index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
 local o = parse_args(arg)
 if o.show ~= nil then
-  if o.enum then show_enum(o.show, o) else show(o.show, o) end
+  if o.mixed then show_mixed(o.show, o)
+  elseif o.enum then show_enum(o.show, o)
+  else show(o.show, o) end
   os.exit(0)
 end
-local n_sat = o.enum and run_enum(o) or run(o)
+local n_sat = o.mixed and run_mixed(o) or (o.enum and run_enum(o)) or run(o)
 os.exit(n_sat == 0 and 0 or 1)
