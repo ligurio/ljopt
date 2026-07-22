@@ -42,8 +42,8 @@ local IRT_NUM, IRT_INT, IRT_I64 = gen.IRT_NUM, gen.IRT_INT, gen.IRT_I64
 --   rlits    -- binary where op2 is not a leaf but a constant from
 --               this list, of kind rlit_kind (LDEXP exponent).
 -- Excluded ops match gen's blacklist: POW / num MOD / int DIV,MOD
--- (recorder-impossible or ljopt gap) and BROL/BROR (SMT-preamble
--- gap). Callers hunting gaps can pass their own op list.
+-- (recorder-impossible or ljopt gap). Callers hunting gaps can
+-- pass their own op list.
 local OPS = {
   [IRT_NUM] = {
     { name = "ADD", arity = 2, commut = true },
@@ -68,6 +68,16 @@ local OPS = {
     { name = "BSHL", arity = 2 },
     { name = "BSHR", arity = 2 },
     { name = "BSAR", arity = 2 },
+    -- bit.rol / bit.ror. Counts are masked & 31 by both x86 and
+    -- LuaJIT's lj_rol/lj_ror, and by ext_rotate_left/_right.
+    { name = "BROL", arity = 2 },
+    { name = "BROR", arity = 2 },
+    -- Overflow-checked integer arithmetic, emitted by
+    -- lj_opt_narrow for Lua-level `+`/`-`/`*` that stayed integer.
+    -- Guards: the overflow test is the trace exit.
+    { name = "ADDOV", arity = 2, commut = true, guard = true },
+    { name = "SUBOV", arity = 2, guard = true },
+    { name = "MULOV", arity = 2, commut = true, guard = true },
     { name = "NEG", arity = 1, mirror = true },
     { name = "BNOT", arity = 1, no_op2 = true },
     { name = "BSWAP", arity = 1, no_op2 = true },
@@ -145,8 +155,12 @@ end
 -- which the caller assigns) via callback `emit`.
 local function each_application(t, leaves, op, level, prev, emit)
   local opnum = gen.op_num(op.name)
+  -- ADDOV/SUBOV/MULOV are guards *and* value producers: the
+  -- overflow check becomes a trace exit while the wrapped result
+  -- stays on the op stack (see ir/ADDOV.lua).
+  local ty = op.guard and (t + 0x80) or t
   local function ins(ak, av, bk, bv)
-    emit({ op = opnum, t = t, ak = ak, av = av, bk = bk, bv = bv })
+    emit({ op = opnum, t = ty, ak = ak, av = av, bk = bk, bv = bv })
   end
 
   if op.arity == 1 then
@@ -307,9 +321,10 @@ local MIXED_CONST = {
   [IRT_NUM] = { consts = gen.NUM_CONSTS, kind = K.KNUM },
 }
 
--- CONV transitions: from-type -> list of { to = type, mode = op2 }.
+-- CONV transitions: from-type -> list of {to = type, mode = op2}.
 -- Mode = (dst<<IRCONV_DSH)|src [|IRCONV_SEXT for signed widen]
--- [|IRCONV_ANY for num->int]. IRCONV_DSH=5, SEXT=0x800, ANY=0x1000.
+-- [|IRCONV_ANY for num->int]. IRCONV_DSH=5, SEXT=0x800,
+-- ANY=0x1000.
 local SEXT, ANY = 0x800, 0x1000
 local function cmode(dst, src, extra)
   return dst * 32 + src + (extra or 0)
@@ -327,6 +342,13 @@ local MIXED_CONV = {
     { to = IRT_INT, mode = cmode(IRT_INT, IRT_NUM, ANY) },
     { to = IRT_I64, mode = cmode(IRT_I64, IRT_NUM, ANY) },
     { to = IRT_FLT, mode = cmode(IRT_FLT, IRT_NUM) },  -- round to float32
+    -- bit.tobit: num -> int by the "add 2^52+2^51" trick. op2 is
+    -- the bias KNUM (lj_ir_knum_tobit = 0x4338000000000000), which
+    -- ljopt ignores -- it models the op directly as RNE fp->int.
+    -- Reaches LJFOLD(TOBIT KNUM KNUM) and the TOBIT ADD/SUB/CONV
+    -- simplifications.
+    { to = IRT_INT, op = "TOBIT", bk = K.KNUM,
+      mode = 6755399441055744 },
   },
   [IRT_FLT] = {
     { to = IRT_NUM, mode = cmode(IRT_NUM, IRT_FLT) },  -- widen to double
@@ -369,8 +391,9 @@ local function iter_mixed(opts)
     end
     -- (b) CONV to another modeled type.
     for _, tr in ipairs(MIXED_CONV[cur_type]) do
-      body[level] = { op = gen.op_num("CONV"), t = tr.to,
-        ak = K.REF, av = prev_ref, bk = K.LIT, bv = tr.mode }
+      body[level] = { op = gen.op_num(tr.op or "CONV"), t = tr.to,
+        ak = K.REF, av = prev_ref,
+        bk = tr.bk or K.LIT, bv = tr.mode }
       rec(level + 1, tr.to, this_ref)
     end
     body[level] = nil
