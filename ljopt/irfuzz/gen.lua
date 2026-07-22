@@ -137,11 +137,11 @@ local RECORDER_IMPOSSIBLE = {
 local KNOWN_LJOPT_GAP = {
   [IRT_NUM] = { POW = true },
   -- BSHL/BSHR/BSAR are fixed (count masked & 31, BSHR now
-  -- logical) -- see irfuzz-shift-mask-gap. Rotates stay
-  -- excluded: ext_rotate_left/_right are not defined in the
-  -- SMT preamble, so BROL/BROR need separate verification
-  -- before enabling.
-  [IRT_INT] = { BROL = true, BROR = true },
+  -- logical) -- see irfuzz-shift-mask-gap. BROL/BROR are now
+  -- enabled too: ext_rotate_left/_right are defined in the SMT
+  -- preamble (smt_constants.lua) and BROL's int result is
+  -- sign-extended like every other int op.
+  [IRT_INT] = {},
 }
 
 local function menu_for(t, exclude_gaps)
