@@ -127,6 +127,16 @@ local LJOPT_SMTLIB = ([[
 (declare-fun callxs_4 (MemCell MemCell MemCell MemCell) (_ BitVec 64))
 (declare-fun callxs_5 (MemCell MemCell MemCell MemCell MemCell) (_ BitVec 64))
 
+; Table identity of an SLOAD'd VM stack slot. This is a *function*
+; of the slot, not the slot number itself: two different stack
+; slots may hold the same table at run time (`f(t, t)`), so
+; hard-coding distinct ids asserted they could never alias and made
+; every load-forwarding / alias-analysis miscompile invisible.
+; Both the unopt and opt traces apply the same function to the same
+; slot, so they still agree on identity; the solver stays free to
+; make two slots equal, which is what exercises aa_ahref/aa_table.
+(declare-fun tab_slot (Int) Int)
+
 ; `(fp2bv64 x)` is the IEEE-754 encoding of the double x -- the
 ; bytes an FFI store writes. Declared, not defined: float -> bitvector
 ; is not a function for NaN, so SMT-LIB has no operator for it

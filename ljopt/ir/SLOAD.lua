@@ -69,7 +69,11 @@ function impls.IRNodeSLOADTab:to_smt_lib(ctx)
         -- I suppose guard for SLOAD is always true for us.
         -- It means we never exit by it.
         ctx.te_stack:store(ssa_ref, 'true'),
-        ctx.op_stack:store(ssa_ref, op_type.TAB, tostring(mem_slot)),
+        -- Symbolic table identity, not the slot literal -- see
+        -- `tab_slot` in smt_constants. Distinct slots must be
+        -- allowed to alias.
+        ctx.op_stack:store(ssa_ref, op_type.TAB,
+            ('(tab_slot %s)'):format(mem_slot)),
         smt_fm
     )
 end
