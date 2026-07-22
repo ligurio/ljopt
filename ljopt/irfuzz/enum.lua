@@ -656,11 +656,105 @@ local function count_alias()
   return n
 end
 
+-- Raw FFI memory (xmem) enumeration. Targets lj_opt_mem.c's
+-- aa_xref plus the store-to-load forwarding conversion: when a
+-- forwarded store's type differs from the load's, LuaJIT rewrites
+-- the load into a CONV and picks sign- or zero-extension from the
+-- *load* type. aa_xref also declares two types that differ only in
+-- signedness to be the same location,
+--   ((xa->t.irt - IRT_I8) ^ (xb->t.irt - IRT_I8)) == 1
+-- so an i8 store feeding a u8 load must forward through that CONV
+-- rather than being treated as a distinct address. Every width
+-- here carries an int-typed value, which is what the recorder
+-- emits -- LuaJIT has no arithmetic narrower than int, so a narrow
+-- XSTORE always takes an int and truncates at the store.
+local function iter_xmem(opts)
+  opts = opts or {}
+  local SL = gen.op_num("SLOAD")
+  local ADD = gen.op_num("ADD")
+  local XSTORE = gen.op_num("XSTORE")
+  local XLOAD = gen.op_num("XLOAD")
+
+  local TYPES = {
+    { name = "i8", t = gen.IRT_I8 },
+    { name = "u8", t = gen.IRT_U8 },
+    { name = "i16", t = gen.IRT_I16 },
+    { name = "u16", t = gen.IRT_U16 },
+    { name = "int", t = gen.IRT_INT },
+  }
+  -- Byte offsets from the same base. 0 aliases exactly; 1 and 2
+  -- partially overlap a wider access; 4 is disjoint for every
+  -- width here.
+  local OFFSETS = { 0, 1, 2, 4 }
+  local SHAPES = { "store_load", "store_store_load", "load_store_load" }
+
+  return coroutine.wrap(function()
+    for _, st in ipairs(TYPES) do
+      for _, lt in ipairs(TYPES) do
+        for _, off in ipairs(OFFSETS) do
+          for _, shape in ipairs(SHAPES) do
+            local insns = {}
+            local function add(x)
+              insns[#insns + 1] = x
+              return #insns
+            end
+            -- Prologue: the int value to store, and a cdata box
+            -- whose payload is the base address. `ADD p64 cdt, k`
+            -- is exactly how the recorder forms an FFI element
+            -- address (see any `arr[i] = v` trace).
+            local vref = add({ op = SL, t = gen.IRT_INT, ak = K.LIT,
+              av = 1, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+            local cref = add({ op = SL, t = gen.IRT_CDT, ak = K.LIT,
+              av = 2, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+            local function addr(o)
+              return add({ op = ADD, t = gen.IRT_P64, ak = K.REF,
+                av = cref, bk = K.KINT, bv = 8 + o })
+            end
+            local pa = addr(0)
+            local pb = addr(off)
+            local function store(p, ty)
+              add({ op = XSTORE, t = ty, ak = K.REF, av = p,
+                bk = K.REF, bv = vref })
+            end
+            local function load(p, ty)
+              return add({ op = XLOAD, t = ty, ak = K.REF, av = p,
+                bk = K.LIT, bv = 0 })
+            end
+
+            local outputs
+            if shape == "store_load" then
+              store(pa, st.t)
+              outputs = { load(pb, lt.t) }
+            elseif shape == "store_store_load" then
+              store(pa, st.t)
+              store(pb, lt.t)
+              outputs = { load(pa, st.t) }
+            else
+              local first = load(pa, st.t)
+              store(pb, lt.t)
+              outputs = { first, load(pa, st.t) }
+            end
+            coroutine.yield({ insns = insns, outputs = outputs })
+          end
+        end
+      end
+    end
+  end)
+end
+
+local function count_xmem()
+  local n = 0
+  for _ in iter_xmem() do n = n + 1 end
+  return n
+end
+
 return {
   iter = iter,
   count = count,
   iter_alias = iter_alias,
   count_alias = count_alias,
+  iter_xmem = iter_xmem,
+  count_xmem = count_xmem,
   iter_mixed = iter_mixed,
   count_mixed = count_mixed,
   iter_guard = iter_guard,

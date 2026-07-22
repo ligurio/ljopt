@@ -22,6 +22,14 @@ local IRT_I64 = 21
 local IRT_TAB = 11   -- table pointer
 -- 32-bit GC pointer (AREF/HREF/FLOAD tab.array result)
 local IRT_P32 = 5
+-- Raw-memory (FFI) types. Narrow C integers only ever reach the
+-- IR through XLOAD/XSTORE -- LuaJIT promotes them to int for any
+-- arithmetic -- so these exist purely for the xmem enumerator.
+local IRT_I8, IRT_U8, IRT_I16, IRT_U16 = 15, 16, 17, 18
+local IRT_U32, IRT_U64 = 20, 22
+local IRT_FLT = 13
+local IRT_CDT = 10
+local IRT_P64 = 9
 
 -- Operand kinds -- must match the IRFUZZ_OPND_* enum in
 -- lib_jit.c.
@@ -452,4 +460,14 @@ return {
   FIELD_TAB_ARRAY = FIELD_TAB_ARRAY,
   ARR_IDXS = ARR_IDXS,
   HASH_KEYS = HASH_KEYS,
+  -- Raw FFI memory building blocks, used by the xmem enumerator.
+  IRT_I8 = IRT_I8,
+  IRT_U8 = IRT_U8,
+  IRT_I16 = IRT_I16,
+  IRT_U16 = IRT_U16,
+  IRT_U32 = IRT_U32,
+  IRT_U64 = IRT_U64,
+  IRT_FLT = IRT_FLT,
+  IRT_CDT = IRT_CDT,
+  IRT_P64 = IRT_P64,
 }
