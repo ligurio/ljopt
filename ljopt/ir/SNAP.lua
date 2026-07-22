@@ -75,14 +75,34 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                     data = arith_utils.smt_int_to_fp(
                         ctx.op_stack:load(value_data, op_type.I64)
                     )
-                elseif type == "i64" then
+                elseif type == "i64" or type == "u64"
+                    or type == "u32" or type == "i8" or type == "u8"
+                    or type == "i16" or type == "u16" then
                     -- Full 64-bit value -> fp (smt_int_to_fp would
                     -- truncate to 32 bits). Deterministic, so a
                     -- folded i64 constant and a computed i64 slot
                     -- compare equal; only distinct 64-bit results
                     -- that round to the same double are missed.
+                    --
+                    -- Every other C integer width belongs here too:
+                    -- they all live as 64-bit BVs in an `int-val`
+                    -- cell (a narrow XLOAD arrives already sign- or
+                    -- zero-extended). Letting them fall through to
+                    -- the numeric branch called get-fp on an
+                    -- int-val cell, which is unconstrained, so z3
+                    -- picked different fps per side and the check
+                    -- sat spuriously -- the same trap as `fun`
+                    -- above. It made 15 of 40 xmem traces read as
+                    -- bug candidates on clean LuaJIT.
                     data = arith_utils.smt_i64_to_fp(
                         ctx.op_stack:load(value_data, op_type.I64)
+                    )
+                elseif type == "flt" then
+                    -- float32 is held as (_ FloatingPoint 8 24);
+                    -- widen it to the double the snap stack stores
+                    -- rather than reading it as one.
+                    data = ('((_ to_fp 11 53) RNE %s)'):format(
+                        ctx.op_stack:load(value_data, 'flt')
                     )
                 else
                     data = ctx.op_stack:load(value_data, op_type.NUM)
