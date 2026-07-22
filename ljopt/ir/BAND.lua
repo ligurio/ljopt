@@ -9,6 +9,9 @@ ir_node.extended(impls.IRNodeBANDInt, bin_op.BinOpInt)
 impls.IRNodeBANDI64 = { op_str = 'bvand' }
 ir_node.extended(impls.IRNodeBANDI64, bin_op.BinOpI64)
 
+impls.IRNodeBANDU64 = { op_str = 'bvand' }
+ir_node.extended(impls.IRNodeBANDU64, bin_op.BinOpI64)
+
 local function instance(node_str)
     return impls[node_str]
 end

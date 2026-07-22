@@ -9,6 +9,10 @@ ir_node.extended(impls.IRNodeMODInt, bin_op.BinOpInt)
 impls.IRNodeMODI64 = { op_str = 'bvsrem' }
 ir_node.extended(impls.IRNodeMODI64, bin_op.BinOpI64)
 
+-- See DIV: u64 takes the unsigned remainder.
+impls.IRNodeMODU64 = { op_str = 'bvurem' }
+ir_node.extended(impls.IRNodeMODU64, bin_op.BinOpI64)
+
 local function instance(node_str)
     return impls[node_str]
 end

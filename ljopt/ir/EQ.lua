@@ -121,6 +121,8 @@ function impls.IRNodeEQP32.is_implemented(_flags, _type, _opcode,
                                           left_op, right_op_val)
     return is_ref_base(left_op) or is_ref_base(right_op_val)
 end
+impls.IRNodeEQU64 = { op_str = '=' }
+ir_node.extended(impls.IRNodeEQU64, bin_op.BinOpGuardI64)
 
 local function instance(node_str)
     return impls[node_str]

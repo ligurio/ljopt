@@ -25,6 +25,9 @@ ir_node.extended(impls.IRNodeUGTInt, bin_op.BinOpGuardInt)
 impls.IRNodeUGTU32 = { op_str = 'bvugt' }
 ir_node.extended(impls.IRNodeUGTU32, bin_op.BinOpGuardU32)
 
+impls.IRNodeUGTU64 = { op_str = 'bvugt' }
+ir_node.extended(impls.IRNodeUGTU64, bin_op.BinOpGuardI64)
+
 local function instance(node_str)
     return impls[node_str]
 end

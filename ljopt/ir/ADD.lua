@@ -43,6 +43,8 @@ function impls.IRNodeADDP32.is_implemented(_flags, _type, _opcode,
                                            left_op, _right_op)
     return left_op ~= nil and left_op:is_ssa()
 end
+impls.IRNodeADDU64 = { op_str = 'bvadd' }
+ir_node.extended(impls.IRNodeADDU64, bin_op.BinOpI64)
 
 local function instance(node_str)
     return impls[node_str]
