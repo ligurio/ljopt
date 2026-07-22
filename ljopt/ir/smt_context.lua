@@ -565,7 +565,15 @@ function MemoryStack.allocate(self, inherited_from)
         -- disjunct spuriously sat.
         current_slot = str_id
         self.vm_slot_map[str_id] = { slot = current_slot }
-        return current_slot, ''
+        -- VM-slot table ids must stay >= 0: auto-allocated slots
+        -- are strictly negative so the equivalence disjunct's
+        -- witness guard (>= witness_ptr 0) can tell them apart.
+        -- `tab_slot` is uninterpreted, so pin its range here.
+        -- Emitted by both the unopt and opt stacks; a repeated
+        -- assert is redundant but harmless (unlike a repeated
+        -- declaration).
+        return current_slot,
+            ('\n(assert (>= (tab_slot %s) 0))'):format(current_slot)
     end
     local slot_num
     current_slot, slot_num = self:alloc_slot()
