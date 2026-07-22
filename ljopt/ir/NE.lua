@@ -57,6 +57,8 @@ function impls.IRNodeNEStr:to_smt_lib(ctx)
             ir_node.retrieve_str_op(self:get_right_op(), ctx)
         ))
 end
+impls.IRNodeNEU64 = { op_str = 'distinct' }
+ir_node.extended(impls.IRNodeNEU64, bin_op.BinOpGuardI64)
 
 local function instance(node_str)
     return impls[node_str]

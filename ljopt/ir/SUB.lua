@@ -38,6 +38,8 @@ function impls.IRNodeSUBInt:to_smt_lib(ctx)
     end
     return sub_int_to_smt_lib(self, ctx)
 end
+impls.IRNodeSUBU64 = { op_str = 'bvsub' }
+ir_node.extended(impls.IRNodeSUBU64, bin_op.BinOpI64)
 
 local function instance(node_str)
     return impls[node_str]

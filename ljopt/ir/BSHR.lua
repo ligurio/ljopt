@@ -11,6 +11,9 @@ local impls = {}
 impls.IRNodeBSHRI64 = { op_str = 'bvlshr' }
 ir_node.extended(impls.IRNodeBSHRI64, bin_op.BinOpI64)
 
+impls.IRNodeBSHRU64 = { op_str = 'bvlshr' }
+ir_node.extended(impls.IRNodeBSHRU64, bin_op.BinOpI64)
+
 impls.IRNodeBSHRInt = { op_str = 'bvlshr' }
 ir_node.extended(impls.IRNodeBSHRInt, bin_op.BinOpShiftInt)
 

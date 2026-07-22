@@ -59,6 +59,11 @@ function impls.IRNodeBROLI64:to_smt_lib(ctx)
     )
 end
 
+-- u64 rotates at the same 64-bit width as i64, and the rotate is
+-- bit-pattern-only, so signedness never enters into it.
+impls.IRNodeBROLU64 = {}
+ir_node.extended(impls.IRNodeBROLU64, impls.IRNodeBROLI64)
+
 local function instance(node_str)
     return impls[node_str]
 end

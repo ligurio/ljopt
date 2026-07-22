@@ -57,6 +57,11 @@ function impls.IRNodeBRORInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+-- See BROL: the 64-bit rotate is bit-pattern-only, so u64 reuses
+-- the i64 implementation unchanged.
+impls.IRNodeBRORU64 = {}
+ir_node.extended(impls.IRNodeBRORU64, impls.IRNodeBRORI64)
+
 local function instance(node_str)
     return impls[node_str]
 end
