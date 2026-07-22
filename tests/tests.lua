@@ -1951,6 +1951,20 @@ f(1.5)
         ins = {
             {type = "num", name = "ADD"},
         },
+    }, {
+        name = "i64 BSHR is a logical shift",
+        code = [[
+local rshift = bit.rshift
+local function f(x)
+  return rshift(-8LL, 1), x
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "i64", name = "BSHR"},
+        },
     }}
     test:plan(3 * #srcs)
 
