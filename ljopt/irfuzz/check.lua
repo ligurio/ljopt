@@ -54,9 +54,17 @@ local function attach_snapshot(rec, pass, cmp)
       } }
     end
   end
-  -- snap_id 1, taken after the last instruction; no guards
-  -- => no exits.
-  rec.snapshots = { [1] = { nins = { #rec.trace + 1 }, slots = slots } }
+  -- Two snapshots. Snapshot 1 sits before the whole stream so
+  -- enrich_snapshots_with_exits (which attaches a guard to the
+  -- snapshot with nins <= ir_id) assigns every guard in the
+  -- trace to it -- that is what feeds `snap_<name>_te` and makes
+  -- guard elimination visible to the equivalence check. It holds
+  -- no slots: it only owns exits. Snapshot 2 sits after the last
+  -- instruction and carries the compared output values.
+  rec.snapshots = {
+    [1] = { nins = { 1 }, slots = {} },
+    [2] = { nins = { #rec.trace + 1 }, slots = slots },
+  }
 end
 
 -- Classify an output ref on one side: nil if comparable, else
@@ -128,7 +136,27 @@ local function build_from(insns, outputs, opts, seed)
   opts = opts or {}
 
   -- Replay through the fold engine twice (unopt + opt).
-  local unopt_pass, opt_pass = jutil.irfuzz(gen.to_spec(insns))
+  --
+  -- A guard whose condition folds to statically false makes
+  -- LuaJIT abort with the trace error LJ_TRERR_GFAIL ("guard
+  -- would always fail"), thrown from C as a bare number. That is
+  -- not a finding: the recorder only ever emits a guard in the
+  -- direction that held at record time (rec_comp /
+  -- rec_comp_fixup), so a statically-false guard is
+  -- recorder-impossible. Report it as an aborted trace and let
+  -- the driver skip it. Non-numeric errors are real, so they
+  -- are re-raised.
+  local replay_ok, unopt_pass, opt_pass = pcall(jutil.irfuzz,
+    gen.to_spec(insns))
+  if not replay_ok then
+    local err = unopt_pass
+    if type(err) ~= "number" then error(err, 0) end
+    return {
+      seed = seed, skipped = true, trace_err = err,
+      identical = false, commut_only = false, gaps = {},
+      insns = insns, outputs = outputs, cmp_outputs = {},
+    }
+  end
   local trace_u = decode.decode(unopt_pass)
   local trace_o = decode.decode(opt_pass)
 
