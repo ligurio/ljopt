@@ -71,6 +71,29 @@ ir_node.extended(impls.IRNodeXSTOREFlt, IRNodeXSTOREBase)
 impls.IRNodeXSTOREU32 = { typ = 'u32', nbytes = 4 }
 ir_node.extended(impls.IRNodeXSTOREU32, IRNodeXSTOREBase)
 
+impls.IRNodeXSTOREU64 = { typ = 'u64', nbytes = 8 }
+ir_node.extended(impls.IRNodeXSTOREU64, IRNodeXSTOREBase)
+
+-- Narrow C integer stores. The value handed to them is int-typed
+-- (LuaJIT keeps narrow arithmetic at int width and truncates only
+-- at the store), and xmem_store already writes just the low
+-- `nbytes` bytes -- so the truncation is exactly the byte count.
+impls.IRNodeXSTOREI8 = { typ = 'i8', nbytes = 1 }
+ir_node.extended(impls.IRNodeXSTOREI8, IRNodeXSTOREBase)
+
+impls.IRNodeXSTOREU8 = { typ = 'u8', nbytes = 1 }
+ir_node.extended(impls.IRNodeXSTOREU8, IRNodeXSTOREBase)
+
+impls.IRNodeXSTOREI16 = { typ = 'i16', nbytes = 2 }
+ir_node.extended(impls.IRNodeXSTOREI16, IRNodeXSTOREBase)
+
+impls.IRNodeXSTOREU16 = { typ = 'u16', nbytes = 2 }
+ir_node.extended(impls.IRNodeXSTOREU16, IRNodeXSTOREBase)
+
+-- float32: 4 bytes of IEEE single, see store_value_bv.
+impls.IRNodeXSTOREFlt = { typ = 'flt', nbytes = 4 }
+ir_node.extended(impls.IRNodeXSTOREFlt, IRNodeXSTOREBase)
+
 local function instance(node_str)
     return impls[node_str]
 end

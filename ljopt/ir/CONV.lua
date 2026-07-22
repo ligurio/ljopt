@@ -1,6 +1,17 @@
 local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 
+-- CONV modes narrowing to a C integer type, and the width each
+-- one truncates to. Only these four exist: LuaJIT promotes every
+-- narrower-than-int C type to `int` for arithmetic, so a
+-- narrowing cast is the only place the width is visible.
+local NARROW_CONV = {
+    ['int.i8']  = 8,
+    ['int.u8']  = 8,
+    ['int.i16'] = 16,
+    ['int.u16'] = 16,
+}
+
 local IRNodeCONV = {}
 ir_node.extended(IRNodeCONV, ir_node.ir_node_base)
 
@@ -90,6 +101,36 @@ function IRNodeCONV:to_smt_lib(ctx)
         data = ('((_ zero_extend 32) ((_ fp.to_ubv 32) RTZ %s))'):format(
             left_op
         )
+    -- Narrowing casts to a C integer type (`ffi.cast("int8_t", x)`
+    -- and friends). The IR result stays `int` -- LuaJIT has no
+    -- arithmetic at these widths -- so the conversion is a
+    -- truncate to the C width followed by the re-extension that
+    -- puts the value back in canonical 64-bit op-stack form:
+    -- sign for the signed types, zero for the unsigned ones.
+    -- The `sext` suffix in the mode literal marks which, and only
+    -- ever appears on i8/i16.
+    elseif NARROW_CONV[parsed_right_op[1]] ~= nil then
+        local nbits = NARROW_CONV[parsed_right_op[1]]
+        left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
+        local extend = parsed_right_op[2] == 'sext'
+            and 'sign_extend' or 'zero_extend'
+        data = ('((_ %s %d) ((_ extract %d 0) %s))'):format(
+            extend, 64 - nbits, nbits - 1, left_op
+        )
+    elseif parsed_right_op[1] == 'int.u64' then
+        -- 64-bit -> int: keep the low 32 bits, sign-extend back.
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'u64')
+        data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(left_op)
+    elseif parsed_right_op[1] == 'num.u64' then
+        -- u64 -> num: *unsigned* widening, so fp.to_fp_unsigned.
+        -- Using the signed form would turn every value above
+        -- 2^63 into a negative double.
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'u64')
+        data = ('((_ to_fp_unsigned 11 53) RNE %s)'):format(left_op)
+    elseif parsed_right_op[1] == 'u64.num' then
+        -- num -> u64: C truncation toward zero, unsigned.
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
+        data = ('((_ fp.to_ubv 64) RTZ %s)'):format(left_op)
     elseif parsed_right_op[1] == 'flt.num' then
         -- num -> flt: round a double (fp 11 53) to float32 (fp 8 24).
         -- Rounding is RNE, matching hardware cvtsd2ss.

@@ -21,10 +21,22 @@ local function make_xload(typ, nbytes, finalize)
     return cls
 end
 
+-- Sign- or zero-extend an `nbits`-wide raw load into the 64-bit
+-- op-stack cell, matching the movsx/movzx the backend emits.
+local function sext(nbits)
+    return function(raw)
+        return ('((_ sign_extend %d) %s)'):format(64 - nbits, raw)
+    end
+end
+
+local function zext(nbits)
+    return function(raw)
+        return ('((_ zero_extend %d) %s)'):format(64 - nbits, raw)
+    end
+end
+
 -- int is a 32-bit signed load sign-extended into the 64-bit cell.
-impls.IRNodeXLOADInt = make_xload(op_type.INT, 4, function(raw)
-    return ('((_ sign_extend 32) %s)'):format(raw)
-end)
+impls.IRNodeXLOADInt = make_xload(op_type.INT, 4, sext(32))
 impls.IRNodeXLOADI64 = make_xload(op_type.I64, 8, function(raw)
     return raw
 end)
@@ -36,13 +48,30 @@ impls.IRNodeXLOADP64 = make_xload('p64', 8, function(raw)
 end)
 -- u32 is a 32-bit unsigned load zero-extended into the 64-bit
 -- cell.
-impls.IRNodeXLOADU32 = make_xload('u32', 4, function(raw)
-    return ('((_ zero_extend 32) %s)'):format(raw)
-end)
+impls.IRNodeXLOADU32 = make_xload('u32', 4, zext(32))
 impls.IRNodeXLOADNum = make_xload(op_type.NUM, 8, function(raw)
     return ('((_ to_fp 11 53) %s)'):format(raw)
 end)
 
+-- Narrow C integer loads. LuaJIT never does arithmetic at these
+-- widths -- the recorder emits `i8 XLOAD` feeding an `int ADD`
+-- directly -- so the extension to the full 64-bit cell has to
+-- happen here, signed for i8/i16 and unsigned for u8/u16.
+impls.IRNodeXLOADI8 = make_xload('i8', 1, sext(8))
+impls.IRNodeXLOADU8 = make_xload('u8', 1, zext(8))
+impls.IRNodeXLOADI16 = make_xload('i16', 2, sext(16))
+impls.IRNodeXLOADU16 = make_xload('u16', 2, zext(16))
+
+-- u64 fills the cell exactly; signedness only shows up in the
+-- ops applied to it (bvudiv/bvurem, unsigned compares).
+impls.IRNodeXLOADU64 = make_xload('u64', 8, function(raw)
+    return raw
+end)
+
+-- float32. The op-stack keeps `flt` as an (_ FloatingPoint 8 24)
+-- (see the flt entries in smt_context's type2bv/bv2type), so the
+-- 4 raw bytes are reinterpreted, not converted -- no rounding is
+-- involved in a load.
 impls.IRNodeXLOADFlt = make_xload('flt', 4, function(raw)
     return ('((_ to_fp 8 24) %s)'):format(raw)
 end)
