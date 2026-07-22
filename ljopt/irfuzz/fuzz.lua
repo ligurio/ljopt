@@ -78,10 +78,16 @@ local function parse_args(argv)
       -- Mixed-type CONV enumeration (enum.iter_mixed): chains that
       -- CONV between int/i64/num, exercising the CONV fold rules.
       o.enum = true; o.mixed = true; i = i + 1
+    elseif a == "--guard" then
+      -- Guard (comparison) enumeration (enum.iter_guard): every
+      -- compare op over every modeled type. Checked through the
+      -- snapshot trace-exit bitvector, not a value slot.
+      o.enum = true; o.guard = true; i = i + 1
     elseif a == "--type" then
       o.type = argv[i + 1]
       assert(o.type == "num" or o.type == "int" or o.type == "i64",
         "--type must be num, int or i64")
+      o.type_given = true
       i = i + 2
     elseif a == "--depth" then
       o.depth = tonumber(argv[i + 1]); i = i + 2
@@ -326,6 +332,40 @@ local function run_mixed(o)
     total, repro)
 end
 
+-- Guard options: restrict to one type when --type is given, else
+-- sweep int/num/i64.
+local function guard_opts(o)
+  local go = { depth = o.depth }
+  if o.type_given then
+    go.types = { ({ int = 19, num = 14, i64 = 21 })[o.type] }
+  end
+  return go
+end
+
+local function run_guard(o)
+  local go = guard_opts(o)
+  local total = enum.count_guard(go)
+  io.write(("guard sweep: type=%s depth=%d -- %d traces in space")
+    :format(o.type_given and o.type or "int,num,i64", o.depth, total))
+  local repro = ("--guard --depth %d%s --show"):format(o.depth,
+    o.type_given and (" --type " .. o.type) or "")
+  return sweep(o, function() return enum.iter_guard(go) end, total, repro)
+end
+
+local function show_guard(idx, o)
+  local i = 0
+  for tr in enum.iter_guard(guard_opts(o)) do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("guard #%d (depth=%d)"):format(idx, o.depth))
+      return
+    end
+  end
+  error(("guard index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
 -- Reproduce one mixed-enumeration trace by its 1-based index.
 local function show_mixed(idx, o)
   local i = 0
@@ -343,10 +383,13 @@ end
 
 local o = parse_args(arg)
 if o.show ~= nil then
-  if o.mixed then show_mixed(o.show, o)
+  if o.guard then show_guard(o.show, o)
+  elseif o.mixed then show_mixed(o.show, o)
   elseif o.enum then show_enum(o.show, o)
   else show(o.show, o) end
   os.exit(0)
 end
-local n_sat = o.mixed and run_mixed(o) or (o.enum and run_enum(o)) or run(o)
+local n_sat = o.guard and run_guard(o)
+  or (o.mixed and run_mixed(o))
+  or (o.enum and run_enum(o)) or run(o)
 os.exit(n_sat == 0 and 0 or 1)

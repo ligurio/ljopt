@@ -427,11 +427,130 @@ local function count_mixed(opts)
   return f(1, IRT_INT)
 end
 
+-- -- Guard (comparison) enumeration ---------------------------
+--
+-- Comparisons are the only *guard* instructions in the arithmetic
+-- subset: they produce no value, they produce a trace exit. A
+-- fold that removes one (e.g. LJFOLD(UGE any KINT) drops
+-- `x >=u 0`) is only observable through the snapshot trace-exit
+-- bitvector, which is why check.lua has to hand the guards to a
+-- snapshot -- see the two-snapshot construction in
+-- attach_snapshot.
+--
+-- Recorder reachability (all confirmed against emit sites):
+--   int  -- IRTGI(IR_*), lj_ffrecord.c / lj_record.c
+--   num  -- IRTG(irop, IRT_NUM), lj_record.c rec_comp; the
+--           `irop ^= 4` path is what makes the *unordered* U*
+--           forms reachable
+--   i64  -- IRTG(op, dt), lj_crecord.c cdata compare;
+--           LJ_POST_FIXGUARD supplies the negated
+--           (NE/GE/GT/UGE/UGT) forms
+local CMP_OPS = {
+  "LT", "GE", "LE", "GT", "ULT", "UGE", "ULE", "UGT", "EQ", "NE",
+}
+
+local GUARD_TYPES = { IRT_INT, IRT_NUM, IRT_I64 }
+local IRT_GUARD = 0x80
+
+-- Enumerate guarded comparisons of every op over every modeled
+-- type. `depth` arithmetic steps are prepended so the compare
+-- sees a computed (not just loaded) operand, which is what
+-- reaches the reassociating compare folds.
+-- opts: { depth = 0, types = {...} }.
+--
+-- Operand shapes, all linear-chain legal:
+--   (ref, const)  (const, ref)  (const, const)  (ref, ref)
+-- The (const, const) shape is what triggers the kfold compare
+-- rules (LT KINT KINT and friends); (ref, ref) is the reflexive
+-- `x < x` form.
+local function iter_guard(opts)
+  opts = opts or {}
+  local depth = opts.depth or 0
+  local types = opts.types or GUARD_TYPES
+
+  return coroutine.wrap(function()
+    for _, t in ipairs(types) do
+      local prologue = prologue_for(t, 1)
+      local cinfo = MIXED_CONST[t]
+      local base = #prologue
+      -- Value ref after the prologue.
+      local vref = (t == IRT_I64) and 2 or 1
+
+      -- Arithmetic prefixes of exactly `depth` steps, reusing the
+      -- mixed-mode same-type op menu.
+      local prefixes = {}
+      local body = {}
+      local function build_prefix(level, prev)
+        if level > depth then
+          local copy = {}
+          for i, x in ipairs(body) do copy[i] = x end
+          prefixes[#prefixes + 1] = { insns = copy, ref = prev }
+          return
+        end
+        local this_ref = base + level
+        for _, op in ipairs(MIXED_ARITH[t]) do
+          for _, c in ipairs(cinfo.consts) do
+            body[level] = { op = gen.op_num(op.name), t = t,
+              ak = K.REF, av = prev, bk = cinfo.kind, bv = c }
+            build_prefix(level + 1, this_ref)
+          end
+        end
+        body[level] = nil
+      end
+      build_prefix(1, vref)
+
+      for _, pre in ipairs(prefixes) do
+        local vr = pre.ref
+        local cmp_ref = base + depth + 1
+        for _, opname in ipairs(CMP_OPS) do
+          local opnum = gen.op_num(opname)
+          local shapes = {}
+          for _, c in ipairs(cinfo.consts) do
+            shapes[#shapes + 1] = { K.REF, vr, cinfo.kind, c }
+            shapes[#shapes + 1] = { cinfo.kind, c, K.REF, vr }
+            for _, c2 in ipairs(cinfo.consts) do
+              shapes[#shapes + 1] = { cinfo.kind, c, cinfo.kind, c2 }
+            end
+          end
+          shapes[#shapes + 1] = { K.REF, vr, K.REF, vr }
+          for _, s in ipairs(shapes) do
+            local insns = {}
+            for _, x in ipairs(prologue) do insns[#insns + 1] = x end
+            for _, x in ipairs(pre.insns) do insns[#insns + 1] = x end
+            insns[#insns + 1] = { op = opnum, t = t + IRT_GUARD,
+              ak = s[1], av = s[2], bk = s[3], bv = s[4] }
+            -- The compared value is the output; the guard itself
+            -- carries no value and is checked via the trace exit.
+            coroutine.yield({ insns = insns, outputs = { vr },
+              guard_ref = cmp_ref })
+          end
+        end
+      end
+    end
+  end)
+end
+
+local function count_guard(opts)
+  opts = opts or {}
+  local depth = opts.depth or 0
+  local types = opts.types or GUARD_TYPES
+  local n = 0
+  for _, t in ipairs(types) do
+    local nconst = #MIXED_CONST[t].consts
+    local nprefix = (#MIXED_ARITH[t] * nconst) ^ depth
+    local nshape = nconst * 2 + nconst * nconst + 1
+    n = n + nprefix * #CMP_OPS * nshape
+  end
+  return n
+end
+
 return {
   iter = iter,
   count = count,
   iter_mixed = iter_mixed,
   count_mixed = count_mixed,
+  iter_guard = iter_guard,
+  count_guard = count_guard,
   leaves_for = leaves_for,
   OPS = OPS,
 }
