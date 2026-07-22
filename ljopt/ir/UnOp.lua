@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local arith_utils = require('ljopt.ir.arith_utils')
 local utils = require('ljopt.utils')
 
 local IRNodeUnOpBase = {}
@@ -30,12 +31,17 @@ function IRNodeUnOpNum:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+-- int results are canonicalized (see arith_utils.wrap_i32):
+-- bvneg of the canonical INT_MIN is +2^31, which must wrap back
+-- to INT_MIN like the 32-bit machine does.
 function IRNodeUnOpInt:to_smt_lib(ctx)
-    local left_op = ir_node.retrieve_int_op(
-        self:get_left_op(), ctx, self:get_type()
-    )
+    local type = self:get_type()
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, type)
     local data = string.format('(%s %s)', self.op_str, left_op)
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+    if type == 'int' then
+        data = arith_utils.wrap_i32(data)
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), type, data)
 end
 
 function IRNodeUnOpI64:to_smt_lib(ctx)

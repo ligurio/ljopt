@@ -1,5 +1,6 @@
 local un_op = require('ljopt.ir.UnOp')
 local ir_node = require('ljopt.ir.ir_node_base')
+local arith_utils = require('ljopt.ir.arith_utils')
 
 local impls = {}
 
@@ -16,6 +17,8 @@ function impls.IRNodeABSInt:to_smt_lib(ctx)
     local data = ('(ite (bvslt %s (_ bv0 64)) (bvneg %s) %s)'):format(
         left_op, left_op, left_op
     )
+    -- abs(INT_MIN) wraps back to INT_MIN on the 32-bit machine.
+    data = arith_utils.wrap_i32(data)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 

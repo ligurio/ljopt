@@ -40,7 +40,12 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- luacheck: push no max_comment_line_length
         -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
         -- luacheck: pop
-        data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
+        -- Convert at 32-bit width: the result is an int32
+        -- (cvttsd2si r32), so out-of-range doubles wrap into the
+        -- canonical form instead of escaping into the high bits.
+        data = arith_utils.wrap_i32(
+            string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
+        )
     elseif parsed_right_op[1] == 'num.i64' then
         left_op = self:get_left_op()
         data = ir_node.retrieve_i64_op(left_op, ctx, 'int')

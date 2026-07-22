@@ -104,6 +104,19 @@ local function wrap_u32(bv_value)
     return ('((_ zero_extend 32) ((_ extract 31 0) %s))'):format(bv_value)
 end
 
+-- Canonicalize a 64-bit BV holding an int (int32) result: keep
+-- the low 32 bits and sign-extend. This is the signed sibling of
+-- wrap_u32: LuaJIT `int` is int32, its plain arithmetic wraps mod
+-- 2^32 (x86 add r32), and the canonical op-stack form is the
+-- wrapped value sign-extended to the 64-bit cell. Without this,
+-- `int` chains escape int32 range in the model and overflow
+-- guards (ADDOV/SUBOV/MULOV) become failable where the real
+-- 32-bit machine would have wrapped -- every identity fold of an
+-- OV op then reads as a spurious miscompile.
+local function wrap_i32(bv_value)
+    return ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(bv_value)
+end
+
 -- Convert a u32 value (stored as a zero-extended 64-bit BV) to a
 -- floating-point `num`. The canonical u32 is always non-negative,
 -- so the signed bitvector-to-FP conversion gives the unsigned
@@ -260,4 +273,5 @@ return {
     wrap_u32 = wrap_u32,
     brol32 = brol32,
     bror32 = bror32,
+    wrap_i32 = wrap_i32,
 }
