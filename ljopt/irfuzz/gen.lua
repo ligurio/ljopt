@@ -445,4 +445,11 @@ return {
   -- Operand kinds (mirror the IRFUZZ_OPND_* enum in lib_jit.c).
   kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4, KINT64 = 5 },
   SLOAD_TYPECHECK = SLOAD_TYPECHECK,
+  -- Table/memory access building blocks, used by the aliasing
+  -- enumerator in enum.lua.
+  IRT_TAB = IRT_TAB,
+  IRT_P32 = IRT_P32,
+  FIELD_TAB_ARRAY = FIELD_TAB_ARRAY,
+  ARR_IDXS = ARR_IDXS,
+  HASH_KEYS = HASH_KEYS,
 }
