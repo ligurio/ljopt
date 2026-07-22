@@ -45,19 +45,32 @@ function IRNodeBinOpNum:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
+-- int results are canonicalized with wrap_i32: `int` is int32 and
+-- wraps mod 2^32 (see arith_utils). The type check matters --
+-- some 64-bit nodes (e.g. BSAR i64) inherit this class and must
+-- not be truncated.
+--
+-- PHI-marked (loop-carried) ops are exempt. A narrowed FORL
+-- index wraps in reality too, but only because LuaJIT proved at
+-- record time that it never can (entry invariant i <= stop,
+-- stop+step checked non-overflowing) -- an invariant ljopt does
+-- not model. Wrapping the loop-carried ADD faithfully lets z3
+-- enter the loop at INT32_MAX, where the wrapped int side keeps
+-- looping while the -O0 FP side exits: a real divergence on an
+-- unreachable entry, i.e. a false SAT (seen as 15 failing FORL
+-- tests). Unwrapped 64-bit arithmetic mimics the FP mirror on
+-- exactly those unreachable entries, which is what the loop
+-- tests are calibrated against.
 function IRNodeBinOpInt:to_smt_lib(ctx)
-    local left_op = ir_node.retrieve_int_op(
-        self:get_left_op(), ctx, self:get_type()
-    )
-    local right_op = ir_node.retrieve_int_op(
-        self:get_right_op(), ctx, self:get_type()
-    )
+    local type = self:get_type()
+    local left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, type)
+    local right_op = ir_node.retrieve_int_op(self:get_right_op(), ctx, type)
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
 
     -- LuaJIT's int arithmetic is 32-bit and wraps, so a folded
     -- result is only the real one while it stays in range. Out of
     -- range the node keeps its symbolic form, which is always
-    -- sound -- just less folded.
+    -- sound -- just less folded; the emitted term wraps anyway.
     if self.const_fn then
         local lc = utils.resolve_const(self:get_left_op(), ctx)
         local rc = utils.resolve_const(self:get_right_op(), ctx)
@@ -69,7 +82,10 @@ function IRNodeBinOpInt:to_smt_lib(ctx)
         end
     end
 
-    return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
+    if type == 'int' and not self:get_flags().irt_isphi then
+        data = arith_utils.wrap_i32(data)
+    end
+    return ctx.op_stack:store(self:get_ssa_reference(), type, data)
 end
 
 function IRNodeBinOpI64:to_smt_lib(ctx)
