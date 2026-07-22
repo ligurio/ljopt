@@ -1935,6 +1935,22 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "numeric EQ compares +0.0 and -0.0 equal",
+        code = [[
+local function f(x)
+  if 0.0 == -0.0 then
+    return x + 1
+  end
+  return x
+end
+f(1.5)
+f(1.5)
+f(1.5)
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+        },
     }}
     test:plan(3 * #srcs)
 
