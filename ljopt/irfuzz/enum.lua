@@ -544,9 +544,123 @@ local function count_guard(opts)
   return n
 end
 
+-- -- Aliasing enumeration ---------------------------------------
+--
+-- Targets LuaJIT's load-forwarding and dead-store elimination,
+-- which run *as fold rules* and so are reachable from this
+-- harness:
+--   LJFOLD(ALOAD any)  -> lj_opt_fwd_aload
+--   LJFOLD(HLOAD any)  -> lj_opt_fwd_hload
+--   LJFOLD(ASTORE ...) -> lj_opt_dse_ahstore
+-- Unlike constant folding, these depend on alias analysis
+-- (aa_ahref in lj_opt_mem.c) deciding whether a load may see
+-- past a store. Getting that wrong is a miscompile, and random
+-- generation almost never produces the store/load pairs that
+-- exercise it -- hence an explicit enumeration.
+--
+-- Shapes emitted, per (access kind, table pair, key pair):
+--   store;load          -- may the load forward the stored value?
+--   store;store;load    -- is the first store dead?
+--   load;store;load     -- may the second load reuse the first?
+--
+-- The table pair matters most. Two *distinct* SLOAD tab slots may
+-- still hold the same table at run time, so AA must stay
+-- conservative; a wrong "definitely disjoint" is exactly the bug
+-- class worth hunting.
+local function iter_alias(opts)
+  opts = opts or {}
+  local ntab = 2
+  local IRT_TAB, IRT_P32 = gen.IRT_TAB, gen.IRT_P32
+  local SL = gen.op_num("SLOAD")
+
+  -- Key sets per access kind. Array indices go through
+  -- FLOAD tab.array + AREF; hash keys through HREF.
+  local KINDS = {
+    { name = "array", keys = gen.ARR_IDXS,
+      load = "ALOAD", store = "ASTORE" },
+    { name = "hash", keys = gen.HASH_KEYS,
+      load = "HLOAD", store = "HSTORE" },
+  }
+  local SHAPES = { "store_load", "store_store_load", "load_store_load" }
+
+  return coroutine.wrap(function()
+    for _, kind in ipairs(KINDS) do
+      for ta = 1, ntab do
+        for tb = 1, ntab do
+          for _, ka in ipairs(kind.keys) do
+            for _, kb in ipairs(kind.keys) do
+              for _, shape in ipairs(SHAPES) do
+                local insns = {}
+                local function add(x)
+                  insns[#insns + 1] = x
+                  return #insns
+                end
+                -- Prologue: one num value + two table SLOADs.
+                local vref = add({ op = SL, t = IRT_NUM, ak = K.LIT,
+                  av = 1, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+                local tref = {}
+                for i = 1, ntab do
+                  tref[i] = add({ op = SL, t = IRT_TAB, ak = K.LIT,
+                    av = 1 + i, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+                end
+                -- Element ref for table `t` at key `k`.
+                local abase = {}
+                local function eref(t, k)
+                  if kind.name == "array" then
+                    if not abase[t] then
+                      abase[t] = add({ op = gen.op_num("FLOAD"),
+                        t = IRT_P32, ak = K.REF, av = tref[t],
+                        bk = K.LIT, bv = gen.FIELD_TAB_ARRAY })
+                    end
+                    return add({ op = gen.op_num("AREF"), t = IRT_P32,
+                      ak = K.REF, av = abase[t], bk = K.KINT, bv = k })
+                  end
+                  return add({ op = gen.op_num("HREF"), t = IRT_P32,
+                    ak = K.REF, av = tref[t], bk = K.KINT, bv = k })
+                end
+                local function store(t, k, val)
+                  add({ op = gen.op_num(kind.store), t = IRT_NUM,
+                    ak = K.REF, av = eref(t, k), bk = K.REF, bv = val })
+                end
+                local function load(t, k)
+                  return add({ op = gen.op_num(kind.load), t = IRT_NUM,
+                    ak = K.REF, av = eref(t, k), bk = K.NONE, bv = 0 })
+                end
+
+                local outputs
+                if shape == "store_load" then
+                  store(ta, ka, vref)
+                  outputs = { load(tb, kb) }
+                elseif shape == "store_store_load" then
+                  store(ta, ka, vref)
+                  store(tb, kb, vref)
+                  outputs = { load(ta, ka) }
+                else
+                  local first = load(ta, ka)
+                  store(tb, kb, vref)
+                  outputs = { first, load(ta, ka) }
+                end
+                coroutine.yield({ insns = insns, outputs = outputs })
+              end
+            end
+          end
+        end
+      end
+    end
+  end)
+end
+
+local function count_alias()
+  local n = 0
+  for _ in iter_alias() do n = n + 1 end
+  return n
+end
+
 return {
   iter = iter,
   count = count,
+  iter_alias = iter_alias,
+  count_alias = count_alias,
   iter_mixed = iter_mixed,
   count_mixed = count_mixed,
   iter_guard = iter_guard,

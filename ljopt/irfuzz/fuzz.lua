@@ -78,6 +78,11 @@ local function parse_args(argv)
       -- Mixed-type CONV enumeration (enum.iter_mixed): chains that
       -- CONV between int/i64/num, exercising the CONV fold rules.
       o.enum = true; o.mixed = true; i = i + 1
+    elseif a == "--alias" then
+      -- Aliasing enumeration (enum.iter_alias): store/load
+      -- patterns that exercise load forwarding and DSE, i.e.
+      -- LuaJIT's alias analysis rather than constant folding.
+      o.enum = true; o.alias = true; i = i + 1
     elseif a == "--guard" then
       -- Guard (comparison) enumeration (enum.iter_guard): every
       -- compare op over every modeled type. Checked through the
@@ -332,6 +337,28 @@ local function run_mixed(o)
     total, repro)
 end
 
+local function run_alias(o)
+  local total = enum.count_alias()
+  io.write(("alias sweep: store/load forwarding + DSE -- %d traces")
+    :format(total))
+  return sweep(o, function() return enum.iter_alias() end, total,
+    "--alias --show")
+end
+
+local function show_alias(idx, o)
+  local i = 0
+  for tr in enum.iter_alias() do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("alias #%d"):format(idx))
+      return
+    end
+  end
+  error(("alias index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
 -- Guard options: restrict to one type when --type is given, else
 -- sweep int/num/i64.
 local function guard_opts(o)
@@ -383,13 +410,15 @@ end
 
 local o = parse_args(arg)
 if o.show ~= nil then
-  if o.guard then show_guard(o.show, o)
+  if o.alias then show_alias(o.show, o)
+  elseif o.guard then show_guard(o.show, o)
   elseif o.mixed then show_mixed(o.show, o)
   elseif o.enum then show_enum(o.show, o)
   else show(o.show, o) end
   os.exit(0)
 end
-local n_sat = o.guard and run_guard(o)
+local n_sat = o.alias and run_alias(o)
+  or (o.guard and run_guard(o))
   or (o.mixed and run_mixed(o))
   or (o.enum and run_enum(o)) or run(o)
 os.exit(n_sat == 0 and 0 or 1)
