@@ -85,10 +85,11 @@ local OPS = {
   -- i64: inputs are int SLOADs widened via CONV int->i64 (see
   -- prologue_for); constants are KINT64. Only ops ljopt models for
   -- i64 AND the recorder emits via FFI 64-bit arithmetic/bitwise:
-  -- ADD/SUB/MUL/BAND/BOR/BXOR. Excluded: DIV/MOD (recorder lowers
-  -- 64-bit div/mod to CALL helpers, no IR_DIV), NEG/BSWAP (no ljopt
-  -- I64 translator), shifts (same count-mask gap as int shifts,
-  -- needs separate verification first).
+  -- ADD/SUB/MUL/BAND/BOR/BXOR plus the shifts. Shifts run through
+  -- BinOpShiftI64 (count masked & 63, full 64-bit width) -- the
+  -- i64 sibling of the int shift-mask fix. Excluded: DIV/MOD
+  -- (recorder lowers 64-bit div/mod to CALL helpers, no IR_DIV),
+  -- NEG/BSWAP (no ljopt I64 translator).
   [IRT_I64] = {
     { name = "ADD", arity = 2, commut = true },
     { name = "SUB", arity = 2 },
@@ -96,6 +97,12 @@ local OPS = {
     { name = "BAND", arity = 2, commut = true },
     { name = "BOR", arity = 2, commut = true },
     { name = "BXOR", arity = 2, commut = true },
+    { name = "BSHL", arity = 2, rlits = gen.SHIFT_COUNTS,
+      rlit_kind = K.KINT },
+    { name = "BSHR", arity = 2, rlits = gen.SHIFT_COUNTS,
+      rlit_kind = K.KINT },
+    { name = "BSAR", arity = 2, rlits = gen.SHIFT_COUNTS,
+      rlit_kind = K.KINT },
   },
 }
 
