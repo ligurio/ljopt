@@ -335,6 +335,30 @@ foo()
         },
     }, {
         code = [[
+local abs = math.abs
+local r
+for i = 1, 4 do
+    r = abs(i)
+end
+]],
+        ins = {
+            {type = "num", name = "FLOAD"},
+            {type = "num", name = "ABS"},
+        },
+    }, {
+        code = [[
+local abs = math.abs
+local r
+for i = 1.1, 4.4 do
+    r = -(i)
+end
+]],
+        ins = {
+            {type = "num", name = "FLOAD"},
+            {type = "num", name = "NEG"},
+        },
+    }, {
+        code = [[
 local function foo(c)
   return 1 == c
 end
