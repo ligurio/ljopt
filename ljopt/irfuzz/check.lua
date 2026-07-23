@@ -132,6 +132,30 @@ end
 -- output (root) refs. Shared by the random path (build, via
 -- gen.gen) and the exhaustive path (enum). `seed` is only carried
 -- through for reporting and may be nil.
+-- Well-formedness lint: a CONV's node type must equal its mode's
+-- destination type. LuaJIT's fold engine maintains this invariant
+-- ("fold: keep type of emitted CONV in sync with its mode",
+-- c9588f51, the fix for LuaJIT#524) -- the buggy fold emitted
+-- int-typed CONVs with u32 modes. The *semantic* damage of that
+-- lie happens below ljopt's abstraction (the backend elides
+-- sign/zero-extension moves based on the type field), so the
+-- SMT equivalence check cannot see it: ljopt keys CONV
+-- semantics on the mode string, which stayed correct. The lint
+-- convicts the malformed instruction directly instead.
+local function lint_conv_types(rec)
+  local bad = {}
+  for i, ins in ipairs(rec.trace) do
+    if ins.irop == "CONV" and ins.op2_txt and ins.irtype then
+      local dest = ins.op2_txt:match("^(%w+)%.")
+      if dest and dest ~= ins.irtype then
+        bad[#bad + 1] = ("%04d %s CONV %s"):format(
+          i, ins.irtype, ins.op2_txt)
+      end
+    end
+  end
+  return bad
+end
+
 local function build_from(insns, outputs, opts, seed)
   opts = opts or {}
 
@@ -159,6 +183,9 @@ local function build_from(insns, outputs, opts, seed)
   end
   local trace_u = decode.decode(unopt_pass)
   local trace_o = decode.decode(opt_pass)
+  local lint = lint_conv_types(trace_o)
+  local lint_u = lint_conv_types(trace_u)
+  for _, x in ipairs(lint_u) do lint[#lint + 1] = x .. " (unopt)" end
 
   -- An output is comparable only if it is usable on BOTH sides. A
   -- dummy/uninterpreted output is reported as a coverage gap
@@ -211,6 +238,7 @@ local function build_from(insns, outputs, opts, seed)
     cmp_outputs = cmp,
     trace_unopt = trace_u,
     trace_opt = trace_o,
+    lint = lint,
     formula = formula,
   }
 end
