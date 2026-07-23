@@ -1,8 +1,7 @@
 diff --git a/src/lib_jit.c b/src/lib_jit.c
-index 5a0d3861..a647dd0a 100644
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -393,6 +393,230 @@ LJLIB_CF(jit_util_tracemc)
+@@ -393,6 +393,246 @@
    return 0;
  }
  
@@ -15,7 +14,8 @@ index 5a0d3861..a647dd0a 100644
 +  IRFUZZ_OPND_KINT,   /* int32 constant, interned via lj_ir_kint(). */
 +  IRFUZZ_OPND_KNUM,   /* FP constant, interned via lj_ir_knum(). */
 +  IRFUZZ_OPND_LIT,    /* Raw literal (slot number, mode bits, ...). */
-+  IRFUZZ_OPND_KINT64  /* int64 constant, interned via lj_ir_kint64(). */
++  IRFUZZ_OPND_KINT64, /* int64 constant, interned via lj_ir_kint64(). */
++  IRFUZZ_OPND_KSTR    /* string constant, interned via lj_ir_kstr(). */
 +};
 +
 +/* Pseudo-trace initialization, mirroring trace_start() and
@@ -92,6 +92,21 @@ index 5a0d3861..a647dd0a 100644
 +    return lj_ir_knum(J, v);
 +  case IRFUZZ_OPND_LIT:
 +    return (TRef)(uint32_t)v;
++  case IRFUZZ_OPND_KSTR: {
++    /* Value is a Lua string, interned as a GCstr constant. This
++    ** is the only operand kind whose value is not a number, so it
++    ** is read fresh here rather than via the lua_tonumber above. */
++    const char *str;
++    size_t len;
++    TRef r;
++    lua_rawgeti(L, valtab, i);
++    str = lua_tolstring(L, -1, &len);
++    if (!str)
++      lj_err_callermsg(L, "irfuzz: KSTR operand must be a string");
++    r = lj_ir_kstr(J, lj_str_new(L, str, len));
++    lua_pop(L, 1);
++    return r;
++  }
 +  default:
 +    lj_err_callermsg(L, "irfuzz: bad operand kind");
 +    return 0;  /* unreachable */

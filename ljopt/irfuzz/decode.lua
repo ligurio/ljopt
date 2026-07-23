@@ -104,6 +104,13 @@ local function decode_const(pass, v)
     -- identical-comparison text.
     return tostring(k), { type = "int64", value = k }
   end
+  if type(k) == "string" then
+    -- KGC string constant (from the KSTR operand kind).
+    -- lj_ir_kvalue pushed the GCstr content as a Lua string, so
+    -- emit a str-typed operand (op_type.STR == "string"); the
+    -- string itself is the deterministic display text.
+    return k, { type = "string", value = k }
+  end
   -- Non-numeric constants are outside the v1 op set; fall back
   -- to a literal string so translation can mark the node NYI
   -- rather than crash.

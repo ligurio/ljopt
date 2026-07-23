@@ -783,9 +783,73 @@ local function count_xmem()
   return n
 end
 
+-- String enumeration. LuaJIT's fold-reachable string ops that
+-- ljopt models are dominated by the STR_LEN family
+-- (fold_str_len_kgc: #<const> -> const length). We exercise it
+-- directly (`#s`) and composed with int arithmetic and integer
+-- comparisons over pairs of constant strings, so the length fold
+-- has to stay consistent through a small dataflow chain. Every
+-- result is an int, so z3 only reasons about integers -- full
+-- String-theory content reasoning (expensive, often UNKNOWN) is
+-- avoided. Validated non-vacuous by injecting `len + 1` into
+-- fold_str_len_kgc: clean 0 SAT, injected all SAT.
+local function iter_strings()
+  local FLOAD = gen.op_num("FLOAD")
+  local STRS = gen.STR_CONSTS
+  -- Binary int ops (value results) and guard compares.
+  local VALOPS = { "ADD", "SUB", "MUL", "BAND", "BOR", "BXOR" }
+  local CMPOPS = { "LT", "GE", "LE", "GT", "EQ", "NE" }
+
+  return coroutine.wrap(function()
+    for _, s1 in ipairs(STRS) do
+      -- Bare length: #s1 (the fold in isolation).
+      do
+        local insns = { { op = FLOAD, t = IRT_INT, ak = K.KSTR,
+          av = s1, bk = K.LIT, bv = gen.IRFL_STR_LEN } }
+        coroutine.yield({ insns = insns, outputs = { 1 } })
+      end
+      for _, s2 in ipairs(STRS) do
+        -- Two lengths feeding one int op / one compare.
+        local function two_len()
+          local insns = {
+            { op = FLOAD, t = IRT_INT, ak = K.KSTR, av = s1,
+              bk = K.LIT, bv = gen.IRFL_STR_LEN },
+            { op = FLOAD, t = IRT_INT, ak = K.KSTR, av = s2,
+              bk = K.LIT, bv = gen.IRFL_STR_LEN },
+          }
+          return insns
+        end
+        for _, op in ipairs(VALOPS) do
+          local insns = two_len()
+          insns[3] = { op = gen.op_num(op), t = IRT_INT,
+            ak = K.REF, av = 1, bk = K.REF, bv = 2 }
+          coroutine.yield({ insns = insns, outputs = { 3 } })
+        end
+        for _, op in ipairs(CMPOPS) do
+          -- Guard compares: the trace-exit oracle checks them
+          -- (no value slot). A number leaf keeps the snapshot
+          -- non-empty so the compare is observable.
+          local insns = two_len()
+          insns[3] = { op = gen.op_num(op), t = IRT_INT + 0x80,
+            ak = K.REF, av = 1, bk = K.REF, bv = 2 }
+          coroutine.yield({ insns = insns, outputs = { 1 } })
+        end
+      end
+    end
+  end)
+end
+
+local function count_strings()
+  local n = 0
+  for _ in iter_strings() do n = n + 1 end
+  return n
+end
+
 return {
   iter = iter,
   count = count,
+  iter_strings = iter_strings,
+  count_strings = count_strings,
   iter_alias = iter_alias,
   count_alias = count_alias,
   iter_xmem = iter_xmem,
