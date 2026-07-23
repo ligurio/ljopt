@@ -212,6 +212,10 @@ local INT_CONSTS = {
 -- double, which is how the harness marshals a KINT64 operand.
 local I64_CONSTS = {
   0, 1, -1, 2, 4, 8, 3, 7, 4294967296,
+  -- 65 is a shift count > 63: 65 & 63 = 1, distinct from the raw
+  -- value, so it exercises the BinOpShiftI64 count mask (x << 65
+  -- must equal x << 1, which SMT bvshl-by-65 = 0 would get wrong).
+  65,
 }
 
 -- Numeric opcodes for the ops roots() must recognise: SLOAD
@@ -458,6 +462,11 @@ return {
   -- z3 String reasoning is costly, so string shapes stay minimal.
   STR_CONSTS = { "", "a", "hi", "abc", "hello", "lorem ipsum" },
   IRFL_STR_LEN = 0,
+  -- Shift/rotate counts for 64-bit shifts (emitted as KINT, the
+  -- width the recorder uses: LJFOLD(BSHL KINT64 KINT)). Spans the
+  -- mask boundary: 32/63 are in range, 65 exceeds it (65 & 63 = 1)
+  -- so the count mask is exercised.
+  SHIFT_COUNTS = { 0, 1, 7, 31, 32, 63, 65 },
   SLOAD_TYPECHECK = SLOAD_TYPECHECK,
   -- Table/memory access building blocks, used by the aliasing
   -- enumerator in enum.lua.
