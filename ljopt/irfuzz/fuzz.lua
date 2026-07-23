@@ -205,6 +205,15 @@ end
 -- mutable counter table; `label` names the trace in findings
 -- ("seed=7" / "#123"); `hint` is the reproduce command for a SAT.
 local function check_one(r, c, timeout_sec, label, hint, strict)
+  -- Malformed-IR findings (see check.lint_conv_types): reported
+  -- independently of the equivalence verdict, because the class
+  -- it catches (type field disagreeing with the CONV mode) is
+  -- invisible to the SMT check by construction.
+  if r.lint and #r.lint > 0 then
+    c.lint = c.lint + 1
+    io.write(("LINT  %s  CONV type/mode mismatch: %s -- reproduce: %s\n")
+      :format(label, table.concat(r.lint, "; "), hint))
+  end
   if #r.gaps > 0 then
     c.gap = c.gap + 1
     local ops = {}
@@ -258,16 +267,16 @@ end
 
 local function counters()
   return { sat = 0, unsat = 0, unknown = 0, skip = 0, gap = 0,
-           ident = 0, commut = 0, gap_ops = {} }
+           ident = 0, commut = 0, lint = 0, gap_ops = {} }
 end
 
 local function report(c, total)
   io.write((
     "\ndone: %d unsat, %d SAT(bug candidates), %d unknown, "
     .. "%d trivially-identical, %d commut-swap-only, "
-    .. "%d gap-seeds, %d skipped (of %d)\n"
+    .. "%d gap-seeds, %d skipped, %d LINT (of %d)\n"
   ):format(c.unsat, c.sat, c.unknown, c.ident, c.commut,
-    c.gap, c.skip, total))
+    c.gap, c.skip, c.lint, total))
   if next(c.gap_ops) then
     io.write("ljopt coverage gaps by op: ")
     local parts = {}
