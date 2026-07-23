@@ -595,13 +595,23 @@ local function iter_alias(opts)
                   insns[#insns + 1] = x
                   return #insns
                 end
-                -- Prologue: one num value + two table SLOADs.
+                -- Prologue: two DISTINCT num values + two table
+                -- SLOADs. The second value matters for DSE: a
+                -- dead-store shape that writes the same value
+                -- twice is vacuous, because dse_ahstore's
+                -- ALIAS_MAY case only conflicts when the stored
+                -- value differs (`store->op2 != val`), so eliding
+                -- a same-value store is always correct regardless
+                -- of aliasing. Distinct values make "the wrong
+                -- store survived" observable in the load.
                 local vref = add({ op = SL, t = IRT_NUM, ak = K.LIT,
                   av = 1, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+                local vref2 = add({ op = SL, t = IRT_NUM, ak = K.LIT,
+                  av = 2, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
                 local tref = {}
                 for i = 1, ntab do
                   tref[i] = add({ op = SL, t = IRT_TAB, ak = K.LIT,
-                    av = 1 + i, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+                    av = 2 + i, bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
                 end
                 -- Element ref for table `t` at key `k`.
                 local abase = {}
@@ -618,13 +628,22 @@ local function iter_alias(opts)
                   return add({ op = gen.op_num("HREF"), t = IRT_P32,
                     ak = K.REF, av = tref[t], bk = K.KINT, bv = k })
                 end
-                local function store(t, k, val)
+                -- store_at/load_at take a *precomputed* element ref
+                -- so a shape can control instruction ordering (DSE
+                -- needs the two stores adjacent -- see below).
+                local function store_at(ref, val)
                   add({ op = gen.op_num(kind.store), t = IRT_NUM,
-                    ak = K.REF, av = eref(t, k), bk = K.REF, bv = val })
+                    ak = K.REF, av = ref, bk = K.REF, bv = val })
+                end
+                local function load_at(ref)
+                  return add({ op = gen.op_num(kind.load), t = IRT_NUM,
+                    ak = K.REF, av = ref, bk = K.NONE, bv = 0 })
+                end
+                local function store(t, k, val)
+                  store_at(eref(t, k), val)
                 end
                 local function load(t, k)
-                  return add({ op = gen.op_num(kind.load), t = IRT_NUM,
-                    ak = K.REF, av = eref(t, k), bk = K.NONE, bv = 0 })
+                  return load_at(eref(t, k))
                 end
 
                 local outputs
@@ -632,9 +651,25 @@ local function iter_alias(opts)
                   store(ta, ka, vref)
                   outputs = { load(tb, kb) }
                 elseif shape == "store_store_load" then
-                  store(ta, ka, vref)
-                  store(tb, kb, vref)
-                  outputs = { load(ta, ka) }
+                  -- DSE. Two requirements make this non-vacuous,
+                  -- both found by fault-injecting dse_ahstore
+                  -- (MAY-alias treated as MUST):
+                  --   * DISTINCT values -- dse_ahstore's MAY case
+                  --     only conflicts when the stored value
+                  --     differs, so two same-value stores make
+                  --     elision always safe regardless of alias.
+                  --   * ADJACENT stores -- the elimination bails on
+                  --     any intervening guard, and an eref (HREF/
+                  --     AREF) between the stores blocks it, so both
+                  --     element refs are computed first and the two
+                  --     stores emitted back-to-back. The load
+                  --     reuses the first ref (as HREF CSE would).
+                  -- Verified: clean -> unsat, injected -> SAT.
+                  local ea = eref(ta, ka)
+                  local eb = eref(tb, kb)
+                  store_at(ea, vref)
+                  store_at(eb, vref2)
+                  outputs = { load_at(ea) }
                 else
                   local first = load(ta, ka)
                   store(tb, kb, vref)
