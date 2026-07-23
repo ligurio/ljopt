@@ -114,9 +114,23 @@ local FIELD_TAB_PREFIX = '```'
 -- String buffer slot.
 local STRING_BUFF_SLOT = FIELD_TAB_PREFIX .. 'bufhdr'
 
+-- FP sign masks LuaJIT keeps in GG_State and loads via
+-- `num FLOAD nil #<offset>` as the mask operand of num ABS/NEG.
+-- The offset depends on the LuaJIT build/layout, so the value is
+-- resolved per trace from the ABS/NEG consumer (see
+-- derive_nil_fload_masks). ABS/NEG are modelled semantically and
+-- never read the mask, so a dead/unconsumed load gets any valid
+-- constant -- NIL_FLOAD_UNUSED_MASK.
+local NIL_FLOAD_ABS_MASK = '((_ to_fp 11 53) #x7fffffffffffffff)'
+local NIL_FLOAD_NEG_MASK = '((_ to_fp 11 53) #x8000000000000000)'
+local NIL_FLOAD_UNUSED_MASK = '((_ to_fp 11 53) #x0000000000000000)'
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
     FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
     STRING_BUFF_SLOT = STRING_BUFF_SLOT,
+    NIL_FLOAD_ABS_MASK = NIL_FLOAD_ABS_MASK,
+    NIL_FLOAD_NEG_MASK = NIL_FLOAD_NEG_MASK,
+    NIL_FLOAD_UNUSED_MASK = NIL_FLOAD_UNUSED_MASK,
 }
