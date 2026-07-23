@@ -451,7 +451,13 @@ return {
   UNARY_OPS = UNARY_OPS,
   UNARY_NO_OP2 = UNARY_NO_OP2,
   -- Operand kinds (mirror the IRFUZZ_OPND_* enum in lib_jit.c).
-  kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4, KINT64 = 5 },
+  kinds = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4, KINT64 = 5,
+            KSTR = 6 },
+  -- Small constant string pool for string-op fuzzing. Kept short
+  -- and varied in length so `#s` folds produce distinct constants;
+  -- z3 String reasoning is costly, so string shapes stay minimal.
+  STR_CONSTS = { "", "a", "hi", "abc", "hello", "lorem ipsum" },
+  IRFL_STR_LEN = 0,
   SLOAD_TYPECHECK = SLOAD_TYPECHECK,
   -- Table/memory access building blocks, used by the aliasing
   -- enumerator in enum.lua.

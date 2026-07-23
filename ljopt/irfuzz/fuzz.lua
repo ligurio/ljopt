@@ -83,6 +83,11 @@ local function parse_args(argv)
       -- patterns that exercise load forwarding and DSE, i.e.
       -- LuaJIT's alias analysis rather than constant folding.
       o.enum = true; o.alias = true; i = i + 1
+    elseif a == "--strings" then
+      -- String enumeration (enum.iter_strings): STR_LEN folds
+      -- (#const) alone and composed with int arithmetic /
+      -- compares. Int-typed results keep z3 tractable.
+      o.enum = true; o.strings = true; i = i + 1
     elseif a == "--xmem" then
       -- Raw FFI memory enumeration (enum.iter_xmem): XLOAD/XSTORE
       -- over the narrow C integer widths, exercising aa_xref and
@@ -351,6 +356,28 @@ local function run_mixed(o)
     total, repro)
 end
 
+local function run_strings(o)
+  local total = enum.count_strings()
+  io.write(("string sweep: STR_LEN folds + int compose -- %d traces")
+    :format(total))
+  return sweep(o, function() return enum.iter_strings() end, total,
+    "--strings --show")
+end
+
+local function show_strings(idx, o)
+  local i = 0
+  for tr in enum.iter_strings() do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("string #%d"):format(idx))
+      return
+    end
+  end
+  error(("string index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
 local function run_xmem(o)
   local total = enum.count_xmem()
   io.write(("xmem sweep: FFI load/store forwarding -- %d traces")
@@ -446,7 +473,8 @@ end
 
 local o = parse_args(arg)
 if o.show ~= nil then
-  if o.xmem then show_xmem(o.show, o)
+  if o.strings then show_strings(o.show, o)
+  elseif o.xmem then show_xmem(o.show, o)
   elseif o.alias then show_alias(o.show, o)
   elseif o.guard then show_guard(o.show, o)
   elseif o.mixed then show_mixed(o.show, o)
@@ -454,7 +482,8 @@ if o.show ~= nil then
   else show(o.show, o) end
   os.exit(0)
 end
-local n_sat = o.xmem and run_xmem(o)
+local n_sat = o.strings and run_strings(o)
+  or (o.xmem and run_xmem(o))
   or (o.alias and run_alias(o))
   or (o.guard and run_guard(o))
   or (o.mixed and run_mixed(o))
