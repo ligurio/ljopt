@@ -332,9 +332,17 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
         end
         witness_dom = ('(or %s)'):format(table.concat(alts, ' '))
     end
+    -- Compare a single cell rather than the whole inner array:
+    -- two arrays differ exactly when they differ at some key, so
+    -- witness_key loses no power, and it lets the comparison use
+    -- memcell_equiv (NaN-tolerant, see smt_constants) instead of
+    -- structural `=`, which distinguished NaN sign bits and
+    -- reported LuaJIT's `-1.0*x -> -x` fold as a miscompile.
+    smt_result = '(declare-const witness_key MemCell)\n' .. smt_result
     smt_result = smt_result .. ([[    (and %s
-         (not (= (select (select %s %s) witness_ptr)
-                 (select (select %s %s) witness_ptr))))
+         (not (memcell_equiv
+                 (select (select (select %s %s) witness_ptr) witness_key)
+                 (select (select (select %s %s) witness_ptr) witness_key))))
 ]]):format(
         witness_dom,
         stack1._name, stack1:get_version(),
