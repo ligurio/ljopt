@@ -159,6 +159,24 @@ local LJOPT_SMTLIB = ([[
 ; argument never reaches this -- ir/CALLL.lua reverses it in Lua
 ; and emits the resulting literal.
 (declare-fun str_reverse (String) String)
+
+; Observational equivalence of two memory cells.
+;
+; Structural `=` on a FloatingPoint distinguishes NaN payloads /
+; sign bits, but Lua cannot observe the sign of a NaN -- and
+; LuaJIT relies on that: it folds `-1.0 * x` to `-x`, where NEG
+; is an XOR with the sign mask, so a NaN operand comes out with a
+; flipped sign bit while `mulsd` preserves it. Comparing memory
+; structurally reported that as a miscompile.
+;
+; Only NaN is relaxed. Non-NaN values stay structural on purpose:
+; +0.0 and -0.0 ARE observable from Lua (1/x gives +inf vs -inf),
+; so `fp.eq` here would hide a genuine difference.
+(define-fun memcell_equiv ((a MemCell) (b MemCell)) Bool
+    (ite (and ((_ is fp-val) a) ((_ is fp-val) b))
+         (or (and (fp.isNaN (get-fp a)) (fp.isNaN (get-fp b)))
+             (= (get-fp a) (get-fp b)))
+         (= a b)))
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 
