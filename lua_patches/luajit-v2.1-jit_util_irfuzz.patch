@@ -1,7 +1,7 @@
 diff --git a/src/lib_jit.c b/src/lib_jit.c
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -393,6 +393,246 @@
+@@ -393,6 +393,256 @@
    return 0;
  }
  
@@ -155,8 +155,18 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +  lua_createtable(L, nk, 0);
 +  for (i = 1; i <= nk; i++) {
 +    IRIns *ir = &J->cur.ir[REF_BIAS - i];
-+    if (ir->o == IR_KSLOT)
++    if (ir->o == IR_KSLOT) {
++      /* A KSLOT's op1 must reference another constant in the live
++      ** [nk, REF_BIAS) range. Bounds-check before following it:
++      ** guards against a stale/garbage slot whose op1 points out
++      ** of the buffer (observed crashing irfuzz replays). */
++      if (ir->op1 < (IRRef)J->cur.nk || ir->op1 >= REF_BIAS) {
++        lua_pushinteger(L, 0);  /* benign placeholder, keeps kval aligned */
++        lua_rawseti(L, -2, i);
++        continue;
++      }
 +      ir = &J->cur.ir[ir->op1];
++    }
 +#if LJ_HASFFI
 +    if (ir->o == IR_KINT64 && !ctype_ctsG(G(L))) {
 +      ptrdiff_t oldtop = savestack(L, L->top);
