@@ -358,13 +358,23 @@ local function gen(seed, opts)
     if rand(2) == 1 then
       -- Array access: element ref then load or store a num.
       local base = array_base(entry)
+      -- Loads carry IRT_GUARD (+0x80): every ALOAD/HLOAD the
+      -- recorder emits is a guard (a type check on the loaded
+      -- value) -- verified by -jdump, both when forwarding is off
+      -- and for a non-forwardable key; a same-key load under -O3
+      -- is not "unguarded", it is forwarded away entirely.
+      -- Emitting them unguarded produced recorder-impossible IR:
+      -- lj_opt_dse_ahstore bails on an intervening guard, so with
+      -- plain loads DSE deleted stores across a load and the opt
+      -- trace then read a different value -- the source of the
+      -- --tables false SATs (seeds 104/329/867/872).
       local ref = emit("AREF", IRT_P32, K_REF, base,
         K_KINT, ARR_IDXS[rand(#ARR_IDXS)])
       if rand(2) == 1 then
         local vk, vv = operand(IRT_NUM)
         emit("ASTORE", IRT_NUM, K_REF, ref, vk, vv)
       else
-        emit("ALOAD", IRT_NUM, K_REF, ref, K_NONE, 0)
+        emit("ALOAD", IRT_NUM + 0x80, K_REF, ref, K_NONE, 0)
       end
     else
       -- Hash access on a small numeric key.
@@ -374,7 +384,7 @@ local function gen(seed, opts)
         local vk, vv = operand(IRT_NUM)
         emit("HSTORE", IRT_NUM, K_REF, ref, vk, vv)
       else
-        emit("HLOAD", IRT_NUM, K_REF, ref, K_NONE, 0)
+        emit("HLOAD", IRT_NUM + 0x80, K_REF, ref, K_NONE, 0)
       end
     end
   end
