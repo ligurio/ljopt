@@ -9,13 +9,13 @@ ir_node.extended(IRNodeXSTOREBase, ir_node.ir_node_base)
 
 -- Reduce the store's right operand to a bitvector: int/i64/u32
 -- are already bitvectors on the op-stack, a num is reinterpreted
--- to its IEEE-754 bits via fp.to_ieee_bv.
+-- to its IEEE-754 bits via `fp_to_bits`.
 local function store_value_bv(right, ctx, typ)
     if typ == op_type.NUM then
         local fp = right:is_ssa()
             and ctx.op_stack:load(right:get_ssa(), typ)
             or ir_node.retrieve_num_op(right, ctx, typ)
-        return ('(fp.to_ieee_bv %s)'):format(fp)
+        return arith_utils.fp_to_bits(fp, 64)
     elseif right:is_ssa() then
         return ctx.op_stack:load(right:get_ssa(), typ)
     elseif typ == op_type.I64 and right:is_i64() then
@@ -29,7 +29,7 @@ end
 -- bumping the xmem version so later loads observe the store.
 function IRNodeXSTOREBase:to_smt_lib(ctx)
     local ptr = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'p64')
-    local bv = store_value_bv(self:get_right_op(), ctx, self.typ)
+    local bv, tie = store_value_bv(self:get_right_op(), ctx, self.typ)
 
     local prev = ctx.xmem_cur
     local new_ver = ctx.xmem_versions + 1
@@ -43,6 +43,9 @@ function IRNodeXSTOREBase:to_smt_lib(ctx)
     local store_eq = ('(assert (= %s %s))'):format(
         new_name, arith_utils.xmem_store(prev, ptr, bv, self.nbytes)
     )
+    if tie then
+        return ('%s\n%s\n%s'):format(tie, decl, store_eq)
+    end
     return ('%s\n%s'):format(decl, store_eq)
 end
 

@@ -73,6 +73,19 @@ local LJOPT_SMTLIB = ([[
 (declare-fun callxs_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
 (declare-fun callxs_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
 
+; `(fp2bv64 x)` is the IEEE-754 encoding of the double x -- the
+; bytes an FFI store writes. Declared, not defined: float -> bitvector
+; is not a function for NaN, so SMT-LIB has no operator for it
+; (https://github.com/cvc5/cvc5/discussions/9277). Each use ties
+; the result down through the standard reverse direction, which
+; determines it for everything but NaN:
+;
+;   (assert (= x ((_ to_fp 11 53) (fp2bv64 x))))
+;
+; A function, not a fresh constant per store, so both traces get
+; the same values by congruence.
+(declare-fun fp2bv64 ((_ FloatingPoint 11 53)) (_ BitVec 64))
+
 ; String reverse for lj_buf_putstr_reverse. Uninterpreted, like
 ; the math_* / pow_fp / callxs_* helpers above: both traces apply
 ; the same function to congruent arguments, so equivalent traces
