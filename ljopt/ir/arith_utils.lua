@@ -144,6 +144,23 @@ local function xmem_load(mem, ptr, nbytes)
     return expr
 end
 
+local fp_bits_kind = {
+    [64] = {fn = 'fp2bv64', sort = '(_ to_fp 11 53)'},
+}
+
+-- The IEEE bits of the float `fp`, as a BitVec of `width`.
+--
+-- Returns two strings: the bits, and the assertion that defines
+-- them. The bits are an uninterpreted function (see
+-- smt_constants), so the assertion is not optional -- without it
+-- the result is an arbitrary bitvector. Callers must emit it
+-- before the term that uses the bits.
+local function fp_to_bits(fp, width)
+    local kind = assert(fp_bits_kind[width], 'No fp bits for ' .. width)
+    return ('(%s %s)'):format(kind.fn, fp),
+        ('(assert (= %s (%s (%s %s))))'):format(fp, kind.sort, kind.fn, fp)
+end
+
 -- LuaJIT treats -0.0 and +0.0 as the same table key.
 -- Accepts a MemCell and returns a MemCell: for int-val keys,
 -- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
@@ -163,9 +180,10 @@ return {
     const_str_to_memcell = const_str_to_memcell,
     const_str_to_smt_str = const_str_to_smt_str,
     const_i64_to_memcell = const_i64_to_memcell,
-    memcell_to_str = memcell_to_str,
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
+    fp_to_bits = fp_to_bits,
+    memcell_to_str = memcell_to_str,
     normalize_table_key = normalize_table_key,
     xmem_store = xmem_store,
     xmem_load = xmem_load,
