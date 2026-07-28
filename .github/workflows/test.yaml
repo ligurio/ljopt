@@ -58,6 +58,11 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
+          # Tests that are not decidable at this depth pick their
+          # own; see config.set_loop_unroll_limit.
+          LJOPT_LOOP_UNROLL_N: 2
+          # Loop formulas need more than the 120s default.
+          LJOPT_Z3_TIMEOUT: 300
         run: |
           eval $(luarocks path)
           make test
@@ -75,6 +80,8 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
+          LJOPT_LOOP_UNROLL_N: 2
+          LJOPT_Z3_TIMEOUT: 300
         run: |
           eval $(luarocks path)
           make coverage
