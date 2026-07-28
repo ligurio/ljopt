@@ -105,6 +105,43 @@ local function smt_fp_to_int(fp_value, rounding)
     )
 end
 
+-- The amount of a 32-bit rotate: the low 5 bits of `amount`,
+-- widened back to 32, since a rotate is defined modulo 32.
+local function bv_rotate_amount32(amount)
+    return ('((_ zero_extend 27) ((_ extract 4 0) %s))'):format(amount)
+end
+
+-- 32-bit rotate of `value` by the term `amount`, spelled out
+-- with shifts: SMT-LIB only has the indexed `(_ rotate_left n)`,
+-- whose amount must be a numeral, and z3's term-amount
+-- `ext_rotate_left` is a z3 extension.
+--
+-- `brol32` emits `(x << am) | (x >> (32 - am))`, `bror32` the
+-- mirrored `(x >> am) | (x << (32 - am))` -- the same shape with
+-- the two shifts swapped, so both go through one helper. At am 0
+-- the complementary shift is by 32, which yields zero, so the
+-- value comes back unchanged.
+local function bv_rotate32(value, amount, dir)
+    local by_am, by_rest = 'bvshl', 'bvlshr'
+    if dir == 'right' then
+        by_am, by_rest = by_rest, by_am
+    else
+        assert(dir == 'left', 'Unknown rotate direction ' .. dir)
+    end
+    local am = bv_rotate_amount32(amount)
+    return ('(bvor (%s %s %s) (%s %s (bvsub (_ bv32 32) %s)))'):format(
+        by_am, value, am, by_rest, value, am
+    )
+end
+
+local function brol32(value, amount)
+    return bv_rotate32(value, amount, 'left')
+end
+
+local function bror32(value, amount)
+    return bv_rotate32(value, amount, 'right')
+end
+
 -- Raw FFI memory is modelled byte-granular as a flat array
 -- `xmem : (Array (_ BitVec 64) (_ BitVec 8))`, so overlapping,
 -- sub-word and type-punned accesses alias correctly (SMT array
@@ -192,4 +229,6 @@ return {
     smt_i64_to_fp = smt_i64_to_fp,
     smt_u32_to_fp = smt_u32_to_fp,
     wrap_u32 = wrap_u32,
+    brol32 = brol32,
+    bror32 = bror32,
 }
