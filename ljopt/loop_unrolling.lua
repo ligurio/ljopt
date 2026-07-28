@@ -7,6 +7,17 @@
 -- Also duplicates body snapshots per iteration with remapped
 -- nins and slot SSA refs, so that snapshot matching works
 -- correctly after unrolling.
+--
+-- Besides the nodes and snapshots, the transform reports the ref
+-- at which the final unrolled iteration begins. Guards below it
+-- must be forced true when emitting SMT: the trace we recorded
+-- ran every one of these iterations, so had any earlier guard
+-- failed the trace would have exited there and the later
+-- iterations would never have stored anything. Leaving them free
+-- lets the solver pick an input that exits on iteration 1 while
+-- still comparing memory written by iterations 2..N, which is a
+-- spurious sat (an int32-overflowing induction variable is the
+-- easy witness). See `translate` in ljopt/ir_smtlib.lua.
 
 local dev_checks = require('ljopt.dev_checks')
 local ljopt_config = require('ljopt.config')
@@ -264,7 +275,8 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx)
         end
     end
 
-    return result, new_snapshots
+    -- Prologue + body copies 1..n-1 are known to have run.
+    return result, new_snapshots, prologue_len + (n - 1) * body_len + 1
 end
 
 -- Unroll a loop trace that has NO LOOP/PHI markers
@@ -366,7 +378,8 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
         end
     end
 
-    return result, new_snapshots
+    -- Copies 1..n are known to have run; copy n+1 is the last.
+    return result, new_snapshots, n * body_len + 1
 end
 
 -- Main entry point. Dispatches to the appropriate
@@ -375,9 +388,11 @@ end
 -- @param raw_nodes  array of raw node tables
 -- @param snapshots  snapshot table from trace_record
 -- @param linktype   trace linktype ('loop', 'return', etc.)
--- @return unrolled_nodes, updated_snapshots
+-- @return unrolled_nodes, updated_snapshots, last_iteration_ref
+--         (`last_iteration_ref` is nil when nothing was
+--          unrolled, i.e. every guard may legitimately fail)
 local function loop_unrooling_transform(raw_nodes, snapshots, linktype)
-    dev_checks('table')
+    dev_checks('table', '?table', '?string')
 
     -- Find LOOP node position.
     local loop_idx = nil

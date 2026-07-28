@@ -148,7 +148,8 @@ local function translate(trace_record, ctx_src,
         '\n'
 
     -- 1st stage. Loop unrolling on raw nodes (removes LOOP/PHI).
-    trace_record.trace, trace_record.snapshots =
+    local last_iter_ref
+    trace_record.trace, trace_record.snapshots, last_iter_ref =
         loop_unrolling.loop_unrooling_transform(
             trace_record.trace, trace_record.snapshots,
             trace_record.linktype
@@ -176,6 +177,24 @@ local function translate(trace_record, ctx_src,
             nodes[i]:to_smt_lib(ctx_src), i, utils.trim(parsed_ir))
     end
     jit.on(true, true)
+
+    -- Pin the guards of every unrolled iteration but the last:
+    -- the recorded trace ran them all, so none of those guards
+    -- can have failed. Without this the solver is free to exit
+    -- the loop early and still compare memory written by the
+    -- iterations that follow. The final iteration is left alone
+    -- -- its guard is the loop exit, and it is the one an
+    -- optimizer may legitimately have removed.
+    if last_iter_ref ~= nil then
+        for i = 1, table.getn(nodes) do
+            local ref = nodes[i]:get_ssa_reference()
+            if nodes[i]:get_flags().irt_guard and ref < last_iter_ref then
+                smtlib_buf = ('%s(assert %s)\n'):format(
+                    smtlib_buf, ctx_src.te_stack:load(ref)
+                )
+            end
+        end
+    end
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
     local failed = false
