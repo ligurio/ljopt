@@ -20,7 +20,27 @@ local SNAPSHOT_INC = 1e6
 -- Remap an operand's SSA reference if it appears in the
 -- remap table.
 local function remap_operand(operand, remap)
-    if operand == nil or operand.type ~= 'ssa' then
+    if operand == nil then
+        return nil
+    end
+    -- A call's argument list carries SSA refs of its own, one
+    -- level down. Without recursing, a cloned CALL keeps reading
+    -- the first iteration's arguments.
+    if operand.type == 'carg' then
+        local args = {}
+        for i, arg in ipairs(operand.value) do
+            local tab = remap_operand(arg.tab, remap)
+            -- Drop the display text for remapped refs; it still
+            -- spells the original ref and wins in to_string().
+            local txt = arg.txt
+            if arg.tab ~= nil and arg.tab.type == 'ssa' then
+                txt = nil
+            end
+            args[i] = {tab = tab, txt = txt}
+        end
+        return {type = 'carg', value = args}
+    end
+    if operand.type ~= 'ssa' then
         return operand
     end
     if remap[operand.value] then
@@ -69,6 +89,21 @@ local function infer_phi_map_opt(phi_nodes)
 end
 
 
+-- The display text records the operand as the *original* body
+-- node spelled it, and op_type.to_string() prefers it over the
+-- value. Once an SSA operand is remapped that text is stale, so
+-- every unrolled iteration's SMT comment would claim to read
+-- iteration 1's refs. Drop it for SSA operands and let
+-- to_string() fall back to the remapped value; literals (mode
+-- flags, field names) keep theirs, since op_type.from_raw()
+-- needs the text to reconstruct them.
+local function clone_txt(operand, txt)
+    if operand ~= nil and operand.type == 'ssa' then
+        return nil
+    end
+    return txt
+end
+
 local function clone_node(id, bnode, remap)
     return {
         num = id,
@@ -77,8 +112,8 @@ local function clone_node(id, bnode, remap)
         irop = bnode.irop,
         op1 = remap_operand(bnode.op1, remap),
         op2 = remap_operand(bnode.op2, remap),
-        op1_txt = bnode.op1_txt,
-        op2_txt = bnode.op2_txt,
+        op1_txt = clone_txt(bnode.op1, bnode.op1_txt),
+        op2_txt = clone_txt(bnode.op2, bnode.op2_txt),
     }
 end
 
