@@ -1127,6 +1127,13 @@ foo(false, 5.0)
             {type = "fal", name = "SLOAD"},
         },
     }, {
+        name = "FORL narrowing",
+        -- The narrowed opt trace adds *after* converting the
+        -- induction variable to int32 while the unopt one
+        -- converts after adding in fp, so proving them equal is
+        -- an fp <-> bitvector commutation argument repeated per
+        -- iteration. z3 discharges it at depth 1 but not at 2.
+        unroll_n = 1,
         code = [[
 -- FORL narrowing: IV becomes int SLOAD with CI guard,
 -- step becomes int ADD, and the array write goes through
@@ -1879,8 +1886,12 @@ s = s + f(arr, 1e39)
     }}
     test:plan(3 * #srcs)
 
+    local unroll_n = ljopt_config.get_loop_unroll_count()
     for i, f in ipairs(srcs) do
         local label = f.name or ("test_%d"):format(i)
+        -- Depth is per-test: a chunk may only stay decidable
+        -- below the global setting. See set_loop_unroll_count.
+        ljopt_config.set_loop_unroll_count(f.unroll_n or unroll_n)
         local ok, err = check_ins_present(f.code, f.ins, f.opt)
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
@@ -1894,6 +1905,7 @@ s = s + f(arr, 1e39)
                 ("%s trace %s check."):format(label, j))
         end
     end
+    ljopt_config.set_loop_unroll_count(unroll_n)
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
 end)

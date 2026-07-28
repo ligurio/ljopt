@@ -213,7 +213,13 @@ test:test("pow() inaccuracy (LuaJIT#817)", function(test)
     -- assertion to match. ljopt catches it symbolically instead.
     test:skip("reproduce in runtime")
     local chunk = read_reproducer_file("lj_817.lua")
+    -- POW is uninterpreted, so each unrolled iteration adds an
+    -- opaque term the solver cannot fold; one body copy stays
+    -- decidable, two do not.
+    local unroll_n = ljopt_config.get_loop_unroll_count()
+    ljopt_config.set_loop_unroll_count(math.min(unroll_n, 1))
     test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
+    ljopt_config.set_loop_unroll_count(unroll_n)
 end)
 
 -- Incorrect narrowing for huge numbers (LuaJIT#1236).
