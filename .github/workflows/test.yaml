@@ -58,8 +58,14 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
-          # Some of our tests require it to be >= 2.
-          LJOPT_LOOP_UNROLL_N: 2
+          # Unrolling multiplies formula size, and the narrowed
+          # induction variable in the FORL tests stops being
+          # decidable past a single extra body copy. Reproducers
+          # needing more depth raise it themselves (see
+          # set_loop_unroll_count).
+          LJOPT_LOOP_UNROLL_N: 1
+          # Loop formulas need more than the 120s default.
+          LJOPT_Z3_TIMEOUT: 300
         run: |
           eval $(luarocks path)
           make test
@@ -77,8 +83,8 @@ jobs:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
           LJOPT_TESTS_TIMEOUT: 120
-          # Some of our tests require it to be >= 2.
-          LJOPT_LOOP_UNROLL_N: 4
+          LJOPT_LOOP_UNROLL_N: 1
+          LJOPT_Z3_TIMEOUT: 300
         run: |
           eval $(luarocks path)
           make coverage

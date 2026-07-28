@@ -178,7 +178,13 @@ test:test("Fix FOLD rule for BUFHDR append (LuaJIT#791)", function(test)
     local chunk = read_reproducer_file("lj_791.lua")
     test:ok(reproduce_bug_in_runtime(chunk, "assertion is violated"),
         "reproduce in runtime")
+    -- The append only diverges once a second iteration writes
+    -- into the buffer the first one built, so a single unrolled
+    -- body proves the traces equivalent and the bug disappears.
+    local unroll_n = ljopt_config.get_loop_unroll_count()
+    ljopt_config.set_loop_unroll_count(math.max(unroll_n, 2))
     test:ok(reproduce_bug_using_smt(chunk), "reproduce with SMT")
+    ljopt_config.set_loop_unroll_count(unroll_n)
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/792

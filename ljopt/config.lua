@@ -98,10 +98,22 @@ local function get_loop_unroll_count()
     return loop_unroll_n
 end
 
+-- Unroll depth trades verification strength against solver
+-- cost, and the sweet spot is not the same for every test: a
+-- reproducer may need a minimum depth before the bug it targets
+-- appears at all (LuaJIT#791 needs >= 2), while deeper unrolling
+-- can push an otherwise-fine formula past what z3 will decide.
+-- Tests that care pin their own depth and restore it after.
+local function set_loop_unroll_count(val)
+    dev_checks("number")
+    loop_unroll_n = val
+end
+
 return {
     get_smt_solver = get_smt_solver,
     get_solver_timeout_ms = get_solver_timeout_ms,
     get_loop_unroll_count = get_loop_unroll_count,
+    set_loop_unroll_count = set_loop_unroll_count,
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
     is_narrowing = is_narrowing,
