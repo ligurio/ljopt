@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(7)
+test:plan(8)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -308,6 +308,31 @@ test:test("loop unrolling constrains a narrowed IV", function(test)
         "one wrap constraint per PHI per iteration input")
     test:is(count_duplicates(loaded), 0,
         "each iteration constrains its own refs")
+end)
+
+test:test("loop unrolling remaps call arguments", function(test)
+    test:plan(3)
+
+    local opt = recorded_loop_trace('opt')
+    local nodes = unroll_at(2, opt)
+    test:is(count_irop(nodes, 'LOOP') + count_irop(nodes, 'PHI'), 0,
+        "no LOOP/PHI left")
+
+    local args = {}
+    for _, node in ipairs(nodes) do
+        local op1 = node.op1
+        if op1 ~= nil and op1.type == 'carg' then
+            local first = op1.value[1]
+            if first ~= nil and first.tab ~= nil
+                and first.tab.type == 'ssa' then
+                table.insert(args, first.tab.value)
+            end
+        end
+    end
+    test:is(table.getn(args), 3,
+        "the peeled call plus one per unrolled iteration")
+    test:is(count_duplicates(args), 0,
+        "every call reads its own iteration's argument")
 end)
 
 require("tests.coverage").shutdown()
