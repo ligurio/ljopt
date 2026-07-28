@@ -1,4 +1,5 @@
 local ir_node = require('ljopt.ir.ir_node_base')
+local arith_utils = require('ljopt.ir.arith_utils')
 
 local impls = {}
 
@@ -51,9 +52,8 @@ function impls.IRNodeBRORInt:to_smt_lib(ctx)
     )
     local left_i32 = ('((_ extract 31 0) %s)'):format(left_op)
     local right_i32 = ('((_ extract 31 0) %s)'):format(right_op)
-    local data = ('((_ sign_extend 32) (ext_rotate_right %s %s))'):format(
-        left_i32, right_i32
-    )
+    local rotated = arith_utils.bror32(left_i32, right_i32)
+    local data = ('((_ sign_extend 32) %s)'):format(rotated)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
