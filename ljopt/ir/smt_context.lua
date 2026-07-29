@@ -120,7 +120,7 @@ function VMStackBV.init_smt(self, name)
     self._name = name
     self._cur_stack = 0
     return string.format(
-        '(declare-fun %s () (Array Int (Array Int (MemCell))))', name
+        '(declare-fun %s () (Array Int (Array Int MemCell)))', name
     )
 end
 
@@ -314,7 +314,7 @@ function SnapStack.init_smt(self, name)
     self._exited_by_snap = ('(_ bv0 %d)'):format(smt_constants.MAXSNAP)
     self._cur_stack = 1
     return string.format([[
-(declare-fun %s () (Array Int (Array Int (MemCell))))
+(declare-fun %s () (Array Int (Array Int MemCell)))
 ; %d is arbitrary constant for maximum number of trace exits per snapshot
 (declare-fun %s () (_ BitVec %d))
 ]], self._name, smt_constants.MAXSNAP,
@@ -440,10 +440,13 @@ function MemoryStack.init_smt(self, name, base_stack)
     return mutable_memory
 end
 
+-- Slots are negative, and SMT-LIB spells a negative `(- 1)`.
+-- Returns the SMT term plus the raw id, for the callers that
+-- need the number (a cdata ref stores its slot as a bitvector).
 function MemoryStack.alloc_slot(self)
-    local current_slot = tostring(self.next_free)
+    local current_slot = self.next_free
     self.next_free = self.next_free - 1
-    return current_slot
+    return ('(- %d)'):format(-current_slot), current_slot
 end
 
 -- Takes as input op num (e.g. 0001) or
@@ -499,10 +502,11 @@ function MemoryStack.allocate(self, inherited_from)
         self.vm_slot_map[str_id] = { slot = current_slot }
         return current_slot, ''
     end
-    current_slot = self:alloc_slot()
+    local slot_num
+    current_slot, slot_num = self:alloc_slot()
     local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
         :format(self._name, current_slot)
-    return current_slot, result
+    return current_slot, result, slot_num
 end
 
 -- Read whole table from ptr at current version.
@@ -521,7 +525,9 @@ function MemoryStack.load_index(self, ptr, idx, type)
     local memory_array = self:load(ptr)
     local conv = assert(bv2type[type], 'Unsupported load op type ' .. type)
     return conv:format(
-        extract_value(('(select %s %s)'):format(memory_array, idx), type)
+        extract_value(
+            ('(select %s %s)'):format(memory_array, idx), type
+        )
     )
 end
 

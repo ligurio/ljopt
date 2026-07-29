@@ -91,9 +91,7 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         )
         local ct = ctx.const_tabs[left_op:get_ssa()]
         local tab_left = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
-        data = ctx.mem_stack:load_index(
-            tonumber(tab_left), field_hash, op_type.INT
-        )
+        data = ctx.mem_stack:load_index(tab_left, field_hash, op_type.INT)
         -- Propagate constant table metadata for const-folding.
         if ct ~= nil then
             if right_op == 'tab.asize' and ct.asize ~= nil then

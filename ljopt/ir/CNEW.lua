@@ -19,7 +19,7 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
     )
 
     local ssa_ref = self:get_ssa_reference()
-    local idx, init = ctx.mem_stack:allocate()
+    local idx, init, idx_num = ctx.mem_stack:allocate()
 
     local smt_cdt_size
     if maybe_size == nil then
@@ -39,7 +39,9 @@ function impls.IRNodeCNEWCdt:to_smt_lib(ctx)
         init,
         ctx.mem_stack:store_index(idx, cdt_type, smt_cdt_type, 'i64'),
         ctx.mem_stack:store_index(idx, cdt_size, smt_cdt_size, 'i64'),
-        ctx.op_stack:store(ssa_ref, 'cdt', arith_utils.const_int_to_smt_bv(idx))
+        ctx.op_stack:store(
+            ssa_ref, 'cdt', arith_utils.const_int_to_smt_bv(idx_num)
+        )
     )
 end
 
