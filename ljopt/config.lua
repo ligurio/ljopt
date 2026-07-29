@@ -24,6 +24,9 @@ local is_verify_ljopt_correctness_enabled =
 -- When disabled, narrowing-related logic is skipped end-to-end:
 local is_narrowing_enabled = os.getenv("LJOPT_DISABLE_NARROWING") == nil
 
+local smt_solver = os.getenv("LJOPT_SMT") or "cvc5"
+local solver_timeout_sec = tonumber(os.getenv("LJOPT_SMT_TIMEOUT")) or 120
+
 local function is_debug_mode()
     return is_debug_enabled
 end
@@ -77,7 +80,23 @@ local function set_narrowing(val)
     is_narrowing_enabled = val
 end
 
+local function get_smt_solver()
+    return smt_solver
+end
+
+local function get_solver_timeout()
+    return solver_timeout_sec
+end
+
+
+local function get_solver_timeout_ms()
+    return tostring(math.floor(get_solver_timeout() * 1000))
+end
+
 return {
+    get_smt_solver = get_smt_solver,
+    get_solver_timeout_ms = get_solver_timeout_ms,
+
     is_debug_mode = is_debug_mode,
     set_debug_mode = set_debug_mode,
     is_narrowing = is_narrowing,
