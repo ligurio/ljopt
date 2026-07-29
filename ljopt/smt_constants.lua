@@ -5,9 +5,6 @@ local MAXSNAP = 500
 -- This variable contains SMT library helpers to be used
 -- by ljopt.
 --
--- - lsb: Now it simply checks whether argument is bv0.
--- - zero_pointer_i_1d - 1D array of zeros.
---
 -- luacheck: push no max_line_length
 local LJOPT_SMTLIB = ([[
 (define-fun lsb ((x (_ BitVec %d))) (_ BitVec %d) (ite (not (= x (_ bv0 %d))) (_ bv1 %d) (_ bv0 %d)))
@@ -21,10 +18,20 @@ local LJOPT_SMTLIB = ([[
     (nil-val))))
 (define-sort MemPtr () (Array Int (Array Int (Array MemCell MemCell))))
 
-(define-const zero_pointer (Array MemCell MemCell)
-  ((as const (Array MemCell MemCell)) nil-val))
-(define-const zero_pointer_i_1d (Array Int Int)
-  ((as const (Array Int Int)) 0))
+; The initial cell-array of a freshly allocated table. Deliberately
+; unconstrained rather than ((as const ...) nil-val): cvc5's array
+; solver rejects write-chains that connect two constant arrays, and
+; a store of a constant key and value into a constant array is
+; itself a constant array, so the two trace versions of one table
+; produce exactly that shape. Leaving it a plain symbol keeps every
+; constant array out of the encoding.
+;
+; Dropping the all-nil constraint only weakens the formula, and a
+; weaker formula can turn unsat into sat, never sat into unsat -- so
+; this cannot hide a miscompile, only report a spurious one. Both
+; traces read the same symbol, so they agree on whatever it holds.
+(declare-fun zero_pointer () (Array MemCell MemCell))
+
 ; Uninterpreted functions for TOSTR/STRTO conversions.
 (declare-fun tostr_num ((_ FloatingPoint 11 53)) String)
 (declare-fun strto_num (String) (_ FloatingPoint 11 53))
