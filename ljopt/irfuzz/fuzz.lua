@@ -38,26 +38,55 @@ local check = require("ljopt.irfuzz.check")
 local gen = require("ljopt.irfuzz.gen")
 local enum = require("ljopt.irfuzz.enum")
 
--- Solve one formula with the standalone z3 binary (not in-process
--- libz3): a crash or timeout on one seed then can't take down the
--- whole run, and it matches the project's preferred triage path
--- (CLAUDE.md / use-master-z3-binary memory). Returns one of
--- "sat" / "unsat" / "unknown" / "error".
+-- Solve one formula with a standalone solver binary (not an
+-- in-process library): a crash or timeout on one seed then can't
+-- take down the whole run, and it matches the project's preferred
+-- triage path (CLAUDE.md / use-master-z3-binary memory). Returns
+-- one of "sat" / "unsat" / "unknown" / "error".
+--
+-- z3 stays the default, but the two are close here: on a matched
+-- 8-seed sample at --insns 20 with a 30s cap both resolved 4 and
+-- timed out on 4, z3 in 150s against cvc5's 161s. Per seed the
+-- spread is wide in both directions, so LJOPT_SOLVER=cvc5 is
+-- worth reaching for on a seed the default cannot close, and to
+-- cross-check a finding against a second solver.
+--
+-- (cvc5's large win on the *test suite* does not carry over:
+-- those
+-- formulas encode real trace memory, these are synthetic chains.)
+local SOLVER = os.getenv("LJOPT_SOLVER") or "z3"
 local Z3_BIN = os.getenv("LJOPT_Z3_BIN") or "../z3/build/z3"
-local function z3_solve(formula, timeout_sec)
+local CVC5_BIN = os.getenv("LJOPT_CVC5_BIN") or "../cvc5/build/bin/cvc5"
+
+local function solver_cmd(path, timeout_sec)
+  if SOLVER == "z3" then
+    return ("%s -T:%d %q 2>/dev/null"):format(Z3_BIN, timeout_sec, path)
+  end
+  -- --arrays-exp is required for the constant arrays the memory
+  -- encoding builds on. The limit is milliseconds, and has to be
+  -- --tlimit-per rather than --tlimit: the latter aborts the
+  -- process with no verdict on its output (and dumps core), which
+  -- reads here as a solver error rather than a timeout.
+  return ("%s --arrays-exp --tlimit-per=%d %q 2>/dev/null")
+    :format(CVC5_BIN, timeout_sec * 1000, path)
+end
+
+local function solve(formula, timeout_sec)
   local path = os.tmpname()
   local fh = assert(io.open(path, "w"))
   fh:write(formula)
   fh:close()
-  local cmd = ("%s -T:%d %q 2>/dev/null"):format(Z3_BIN, timeout_sec, path)
-  local p = io.popen(cmd)
+  local p = io.popen(solver_cmd(path, timeout_sec))
   local out = p:read("*a") or ""
   p:close()
   os.remove(path)
-  if out:find("unsat", 1, true) then return "unsat" end
-  if out:find("sat", 1, true) then return "sat" end
-  if out:find("timeout", 1, true) or out:find("unknown", 1, true) then
-    return "unknown"
+  -- Match a verdict line exactly rather than searching the whole
+  -- output: an error message mentioning "unsatisfiable" would
+  -- otherwise be read as a verdict.
+  for line in out:gmatch("[^\r\n]+") do
+    if line == "unsat" then return "unsat" end
+    if line == "sat" then return "sat" end
+    if line == "timeout" or line:match("^unknown") then return "unknown" end
   end
   return "error"
 end
@@ -255,7 +284,7 @@ local function check_one(r, c, timeout_sec, label, hint, strict)
     c.commut = c.commut + 1
     return
   end
-  local res = z3_solve(r.formula, timeout_sec)
+  local res = solve(r.formula, timeout_sec)
   if res == "sat" then
     c.sat = c.sat + 1
     io.write((
@@ -266,7 +295,7 @@ local function check_one(r, c, timeout_sec, label, hint, strict)
     c.unsat = c.unsat + 1
   else
     c.unknown = c.unknown + 1
-    io.write(("UNKNOWN %s (z3 %s)\n"):format(label, res))
+    io.write(("UNKNOWN %s (%s %s)\n"):format(label, SOLVER, res))
   end
 end
 
