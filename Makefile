@@ -81,6 +81,11 @@ test: $(LUA_BUGGY_BIN) $(LUA_BIN)
 $(LUACOV_STATS):
 	LJOPT_COVERAGE=1 $(MAKE) test
 
+# Cheap check that the z3 backend still works.
+test-z3-smoke: $(LUA_BIN)
+	@echo "Smoke-test the z3 backend"
+	LJOPT_SMT=z3 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
+
 coverage: $(LUACOV_STATS)
 	@sed -i -e 's@'"$$(realpath .)"'/@@' $(LUACOV_STATS)
 	@cd $(PROJECT_DIR) && luacov ^ljopt
