@@ -1373,6 +1373,14 @@ end
             {type = "num", name = "HSTORE"},
         },
     }, {
+        -- Not unrolled. The string reaches str.len through an
+        -- op-stack slot rather than as a literal, so each
+        -- iteration makes the solver reason about the length of
+        -- an unconstrained string, convert it with int2bv, and
+        -- feed that to an uninterpreted sin. Even one body copy
+        -- costs z3 97s and defeats cvc5 entirely; one iteration
+        -- already covers the FLOAD being checked.
+        unroll_n = 0,
         code = [[
 local sin = math.sin
 local res = 0.0
