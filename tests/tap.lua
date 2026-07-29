@@ -300,6 +300,11 @@ test_mt = {
 }
 
 local function root_test(...)
+    -- Line-buffer stdout. Piped output (CI) is block-buffered by
+    -- default, so the last line in a log is whatever filled the
+    -- last 4K block, not the test being run -- which makes a slow
+    -- test look like it hung several tests earlier than it is.
+    io.stdout:setvbuf('line')
     io.write('TAP version 13', '\n')
     return test(nil, ...)
 end
