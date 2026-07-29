@@ -73,11 +73,13 @@ local LJOPT_SMTLIB = ([[
 (declare-fun callxs_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
 (declare-fun callxs_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
 
-(define-fun-rec str_reverse ((s String)) String
-  (ite (= (str.len s) 0)
-       ""
-       (str.++ (str_reverse (str.substr s 1 (- (str.len s) 1)))
-               (str.substr s 0 1))))
+; String reverse for lj_buf_putstr_reverse. Uninterpreted, like
+; the math_* / pow_fp / callxs_* helpers above: both traces apply
+; the same function to congruent arguments, so equivalent traces
+; match by congruence even with no semantic model. A constant
+; argument never reaches this -- ir/CALLL.lua reverses it in Lua
+; and emits the resulting literal.
+(declare-fun str_reverse (String) String)
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 

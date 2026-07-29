@@ -2,6 +2,7 @@ local ir_node = require('ljopt.ir.ir_node_base')
 local arith_utils = require('ljopt.ir.arith_utils')
 local op_type = require('ljopt.ir.op_type')
 local constants = require('ljopt.smt_constants')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -22,9 +23,18 @@ function impls.IRNodeCALLLP32:to_smt_lib(ctx)
         )
 
         local prev = ctx.mem_stack:load_index(idx, slot_id, op_type.STR)
-        local value = ir_node.retrieve_str_op(args[2], ctx)
 
-        local res = ('(str.++ %s (str_reverse %s))'):format(prev, value)
+        local known = utils.resolve_const_str(args[2], ctx)
+        local reversed
+        if known ~= nil then
+            reversed = arith_utils.const_str_to_smt_str(known:reverse())
+        else
+            reversed = ('(str_reverse %s)'):format(
+                ir_node.retrieve_str_op(args[2], ctx)
+            )
+        end
+
+        local res = ('(str.++ %s %s)'):format(prev, reversed)
         return ctx.mem_stack:store_index(idx, slot_id, res, op_type.STR)
     end
 
