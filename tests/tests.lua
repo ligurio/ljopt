@@ -1617,6 +1617,12 @@ m()
             },
         },
     }, {
+        -- Not unrolled: the read goes through tab.meta, so every
+        -- extra iteration adds another aliasing-heavy HLOAD
+        -- chain over the metatable. Decided in 0.3s at depth 0,
+        -- no answer in 100s at depth 1 or 2. One iteration
+        -- already covers the FLOAD tab.meta being checked.
+        unroll_n = 0,
         name = "read field through metatable __index",
         code = [[
 local mt = {__index = {x = 42}}
