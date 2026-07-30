@@ -46,18 +46,25 @@ function IRNodeCALLXSBase:to_smt_lib(ctx)
     for i, a in ipairs(args) do
         arg_bvs[i] = ir_node.retrieve_i64_op(a, ctx, 'i64')
     end
-    local fn_name = ('callxs_%d'):format(arity)
-    local result = ('(%s %s)'):format(
-        fn_name, table.concat(arg_bvs, ' ')
+    local result = ('(%s%d %s)'):format(
+        self.fn_prefix, arity, table.concat(arg_bvs, ' ')
     )
     return ctx.op_stack:store(self:get_ssa_reference(), self.type, result)
 end
 
-impls.IRNodeCALLXSInt = { type = 'int' }
+impls.IRNodeCALLXSInt = { type = 'int', fn_prefix = 'callxs_' }
 ir_node.extended(impls.IRNodeCALLXSInt, IRNodeCALLXSBase)
 
-impls.IRNodeCALLXSI64 = { type = 'i64' }
+impls.IRNodeCALLXSI64 = { type = 'i64', fn_prefix = 'callxs_' }
 ir_node.extended(impls.IRNodeCALLXSI64, IRNodeCALLXSBase)
+
+-- A double-returning C function, e.g. FFI `double sin(double)`.
+-- callxs_fp_<arity> returns an fp, so the result lands in the
+-- MemCell's fp-val directly instead of being reinterpreted from
+-- bits. Congruence still ties the two traces together: the same
+-- callee pointer and arguments give the same double.
+impls.IRNodeCALLXSNum = { type = 'num', fn_prefix = 'callxs_fp_' }
+ir_node.extended(impls.IRNodeCALLXSNum, IRNodeCALLXSBase)
 
 local function instance(node_str)
     return impls[node_str]

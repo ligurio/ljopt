@@ -103,6 +103,13 @@ local LJOPT_SMTLIB = ([[
 ; function to congruent arguments, so equivalent FFI calls
 ; match by congruence even though we have no semantic model
 ; of the underlying C routine.
+; A double-returning external call yields an fp directly: MemCell
+; carries an fp-val, so there is no reason to route the result
+; through bits and reinterpret it.
+(declare-fun callxs_fp_1 ((_ BitVec 64)) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_2 ((_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
 (declare-fun callxs_1 ((_ BitVec 64)) (_ BitVec 64))
 (declare-fun callxs_2 ((_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
 (declare-fun callxs_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
