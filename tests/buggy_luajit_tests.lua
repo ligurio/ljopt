@@ -398,6 +398,11 @@ function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_1244.lua")
     test:skip("reproduce in runtime")
+    -- Not decidable yet. The pair records four snapshots in the
+    -- unoptimised trace and three in the optimised one, so the extra
+    -- one is compared against a different program point and the check
+    -- reports sat on the fixed build too. Unsat at unroll depth 0,
+    -- but the bug needs at least one unrolled iteration to appear.
     test:skip("reproduce with SMT")
 end)
 
