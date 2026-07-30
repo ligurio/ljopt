@@ -377,9 +377,17 @@ end)
 test:test("Missing phi check in bufput_bufstr fold rule (LuaJIT#797)",
 function(test)
     test:plan(2)
-    local _ = read_reproducer_file("lj_797.lua")
+    local chunk = read_reproducer_file("lj_797.lua")
     test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
+    -- Same fold rule as LuaJIT#791: the phi check guards the
+    -- BUFPUT BUFHDR BUFSTR append, and `a` is loop-carried, so the
+    -- divergence only shows once a second iteration appends to the
+    -- buffer the first one built. With a single body copy the
+    -- traces come out equivalent and the bug disappears.
+    local unroll_n = ljopt_config.get_loop_unroll_count()
+    ljopt_config.set_loop_unroll_count(math.max(unroll_n, 2))
+    test:ok(reproduce_bug_using_smt(chunk), "reproduce with SMT")
+    ljopt_config.set_loop_unroll_count(unroll_n)
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/1244
