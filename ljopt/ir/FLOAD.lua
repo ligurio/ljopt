@@ -161,6 +161,22 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
+-- A statically known cdata, e.g. `ffi.C.abs`, whose box the
+-- recorder folded away: the pointer is a constant. LJ has no
+-- constant type for a cdata pointer, so the operand arrives as a
+-- literal and the address is only in its text,
+-- `cdata<...>: 0x..`.
+-- Both traces of a pair are recorded in one process, so they see
+-- the same address -- and the optimised trace, which calls the
+-- pointer directly, already carries that same constant.
+local function const_cdata_ptr(op)
+    local hex = op_type.to_string(op):match('^cdata<.*>: 0x(%x+)')
+    if hex == nil then
+        return nil
+    end
+    return ('#x%016x'):format(tonumber(hex, 16))
+end
+
 impls.IRNodeFLOADP64 = {}
 ir_node.extended(impls.IRNodeFLOADP64, ir_node.ir_node_base)
 
@@ -171,18 +187,22 @@ ir_node.extended(impls.IRNodeFLOADP64, ir_node.ir_node_base)
 -- trace which dropped the box match an unoptimised one which kept
 -- it: both end up with the pointer the box was built from.
 function impls.IRNodeFLOADP64:to_smt_lib(ctx)
-    local cdt_slot = ctx.op_stack:load(self:get_left_op():get_ssa(), 'cdt')
-    local value_key = arith_utils.const_str_to_memcell(
-        smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
-    )
-    local data = ctx.mem_stack:load_index(cdt_slot, value_key, 'p64')
+    local left_op = self:get_left_op()
+    local data = const_cdata_ptr(left_op)
+    if data == nil then
+        local cdt_slot = ctx.op_stack:load(left_op:get_ssa(), 'cdt')
+        local value_key = arith_utils.const_str_to_memcell(
+            smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
+        )
+        data = ctx.mem_stack:load_index(cdt_slot, value_key, 'p64')
+    end
     return ctx.op_stack:store(self:get_ssa_reference(), 'p64', data)
 end
 
 function impls.IRNodeFLOADP64.is_implemented(_flags, _type, _opcode,
                                              left_op, right_op_val)
     return op_type.to_string(right_op_val) == 'cdata.ptr'
-        and left_op:is_ssa()
+        and (left_op:is_ssa() or const_cdata_ptr(left_op) ~= nil)
 end
 
 
