@@ -56,7 +56,8 @@ seed ──► gen.lua ──► spec ──► jit.util.irfuzz ──► (unopt
    `ir_smtlib.compare_trace_records` — the *same* oracle the recorded
    path uses. No SMT lives here.
 
-5. **`fuzz.lua` — drive.** Runs z3 on each query (standalone binary, so
+5. **`fuzz.lua` — drive.** Runs the solver on each query (standalone
+   binary, so
    one crash/timeout can't sink the run) and reports every `sat` with
    its seed.
 
@@ -68,7 +69,8 @@ observable value: `unsat` ⇒ the optimizer preserved observable state,
 
 ## Usage
 
-Needs z3 on `LD_LIBRARY_PATH` (see repo `CLAUDE.md`: `../z3/build`) and
+Needs a solver binary — cvc5 by default, z3 with `LJOPT_SOLVER=z3`
+(see repo `CLAUDE.md`) — and
 the luajit fork with the irfuzz patch applied (the `make`-built
 `build/luajit_<tag>` already has it).
 
@@ -101,7 +103,9 @@ Exhaustive mode: `--enum`, `--type num|int`, `--depth D` (chain
 length), `--ninputs N` (#SLOADs), `--limit L`, `--skip K` (resume
 offset), `--show I` (I = enumeration index).
 
-Tuning env vars: `LJOPT_Z3_BIN` (default `../z3/build/z3`),
+Tuning env vars: `LJOPT_SOLVER` (`cvc5` default, or `z3`),
+`LJOPT_CVC5_BIN` (default `../cvc5/build/bin/cvc5`),
+`LJOPT_Z3_BIN` (default `../z3/build/z3`),
 `LJOPT_Z3_TIMEOUT` (seconds, default 15).
 
 Every seed is a pure function of its number, so any `SAT seed=N`

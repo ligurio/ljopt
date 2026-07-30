@@ -25,7 +25,8 @@
 --       invoking z3. A finding reproduces by its
 --       enumeration index: --enum ... --show I.
 --
--- Needs z3 on LD_LIBRARY_PATH (see CLAUDE.md: ../z3/build).
+-- Needs the solver binary on PATH/LD_LIBRARY_PATH: cvc5 by
+-- default (../cvc5/build/bin/cvc5), or z3 via LJOPT_SOLVER=z3.
 
 -- The irfuzz replay works in the host VM's own jit_State. If the
 -- host JIT starts recording this driver's hot loops, the replay
@@ -44,17 +45,17 @@ local enum = require("ljopt.irfuzz.enum")
 -- triage path (CLAUDE.md / use-master-z3-binary memory). Returns
 -- one of "sat" / "unsat" / "unknown" / "error".
 --
--- z3 stays the default, but the two are close here: on a matched
--- 8-seed sample at --insns 20 with a 30s cap both resolved 4 and
--- timed out on 4, z3 in 150s against cvc5's 161s. Per seed the
--- spread is wide in both directions, so LJOPT_SOLVER=cvc5 is
--- worth reaching for on a seed the default cannot close, and to
--- cross-check a finding against a second solver.
+-- cvc5 is the default, matching the test suite. On a matched
+-- 25-seed sample at the default body length it closed 20 of 25 in
+-- 127s against z3's 18 in 165s. The per-seed spread is wide in
+-- both directions, so LJOPT_SOLVER=z3 is still worth reaching for
+-- on a seed cvc5 cannot close, and to cross-check a finding
+-- against a second solver.
 --
--- (cvc5's large win on the *test suite* does not carry over:
--- those
--- formulas encode real trace memory, these are synthetic chains.)
-local SOLVER = os.getenv("LJOPT_SOLVER") or "z3"
+-- Read an `unknown` count on its own with care: it has no
+-- denominator unless the sample is fixed, which is what made two
+-- earlier comparisons here contradict each other.
+local SOLVER = os.getenv("LJOPT_SOLVER") or "cvc5"
 local Z3_BIN = os.getenv("LJOPT_Z3_BIN") or "../z3/build/z3"
 local CVC5_BIN = os.getenv("LJOPT_CVC5_BIN") or "../cvc5/build/bin/cvc5"
 
