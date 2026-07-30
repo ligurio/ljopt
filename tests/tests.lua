@@ -1018,6 +1018,32 @@ f(3, o)
             {type = "i64", name = "XSTORE"},
         },
     }, {
+        -- CALLXS num: external C call returning double. The
+        -- result is an fp rather than a bit pattern, so it is
+        -- modelled by callxs_fp_<arity> and lands in the
+        -- MemCell's fp-val with no reinterpretation. Storing it
+        -- into a double cell puts it in the memory part of the
+        -- equivalence check, where a wrong result-side
+        -- translation breaks UF congruence and shows up as sat.
+        code = [==[
+local ffi = require('ffi')
+ffi.cdef[[ double fabs(double); ]]
+local C = ffi.C
+local o = ffi.new("double[1]", 0)
+-- Passed as an argument for the same reason as in the llabs
+-- case above: an upvalue would bake a constant cdata pointer
+-- into the trace.
+local function f(i, out) out[0] = C.fabs(-i * 1.5) end
+f(1, o)
+f(2, o)
+f(3, o)
+]==],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "num", name = "CALLXS"},
+            {type = "num", name = "XSTORE"},
+        },
+    }, {
         code = [[
 -- XLOAD i64 + XSTORE i64: read an int64_t* cell, store the
 -- result into another. Discarded into a cdata cell (not a Lua
