@@ -10,7 +10,6 @@ impls.IRNodeCNEWICdt = {}
 ir_node.extended(impls.IRNodeCNEWICdt, ir_node.ir_node_base)
 
 function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
-    local typ = self:get_left_op()
     local value = self:get_right_op()
 
     local cdt_type = arith_utils.const_str_to_memcell(
@@ -37,7 +36,14 @@ function impls.IRNodeCNEWICdt:to_smt_lib(ctx)
         utils.unreachable(value.type)
     end
 
-    local smt_cdt_type = arith_utils.const_num_to_smt_bv(typ:get_num())
+    -- Canonical 0 rather than the recorded ctype id, for the same
+    -- reason as in CNEW: the id is an opaque LJ-internal counter
+    -- that nothing reads back from mem_stack. It is not even
+    -- stable across opt levels -- boxing one FFI function pointer
+    -- gives id 129 in an unoptimised trace and 317 in the
+    -- optimised one -- so keeping it would make two traces that
+    -- box the same value look inequivalent.
+    local smt_cdt_type = arith_utils.const_num_to_smt_bv(0)
     return ('%s\n%s\n%s\n%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         init,
