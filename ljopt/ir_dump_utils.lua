@@ -397,6 +397,31 @@ local function trim(s)
 end
 
 
+-- The callee of an indirect C call, as an ljopt operand.
+--
+-- ir_dump.lua prints the callee of a CALLXS but hands over only
+-- the ctype, so op2 arrives here as nil. Pick it out of the trace
+-- instead: op2 of the CALLXS is either the callee itself or, when
+-- the ctype is known, a CARG(callee, ctype) whose first operand
+-- is the callee. A nil-typed IR instruction is that CARG.
+local function callxs_callee(tr, ins)
+  local _, _, _, op2 = jutil.traceir(tr, ins)
+  local ref = op2
+  if ref > 0 then
+    local _, c_ot, c_op1 = jutil.traceir(tr, ref)
+    if band(c_ot, 31) == 0 then
+      ref = c_op1
+    end
+  end
+  if ref > 0 then
+    return {type = "ssa", value = ref}, format("%04d", ref)
+  end
+  -- A statically known callee. Keep the address, so two calls to
+  -- different constant pointers stay distinguishable.
+  local addr = tonumber((tracek(tr, ref)))
+  return {type = "int64", value = addr}, format("[0x%x]", addr)
+end
+
 local function ljopt_savetrace(tr, ins, flags, irtype, op,
                                op1, op2, op1_tab, op2_tab)
   local tr_id = get_trace_id(tr)
@@ -406,6 +431,10 @@ local function ljopt_savetrace(tr, ins, flags, irtype, op,
   end
 
   assert(irtype ~= nil, "Unknown IR type.")
+
+  if trim(op) == "CALLXS" then
+    op2_tab, op2 = callxs_callee(tr, ins)
+  end
 
   -- The symbol ">" indicates the instruction of the
   -- guard's location

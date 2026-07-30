@@ -28,6 +28,12 @@ end)
 impls.IRNodeXLOADI64 = make_xload(op_type.I64, 8, function(raw)
     return raw
 end)
+-- A pointer read out of raw memory, e.g. an FFI function pointer
+-- picked out of an array of them. The same 8-byte load as i64;
+-- the type only says how the value is used afterwards.
+impls.IRNodeXLOADP64 = make_xload('p64', 8, function(raw)
+    return raw
+end)
 -- u32 is a 32-bit unsigned load zero-extended into the 64-bit
 -- cell.
 impls.IRNodeXLOADU32 = make_xload('u32', 4, function(raw)

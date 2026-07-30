@@ -161,6 +161,30 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
+impls.IRNodeFLOADP64 = {}
+ir_node.extended(impls.IRNodeFLOADP64, ir_node.ir_node_base)
+
+-- Unbox a pointer out of a cdata -- the counterpart of the CNEWI
+-- that boxed it. CNEWI writes the payload into the cdata's
+-- `cdata.value` cell, so reading that same cell back makes the
+-- box/unbox pair an identity. That is what lets an optimised
+-- trace which dropped the box match an unoptimised one which kept
+-- it: both end up with the pointer the box was built from.
+function impls.IRNodeFLOADP64:to_smt_lib(ctx)
+    local cdt_slot = ctx.op_stack:load(self:get_left_op():get_ssa(), 'cdt')
+    local value_key = arith_utils.const_str_to_memcell(
+        smt_constants.FIELD_TAB_PREFIX .. 'cdata.value'
+    )
+    local data = ctx.mem_stack:load_index(cdt_slot, value_key, 'p64')
+    return ctx.op_stack:store(self:get_ssa_reference(), 'p64', data)
+end
+
+function impls.IRNodeFLOADP64.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    return op_type.to_string(right_op_val) == 'cdata.ptr'
+        and left_op:is_ssa()
+end
+
 
 -- Same reasoning as IRNodeFLOADNum: only `cdata.int64` off a
 -- constant or an SSA cdata box is modelled, and the rest has to

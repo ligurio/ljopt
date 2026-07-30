@@ -99,21 +99,33 @@ local LJOPT_SMTLIB = ([[
 (declare-fun calls_int (Int) (_ BitVec 64))
 
 ; Uninterpreted functions for FFI external C calls (CALLXS).
-; Indexed by arity. Both unopt and opt traces apply the same
-; function to congruent arguments, so equivalent FFI calls
-; match by congruence even though we have no semantic model
-; of the underlying C routine.
+; Indexed by arity, where the first argument is the callee
+; pointer and the rest are the call's own arguments. Both unopt
+; and opt traces apply the same function to congruent arguments,
+; so equivalent FFI calls match by congruence even though we have
+; no semantic model of the underlying C routine -- and a trace
+; that calls a different pointer stops matching, which is what
+; catches an indirect call whose callee was hoisted or CSE'd
+; wrongly.
+; Arguments are MemCells, not bitvectors. A cell already carries
+; its own type tag, so passing it whole avoids going through an
+; ADT accessor: `get-bv` on an fp-val cell is unconstrained, and
+; two traces that box the same argument differently -- one as a
+; literal, one as the result of a num CONV -- would then disagree
+; about an otherwise identical call.
 ; A double-returning external call yields an fp directly: MemCell
 ; carries an fp-val, so there is no reason to route the result
 ; through bits and reinterpret it.
-(declare-fun callxs_fp_1 ((_ BitVec 64)) (_ FloatingPoint 11 53))
-(declare-fun callxs_fp_2 ((_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
-(declare-fun callxs_fp_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
-(declare-fun callxs_fp_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ FloatingPoint 11 53))
-(declare-fun callxs_1 ((_ BitVec 64)) (_ BitVec 64))
-(declare-fun callxs_2 ((_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
-(declare-fun callxs_3 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
-(declare-fun callxs_4 ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun callxs_fp_1 (MemCell) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_2 (MemCell MemCell) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_3 (MemCell MemCell MemCell) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_4 (MemCell MemCell MemCell MemCell) (_ FloatingPoint 11 53))
+(declare-fun callxs_fp_5 (MemCell MemCell MemCell MemCell MemCell) (_ FloatingPoint 11 53))
+(declare-fun callxs_1 (MemCell) (_ BitVec 64))
+(declare-fun callxs_2 (MemCell MemCell) (_ BitVec 64))
+(declare-fun callxs_3 (MemCell MemCell MemCell) (_ BitVec 64))
+(declare-fun callxs_4 (MemCell MemCell MemCell MemCell) (_ BitVec 64))
+(declare-fun callxs_5 (MemCell MemCell MemCell MemCell MemCell) (_ BitVec 64))
 
 ; `(fp2bv64 x)` is the IEEE-754 encoding of the double x -- the
 ; bytes an FFI store writes. Declared, not defined: float -> bitvector
