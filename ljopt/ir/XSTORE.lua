@@ -8,14 +8,19 @@ local IRNodeXSTOREBase = {}
 ir_node.extended(IRNodeXSTOREBase, ir_node.ir_node_base)
 
 -- Reduce the store's right operand to a bitvector: int/i64/u32
--- are already bitvectors on the op-stack, a num is reinterpreted
--- to its IEEE-754 bits via `fp_to_bits`.
+-- are already bitvectors on the op-stack, a num and a float are
+-- reinterpreted to their IEEE-754 bits via `fp_to_bits`.
 local function store_value_bv(right, ctx, typ)
     if typ == op_type.NUM then
         local fp = right:is_ssa()
             and ctx.op_stack:load(right:get_ssa(), typ)
             or ir_node.retrieve_num_op(right, ctx, typ)
         return arith_utils.fp_to_bits(fp, 64)
+    elseif typ == 'flt' then
+        assert(right:is_ssa(), 'flt XSTORE expects an SSA operand')
+        return arith_utils.fp_to_bits(
+            ctx.op_stack:load(right:get_ssa(), typ), 32
+        )
     elseif right:is_ssa() then
         return ctx.op_stack:load(right:get_ssa(), typ)
     elseif typ == op_type.I64 and right:is_i64() then
@@ -57,6 +62,9 @@ ir_node.extended(impls.IRNodeXSTOREI64, IRNodeXSTOREBase)
 
 impls.IRNodeXSTORENum = { typ = op_type.NUM, nbytes = 8 }
 ir_node.extended(impls.IRNodeXSTORENum, IRNodeXSTOREBase)
+
+impls.IRNodeXSTOREFlt = { typ = 'flt', nbytes = 4 }
+ir_node.extended(impls.IRNodeXSTOREFlt, IRNodeXSTOREBase)
 
 -- u32: 4-byte store; the value is a zero-extended 64-bit BV on
 -- the op-stack, xmem_store writes its low 4 bytes (same as int).

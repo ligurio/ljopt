@@ -1821,6 +1821,26 @@ f(x, 3, o)
             {type = "num", name = "CONV",
                 right_op = op_type.new("lit", "num.u32")},
         },
+    }, {
+        name = "XSTORE/XLOAD flt",
+        code = [[
+-- Write a double into an FFI float cell and read it back. Both
+-- directions go through float32, so 1e39 -- finite as a double,
+-- past the float32 maximum -- has to come back as inf.
+local ffi = require('ffi')
+local arr = ffi.new("float[1]", 0)
+local function f(p, v) p[0] = v; return p[0] end
+local s = 0
+s = s + f(arr, 1e39)
+s = s + f(arr, 1e39)
+s = s + f(arr, 1e39)
+]],
+        ins = {
+            {type = "flt", name = "CONV"},
+            {type = "flt", name = "XSTORE"},
+            {type = "flt", name = "XLOAD"},
+            {type = "num", name = "CONV"},
+        },
     }}
     test:plan(3 * #srcs)
 

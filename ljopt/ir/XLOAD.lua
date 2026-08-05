@@ -37,6 +37,10 @@ impls.IRNodeXLOADNum = make_xload(op_type.NUM, 8, function(raw)
     return ('((_ to_fp 11 53) %s)'):format(raw)
 end)
 
+impls.IRNodeXLOADFlt = make_xload('flt', 4, function(raw)
+    return ('((_ to_fp 8 24) %s)'):format(raw)
+end)
+
 local function instance(node_str)
     return impls[node_str]
 end

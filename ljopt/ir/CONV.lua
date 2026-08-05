@@ -72,6 +72,14 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- u32 -> 64-bit: zero-extend (unsigned widening).
         left_op = ir_node.retrieve_u32_op(self:get_left_op(), ctx, 'u32')
         data = arith_utils.wrap_u32(left_op)
+    -- float32 <-> double, the FFI `float` conversions. Narrowing
+    -- rounds (RNE, what C does); widening back is exact.
+    elseif parsed_right_op[1] == 'flt.num' then
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
+        data = ('((_ to_fp 8 24) RNE %s)'):format(left_op)
+    elseif parsed_right_op[1] == 'num.flt' then
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'flt')
+        data = ('((_ to_fp 11 53) RNE %s)'):format(left_op)
     elseif parsed_right_op[1] == 'num.u32' then
         -- u32 -> num: unsigned integer to floating point.
         left_op = ir_node.retrieve_u32_op(self:get_left_op(), ctx, 'u32')

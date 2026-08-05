@@ -183,6 +183,7 @@ end
 
 local fp_bits_kind = {
     [64] = {fn = 'fp2bv64', sort = '(_ to_fp 11 53)'},
+    [32] = {fn = 'fp2bv32', sort = '(_ to_fp 8 24)'},
 }
 
 -- The IEEE bits of the float `fp`, as a BitVec of `width`.

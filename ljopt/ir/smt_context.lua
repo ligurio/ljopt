@@ -18,7 +18,7 @@ end
 local type2bv = {
     ['tab'] = '%s',
     ['cdt'] = '%s',
-    ['flt'] = '(fp.to_ieee_bv %s)',
+    ['flt'] = '((_ to_fp 11 53) RNE %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
     ['i16'] = '%s',
@@ -46,7 +46,7 @@ local bv2type = {
     ['cdt'] = '(let ((cdt_bv %s)) ' ..
         '(- (bv2nat cdt_bv) (* 18446744073709551616 ' ..
         '(bv2nat ((_ extract 63 63) cdt_bv)))))',
-    ['flt'] = '((_ to_fp 9 24) %s)',
+    ['flt'] = '((_ to_fp 8 24) RNE %s)',
     ['i8']  = '%s',
     ['u8']  = '%s',
     ['i16'] = '%s',
@@ -88,7 +88,7 @@ local function create_value(memcell, type)
         return ('(str-val %s)'):format(memcell)
     elseif type == op_type.ANY then
         return memcell
-    elseif type == 'num' then
+    elseif type == 'num' or type == 'flt' then
         return ('(fp-val %s)'):format(memcell)
     elseif type == 'tab' then
         return ('(tab-val %s)'):format(memcell)
@@ -102,7 +102,7 @@ local function extract_value(memcell, type)
         return memcell
     elseif type == op_type.STR then
         return ('(get-str %s)'):format(memcell)
-    elseif type == 'num' then
+    elseif type == 'num' or type == 'flt' then
         return ('(get-fp %s)'):format(memcell)
     elseif type == 'tab' then
         return ('(get-tab %s)'):format(memcell)
