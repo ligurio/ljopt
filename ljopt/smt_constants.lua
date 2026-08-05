@@ -92,6 +92,8 @@ local LJOPT_SMTLIB = ([[
 ; A function, not a fresh constant per store, so both traces get
 ; the same values by congruence.
 (declare-fun fp2bv64 ((_ FloatingPoint 11 53)) (_ BitVec 64))
+; Same, for the float32 an FFI `float` store writes.
+(declare-fun fp2bv32 ((_ FloatingPoint 8 24)) (_ BitVec 32))
 
 ; String reverse for lj_buf_putstr_reverse. Uninterpreted, like
 ; the math_* / pow_fp / callxs_* helpers above: both traces apply
