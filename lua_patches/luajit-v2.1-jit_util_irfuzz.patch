@@ -1,7 +1,7 @@
 diff --git a/src/lib_jit.c b/src/lib_jit.c
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -393,6 +393,256 @@
+@@ -393,6 +393,265 @@
    return 0;
  }
  
@@ -155,6 +155,15 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +  lua_createtable(L, nk, 0);
 +  for (i = 1; i <= nk; i++) {
 +    IRIns *ir = &J->cur.ir[REF_BIAS - i];
++    /* A 64-bit constant keeps its payload in the next slot, and raw
++    ** payload bytes decode as a garbage instruction -- a KPRI of
++    ** collectable type faults the GC barrier below. Skip it. */
++    if ((int32_t)(REF_BIAS - i - 1) >= (int32_t)J->cur.nk &&
++	ir_isk64(&J->cur.ir[REF_BIAS - i - 1])) {
++      lua_pushinteger(L, 0);  /* benign placeholder, keeps kval aligned */
++      lua_rawseti(L, -2, i);
++      continue;
++    }
 +    if (ir->o == IR_KSLOT) {
 +      /* A KSLOT's op1 must reference another constant in the live
 +      ** [nk, REF_BIAS) range. Bounds-check before following it:
