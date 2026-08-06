@@ -419,6 +419,15 @@ local function iter_mixed(opts)
         ak = K.REF, av = prev_ref,
         bk = tr.bk or K.LIT, bv = tr.mode }
       rec(level + 1, tr.to, this_ref)
+      -- Also convert a constant, not just the chain value: the
+      -- kfold_conv_k* rules and TOBIT KNUM KNUM match on a
+      -- constant source, which a ref chain never presents.
+      for _, c in ipairs(cinfo.consts) do
+        body[level] = { op = gen.op_num(tr.op or "CONV"), t = tr.to,
+          ak = cinfo.kind, av = c,
+          bk = tr.bk or K.LIT, bv = tr.mode }
+        rec(level + 1, tr.to, this_ref)
+      end
     end
     body[level] = nil
   end
