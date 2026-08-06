@@ -78,6 +78,14 @@ local OPS = {
     { name = "ADDOV", arity = 2, commut = true, guard = true },
     { name = "SUBOV", arity = 2, guard = true },
     { name = "MULOV", arity = 2, commut = true, guard = true },
+    -- math.min/max over two integers: recff_math_minmax emits the
+    -- op at IRT_INT when neither operand needed a CONV to num.
+    { name = "MIN", arity = 2, commut = true },
+    { name = "MAX", arity = 2, commut = true },
+    -- Lua `%` on two integers: lj_opt_narrow_mod emits IRTI MOD,
+    -- but only after guarding the divisor non-zero, so a zero
+    -- right operand is recorder-impossible (and folds via idiv).
+    { name = "MOD", arity = 2, no_zero_right = true },
     { name = "NEG", arity = 1, mirror = true },
     { name = "BNOT", arity = 1, no_op2 = true },
     { name = "BSWAP", arity = 1, no_op2 = true },
@@ -167,6 +175,10 @@ local function each_application(t, leaves, op, level, prev, emit)
   -- stays on the op stack (see ir/ADDOV.lua).
   local ty = op.guard and (t + 0x80) or t
   local function ins(ak, av, bk, bv)
+    -- Ops whose recorder guards the divisor non-zero take only a
+    -- non-zero constant on the right: a ref can still fold to
+    -- zero further down, and kfold divides on the hardware.
+    if op.no_zero_right and (bk == K.REF or bv == 0) then return end
     emit({ op = opnum, t = ty, ak = ak, av = av, bk = bk, bv = bv })
   end
 
@@ -386,10 +398,15 @@ local function iter_mixed(opts)
     for _, op in ipairs(MIXED_ARITH[cur_type]) do
       local opnum = gen.op_num(op.name)
       for _, c in ipairs(cinfo.consts) do
-        body[level] = { op = opnum, t = cur_type,
-          ak = K.REF, av = prev_ref, bk = cinfo.kind, bv = c }
-        rec(level + 1, cur_type, this_ref)
-        if not op.commut then
+        -- Same non-zero divisor rule as each_application: a
+        -- zero constant, or a ref that folds to one, reaches
+        -- the hardware divide in kfold.
+        if not (op.no_zero_right and c == 0) then
+          body[level] = { op = opnum, t = cur_type,
+            ak = K.REF, av = prev_ref, bk = cinfo.kind, bv = c }
+          rec(level + 1, cur_type, this_ref)
+        end
+        if not op.commut and not op.no_zero_right then
           body[level] = { op = opnum, t = cur_type,
             ak = cinfo.kind, av = c, bk = K.REF, bv = prev_ref }
           rec(level + 1, cur_type, this_ref)
