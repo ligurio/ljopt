@@ -171,7 +171,7 @@ local function build_from(insns, outputs, opts, seed)
   -- the driver skip it. Non-numeric errors are real, so they
   -- are re-raised.
   local replay_ok, unopt_pass, opt_pass = pcall(jutil.irfuzz,
-    gen.to_spec(insns))
+    gen.to_spec(insns, outputs))
   if not replay_ok then
     local err = unopt_pass
     if type(err) ~= "number" then error(err, 0) end

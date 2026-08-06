@@ -432,9 +432,12 @@ end
 
 -- Pack an instruction stream into the flat spec table
 -- jit.util.irfuzz expects: parallel arrays indexed 1..n.
-local function to_spec(insns)
+-- `outputs` (optional) lists the stream indexes the replay must
+-- keep live: the post-fold passes read liveness out of a snapshot
+-- over them, so everything else is dead and DCE can act.
+local function to_spec(insns, outputs)
   local spec = { n = #insns, op = {}, t = {},
-                 ak = {}, av = {}, bk = {}, bv = {} }
+                 ak = {}, av = {}, bk = {}, bv = {}, out = outputs }
   for i = 1, #insns do
     local ins = insns[i]
     spec.op[i] = ins.op

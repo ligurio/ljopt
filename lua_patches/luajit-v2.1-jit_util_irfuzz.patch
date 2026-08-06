@@ -1,7 +1,15 @@
 diff --git a/src/lib_jit.c b/src/lib_jit.c
 --- a/src/lib_jit.c
 +++ b/src/lib_jit.c
-@@ -393,6 +393,265 @@
+@@ -26,6 +26,7 @@
+ #include "lj_jit.h"
+ #include "lj_ircall.h"
+ #include "lj_iropt.h"
++#include "lj_snap.h"
+ #include "lj_target.h"
+ #endif
+ #include "lj_trace.h"
+@@ -386,6 +387,306 @@ LJLIB_CF(jit_util_tracemc)
    return 0;
  }
  
@@ -111,6 +119,45 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +    lj_err_callermsg(L, "irfuzz: bad operand kind");
 +    return 0;  /* unreachable */
 +  }
++}
++
++/* Output slots start above every slot the stream can SLOAD:
++** snapshot_slots() drops a slot that just holds the SLOAD of that
++** same slot, and a dropped output leaves DCE free to delete it.
++*/
++#define IRFUZZ_OUTSLOT	64
++
++/* Run the passes that follow FOLD in lj_trace.c (LJ_TRACE_END), so
++** a replay exercises DCE and allocation sinking too. Both read
++** liveness out of the snapshots, so the stream's outputs are
++** published as stack slots and snapshotted first: everything they
++** do not reach is dead, which is what makes DCE do any work.
++** spec.out lists the 1-based stream indexes to keep live; with no
++** such array every value stays live and DCE finds nothing.
++*/
++static void irfuzz_postfold(lua_State *L, jit_State *J, TRef *map, int n)
++{
++  int nout = 0, i;
++  lua_getfield(L, 1, "out");
++  if (lua_istable(L, -1)) {
++    for (i = 1; ; i++) {
++      int ref;
++      lua_rawgeti(L, -1, i);
++      if (lua_isnil(L, -1)) { lua_pop(L, 1); break; }
++      ref = (int)lua_tointeger(L, -1);
++      lua_pop(L, 1);
++      if (ref >= 1 && ref <= n && IRFUZZ_OUTSLOT + nout < LJ_MAX_JSLOTS - 2)
++	J->base[IRFUZZ_OUTSLOT + nout++] = map[ref-1];
++    }
++  } else {
++    for (i = 1; i <= n && IRFUZZ_OUTSLOT + nout < LJ_MAX_JSLOTS - 2; i++)
++      J->base[IRFUZZ_OUTSLOT + nout++] = map[i-1];
++  }
++  lua_pop(L, 1);
++  J->maxslot = (BCReg)(IRFUZZ_OUTSLOT + nout);
++  lj_snap_add(J);
++  lj_opt_dce(J);
++  lj_opt_sink(J);
 +}
 +
 +/* Push the result table for one replay pass. Conventions follow
@@ -257,6 +304,8 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +      lj_ir_set(J, ((uint32_t)op << 8) | (uint32_t)irt, a, b);
 +      map[i-1] = lj_opt_fold(J);
 +    }
++    if (pass)
++      irfuzz_postfold(L, J, map, n);
 +    irfuzz_pushpass(L, J, map, n);
 +  }
 +  J->flags = origflags;
