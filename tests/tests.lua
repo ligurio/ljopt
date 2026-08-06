@@ -318,6 +318,18 @@ foo(1)
             {type = "num", name = "CONV"},
             {type = "num", name = "EQ"}
         },
+    }, {
+        name = "EQ on function references",
+        code = [[
+local mf = math.floor
+local function h(x) return mf(x) * 2 end
+h(1.5)
+h(2.5)
+h(3.5)
+]],
+        ins = {
+            {type = "fun", name = "EQ"},
+        },
 --[[
     }, {
 -- Fix BV <-> FP casts, now it's too slow:
