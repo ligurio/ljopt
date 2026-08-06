@@ -201,6 +201,9 @@ test:test("IR arithmetic tests", function(test)
                         result = math.min(-5., -3.), error = 3.},
         {node = create_node("int", "MOD", num(5), num(3)),
                         result = math.fmod(5, 3), error = 1},
+        -- Mixed signs: Lua `%` floors, so this is 2, not -1.
+        {node = create_node("int", "MOD", num(-7), num(3)),
+                        result = -7 % 3, error = 1},
         {node = create_node("num", "MUL", num(2.3), num(3.4)),
                         result = 2.3 * 3.4, error = 1.},
         {node = create_node("int", "MUL", num(2.), num(3.)),
