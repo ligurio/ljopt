@@ -442,6 +442,21 @@ f(1.5)
             {type = "num", name = "MIN"},
             {type = "num", name = "MAX"},
         },
+    }, {
+        name = "int MOD floors like Lua %",
+        code = [[
+local band = bit.band
+local function f(a)
+  return band(a, -1) % band(-2147483648, -1)
+end
+f(63)
+f(63)
+f(63)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "int", name = "MOD"},
+        },
     }}
     test:plan(3 * #srcs)
 

@@ -3,7 +3,7 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMODInt = { op_str = 'bvsrem' }
+impls.IRNodeMODInt = { op_str = 'bvsmod' }
 ir_node.extended(impls.IRNodeMODInt, bin_op.BinOpInt)
 
 impls.IRNodeMODI64 = { op_str = 'bvsrem' }
