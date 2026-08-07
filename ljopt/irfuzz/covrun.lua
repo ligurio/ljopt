@@ -6,6 +6,8 @@
 --
 -- One mode per process: gcov merges counters across runs, so a
 -- crash in one mode keeps the coverage of the others.
+if os.getenv("COV_JITOFF") then jit.off() end
+
 local check = require("ljopt.irfuzz.check")
 local enum = require("ljopt.irfuzz.enum")
 local gen = require("ljopt.irfuzz.gen")
