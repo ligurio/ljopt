@@ -84,6 +84,10 @@ luajit ljopt/irfuzz/fuzz.lua --seed 1 --count 5000
 # Also generate table/array memory ops (AREF/HREF/ALOAD/HLOAD/…).
 luajit ljopt/irfuzz/fuzz.lua --tables --seed 1 --count 2000
 
+# Replay as a loop trace: the optimized pass also runs lj_opt_loop,
+# so the sweep covers unrolling and PHIs (ljopt unrolls both sides).
+luajit ljopt/irfuzz/fuzz.lua --loop --enum --type num --depth 1
+
 # Also generate ops ljopt models incompletely, to hunt ljopt gaps
 # rather than LuaJIT miscompiles.
 luajit ljopt/irfuzz/fuzz.lua --include-gaps --seed 1 --count 2000

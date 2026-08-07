@@ -148,6 +148,10 @@ local function parse_args(argv)
       o.count = tonumber(argv[i + 1]); i = i + 2
     elseif a == "--insns" then
       o.insns = tonumber(argv[i + 1]); i = i + 2
+    elseif a == "--loop" then
+      -- Replay as a loop trace: the optimized pass also runs
+      -- lj_opt_loop, so the sweep covers unrolling and PHIs.
+      o.loop = true; i = i + 1
     elseif a == "--no-ints" then
       o.ints = false; i = i + 1
     elseif a == "--include-gaps" then
@@ -168,7 +172,7 @@ end
 
 local function gen_opts(o)
   return { insns = o.insns, ints = o.ints, exclude_gaps = not o.include_gaps,
-           tables = o.tables }
+           tables = o.tables, loop = o.loop }
 end
 
 local function show_result(r, label)
@@ -353,7 +357,7 @@ local function sweep(o, make_iter, total, repro)
     idx = idx + 1
     if idx > o.skip then
       checked = checked + 1
-      local r = check.build_from(tr.insns, tr.outputs, {})
+      local r = check.build_from(tr.insns, tr.outputs, { loop = o.loop })
       check_one(r, c, timeout_sec, "#" .. idx, repro .. " " .. idx, strict)
       if checked % 2000 == 0 then
         io.write(("... %d/%d checked (%d z3 calls, %d sat)\n")

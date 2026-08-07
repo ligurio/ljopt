@@ -38,11 +38,14 @@ local PREAMBLE = [[
 -- `pass.map[g]` is the decoded ref: > 0 is an SSA node
 -- (snapshot references it and ljopt reads its typed value),
 -- < 0 is a folded constant (materialized in the snapshot).
-local function attach_snapshot(rec, pass, cmp)
+local function attach_snapshot(rec, pass, cmp, loop)
   local slots = {}
   for i, g in ipairs(cmp) do
     local ref = pass.map[g]
-    local slot = i - 1
+    -- A loop replay writes its outputs back into the slots the
+    -- SLOADs read (slot 1 up), which is how the unroller pairs a
+    -- body result with its input and infers the PHI.
+    local slot = loop and i or (i - 1)
     if ref > 0 then
       slots[#slots + 1] = { slot, { type = "ssa", value = ref } }
     else
@@ -63,7 +66,8 @@ local function attach_snapshot(rec, pass, cmp)
   -- instruction and carries the compared output values.
   rec.snapshots = {
     [1] = { nins = { 1 }, slots = {} },
-    [2] = { nins = { #rec.trace + 1 }, slots = slots },
+    [2] = { nins = { #rec.trace + 1 }, slots = slots,
+            last_slots = slots },
   }
 end
 
@@ -170,8 +174,12 @@ local function build_from(insns, outputs, opts, seed)
   -- recorder-impossible. Report it as an aborted trace and let
   -- the driver skip it. Non-numeric errors are real, so they
   -- are re-raised.
-  local replay_ok, unopt_pass, opt_pass = pcall(jutil.irfuzz,
-    gen.to_spec(insns, outputs))
+  -- A loop replay runs lj_opt_loop, so the optimized trace gets a
+  -- LOOP marker and PHIs while the unoptimized one stays straight;
+  -- ljopt unrolls each shape once it knows the link is a loop.
+  local spec = gen.to_spec(insns, outputs)
+  spec.loop = opts.loop or nil
+  local replay_ok, unopt_pass, opt_pass = pcall(jutil.irfuzz, spec)
   if not replay_ok then
     local err = unopt_pass
     if type(err) ~= "number" then error(err, 0) end
@@ -181,8 +189,9 @@ local function build_from(insns, outputs, opts, seed)
       insns = insns, outputs = outputs, cmp_outputs = {},
     }
   end
-  local trace_u = decode.decode(unopt_pass)
-  local trace_o = decode.decode(opt_pass)
+  local linktype = opts.loop and "loop" or nil
+  local trace_u = decode.decode(unopt_pass, linktype)
+  local trace_o = decode.decode(opt_pass, linktype)
   local lint = lint_conv_types(trace_o)
   local lint_u = lint_conv_types(trace_u)
   for _, x in ipairs(lint_u) do lint[#lint + 1] = x .. " (unopt)" end
@@ -208,8 +217,8 @@ local function build_from(insns, outputs, opts, seed)
   local formula, identical, commut_only = nil, false, false
   local skipped = (#cmp == 0)
   if not skipped then
-    attach_snapshot(trace_u, unopt_pass, cmp)
-    attach_snapshot(trace_o, opt_pass, cmp)
+    attach_snapshot(trace_u, unopt_pass, cmp, opts.loop)
+    attach_snapshot(trace_o, opt_pass, cmp, opts.loop)
     -- The optimized pass changed nothing: both traces render (and
     -- thus translate) identically, so equivalence is trivially
     -- unsat and a driver may skip z3. Exact because constants

@@ -9,7 +9,7 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
  #include "lj_target.h"
  #endif
  #include "lj_trace.h"
-@@ -386,6 +387,306 @@ LJLIB_CF(jit_util_tracemc)
+@@ -386,6 +387,323 @@ LJLIB_CF(jit_util_tracemc)
    return 0;
  }
  
@@ -68,6 +68,7 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +    ir->prev = 0;
 +  }
 +  J->cur.nk = REF_TRUE;
++  lj_snap_add(J);  /* Snapshot #0: empty entry state, as for a root trace. */
 +}
 +
 +/* Resolve one operand descriptor to a TRef/literal for the fold engine.
@@ -137,7 +138,16 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +*/
 +static void irfuzz_postfold(lua_State *L, jit_State *J, TRef *map, int n)
 +{
-+  int nout = 0, i;
++  int nout = 0, i, outbase, loop;
++  lua_getfield(L, 1, "loop");
++  loop = lua_toboolean(L, -1);
++  lua_pop(L, 1);
++  /* A loop trace's outputs go back into the slots its SLOADs read:
++  ** a slot written in the body and live at the loop start is what
++  ** makes lj_opt_loop emit a PHI. Straight-line replays keep them
++  ** clear of those slots (see IRFUZZ_OUTSLOT).
++  */
++  outbase = loop ? 0 : IRFUZZ_OUTSLOT;
 +  lua_getfield(L, 1, "out");
 +  if (lua_istable(L, -1)) {
 +    for (i = 1; ; i++) {
@@ -146,17 +156,24 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +      if (lua_isnil(L, -1)) { lua_pop(L, 1); break; }
 +      ref = (int)lua_tointeger(L, -1);
 +      lua_pop(L, 1);
-+      if (ref >= 1 && ref <= n && IRFUZZ_OUTSLOT + nout < LJ_MAX_JSLOTS - 2)
-+	J->base[IRFUZZ_OUTSLOT + nout++] = map[ref-1];
++      if (ref >= 1 && ref <= n && outbase + nout < LJ_MAX_JSLOTS - 2)
++	J->base[outbase + nout++] = map[ref-1];
 +    }
 +  } else {
-+    for (i = 1; i <= n && IRFUZZ_OUTSLOT + nout < LJ_MAX_JSLOTS - 2; i++)
-+      J->base[IRFUZZ_OUTSLOT + nout++] = map[i-1];
++    for (i = 1; i <= n && outbase + nout < LJ_MAX_JSLOTS - 2; i++)
++      J->base[outbase + nout++] = map[i-1];
 +  }
 +  lua_pop(L, 1);
-+  J->maxslot = (BCReg)(IRFUZZ_OUTSLOT + nout);
++  J->maxslot = (BCReg)(outbase + nout);
 +  lj_snap_add(J);
 +  lj_opt_dce(J);
++  /* A failed unroll (type instability) undoes itself and leaves the
++  ** straight-line trace, which stays comparable, so ignore it.
++  */
++  if (loop) {
++    lj_opt_loop(J);
++    J->loopref = J->chain[IR_LOOP];
++  }
 +  lj_opt_sink(J);
 +}
 +
