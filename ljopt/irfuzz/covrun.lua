@@ -17,10 +17,12 @@ local IRT = { int = gen.IRT_INT, num = gen.IRT_NUM, i64 = gen.IRT_I64 }
 local mode = arg[1] or error("usage: covrun.lua <mode> [limit]")
 local limit = tonumber(arg[2]) or 1e9
 local skip = tonumber(arg[3]) or 0
+local loop = os.getenv("COV_LOOP") ~= nil
 
 local function drive_seeds(opts)
     local ok, skipped = 0, 0
     for seed = 1, limit do
+        opts.loop = loop
         local r = check.build(seed, opts)
         if r.skipped then skipped = skipped + 1 else ok = ok + 1 end
         if seed % 5000 == 0 then io.stderr:write(("  %d\n"):format(seed)) end
@@ -33,7 +35,7 @@ local function drive_iter(make_iter)
     for tr in make_iter() do
         n = n + 1
         if n > skip then
-            local r = check.build_from(tr.insns, tr.outputs, {})
+            local r = check.build_from(tr.insns, tr.outputs, { loop = loop })
             if r.skipped then skipped = skipped + 1 else ok = ok + 1 end
             local step = skip > 0 and 1 or 5000
             if n % step == 0 then io.stderr:write(("  %d\n"):format(n)) end

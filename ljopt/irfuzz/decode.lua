@@ -118,7 +118,7 @@ local function decode_const(pass, v)
 end
 
 -- Decode one replay pass buffer into { trace = <nodes> }.
-local function decode(pass)
+local function decode(pass, linktype)
   local irnames = vmdef.irnames
   local nodes = {}
   for i = 1, pass.nins do
@@ -182,7 +182,7 @@ local function decode(pass)
       op2_txt = op2_txt and trim(op2_txt) or nil,
     }
   end
-  return { trace = nodes }
+  return { trace = nodes, linktype = linktype }
 end
 
 -- SMT bitvector literal (#x...) for a folded-constant ref (< 0) in
