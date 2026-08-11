@@ -457,6 +457,21 @@ f(63)
         ins = {
             {type = "int", name = "MOD"},
         },
+    }, {
+        name = "a folded string constant is escaped in the formula",
+        code = [[
+local function f(t)
+  return 'he said "hi"' .. t
+end
+f("de")
+f("de")
+f("de")
+]],
+        ins = {
+            {type = "p32", name = "BUFHDR"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
+        },
     }}
     test:plan(3 * #srcs)
 

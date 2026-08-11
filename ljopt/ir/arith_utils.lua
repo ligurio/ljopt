@@ -35,12 +35,21 @@ end
 local function memcell_to_str(memcell)
     return ("(get-str %s)"):format(memcell)
 end
+local function escape_smt_str(str)
+    return (str
+        :gsub('\\', '\\u{5c}')
+        :gsub('"', '""')
+        :gsub('%c', function(c)
+            return ('\\u{%x}'):format(c:byte())
+        end))
+end
+
 local function const_str_to_memcell(num_value)
-    return ('(str-val "%s")'):format(num_value)
+    return ('(str-val "%s")'):format(escape_smt_str(num_value))
 end
 
 local function const_str_to_smt_str(str)
-    return ('"%s"'):format(str)
+    return ('"%s"'):format(escape_smt_str(str))
 end
 
 local function const_int_to_smt_bv(int_value)
@@ -216,6 +225,7 @@ return {
     const_num_to_smt_fp = const_num_to_smt_fp,
     const_num_to_memcell = const_num_to_memcell,
     const_str_to_memcell = const_str_to_memcell,
+    escape_smt_str = escape_smt_str,
     const_str_to_smt_str = const_str_to_smt_str,
     const_i64_to_memcell = const_i64_to_memcell,
     const_int_to_smt_bv = const_int_to_smt_bv,

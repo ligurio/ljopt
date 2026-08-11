@@ -81,6 +81,10 @@ local function snap_to_smt_lib(trace, ctx, tr_id, snap_id,
                 smt_expr = ctx.snap_stack:store(slot, op_type.NUM, data)
                 slot_values[slot] = ctx.snap_stack:load(slot, op_type.NUM)
             end
+        elseif value_type == "const"
+            and pair[2].const_type == "string" then
+            smt_expr = "; const str, use directly"
+            slot_values[slot] = value_data
         elseif value_type == "const" then
             if value_data == "true" or value_data == "false" then
                 -- Encode `true` and `false` as 1.0 and 0.0 to be
