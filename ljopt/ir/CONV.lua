@@ -12,6 +12,16 @@ local NARROW_CONV = {
     ['int.u16'] = 16,
 }
 
+-- Guarded conversions out of `num`, and the signed width the
+-- value has to fit for the guard to hold. Only these two are ever
+-- emitted as a trace exit (IRCONV_CHECK / IRCONV_INDEX, from
+-- lj_opt_narrow.c and the recorder's index/toint paths); the
+-- unsigned and FFI casts are IRCONV_ANY, which is not a guard.
+local NUM_SRC_GUARD = {
+    ['int.num'] = 32,
+    ['i64.num'] = 64,
+}
+
 local IRNodeCONV = {}
 ir_node.extended(IRNodeCONV, ir_node.ir_node_base)
 
@@ -55,7 +65,10 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
         -- Truncate to lower 32 bits, then sign-extend back to 64.
         data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(left_op)
-    elseif parsed_right_op[1] == 'i64.int' then
+    -- u64.int is the same widening as i64.int; the `sext` suffix,
+    -- not the destination type, decides sign- vs zero-extension.
+    elseif parsed_right_op[1] == 'i64.int' or
+           parsed_right_op[1] == 'u64.int' then
         local lo = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
         if parsed_right_op[2] == 'sext' then
             data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(lo)
@@ -152,9 +165,23 @@ function IRNodeCONV:to_smt_lib(ctx)
     local ssa_ref = self:get_ssa_reference()
     local te = ""
     if self:get_flags().irt_guard then
-        -- Investigate when this guard can fail and how
-        -- to verify it safely.
-        te = ctx.te_stack:store(ssa_ref, 'true') .. '\n'
+        -- A guarded num -> integer CONV (IRCONV_CHECK /
+        -- IRCONV_INDEX, dumped as `check` / `index`) exits the
+        -- trace unless the double is an exact integer of the
+        -- destination width, so its exit condition is that test
+        -- -- not `true`. Modelling it as `true` made every such
+        -- CONV disagree with the ADDOV that lj_opt_narrow emits
+        -- in its place, whose exit condition IS modelled: the two
+        -- exit bitvectors differed on any overflowing input and
+        -- the narrowing read as a miscompile. Every other guarded
+        -- CONV keeps the assumed-true exit.
+        local guard = 'true'
+        local dst_bits = NUM_SRC_GUARD[parsed_right_op[1]]
+        if dst_bits then
+            guard = arith_utils.num_to_int_guard(
+                left_op, dst_bits)
+        end
+        te = ctx.te_stack:store(ssa_ref, guard) .. '\n'
     end
 
     -- Propagate constant value through conversion.
