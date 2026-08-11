@@ -31,6 +31,29 @@ local function const_num_to_smt_fp(num_value)
     return string.format("((_ to_fp 11 53) %s)", const_num_to_smt_bv(num_value))
 end
 
+-- Exit condition of a *guarded* num -> integer CONV (IRCONV_CHECK
+-- and IRCONV_INDEX): the conversion is only allowed to stay on
+-- the trace while the double is an exact integer that fits the
+-- destination width. LuaJIT emits the same test in the backend
+-- (convert, convert back, compare) and takes the trace exit when
+-- it fails, so this is what makes the guard comparable to the
+-- overflow check on the ADDOV that lj_opt_narrow puts in its
+-- place.
+--
+-- NaN and +-Inf need no separate clause: fp.lt / fp.geq are both
+-- false on NaN, and an infinity fails whichever bound it is on.
+-- `bits` is the destination width (32 for int, 64 for i64); the
+-- bound is +-2^(bits-1), which is exact as a double for both.
+local function num_to_int_guard(fp_value, bits)
+    local limit = 2 ^ (bits - 1)
+    return ('(and (fp.lt %s %s) (fp.geq %s (fp.neg %s))'
+        .. ' (fp.eq %s (fp.roundToIntegral RTZ %s)))'):format(
+        fp_value, const_num_to_smt_fp(limit),
+        fp_value, const_num_to_smt_fp(limit),
+        fp_value, fp_value
+    )
+end
+
 local function const_num_to_memcell(num_value)
     return ("(fp-val %s)"):format(const_num_to_smt_fp(num_value))
 end
@@ -252,6 +275,7 @@ end
 
 return {
     i32_overflow_check = i32_overflow_check,
+    num_to_int_guard = num_to_int_guard,
     const_num_to_smt_bv = const_num_to_smt_bv,
     const_num_to_smt_fp = const_num_to_smt_fp,
     const_num_to_memcell = const_num_to_memcell,
