@@ -92,6 +92,18 @@ luajit ljopt/irfuzz/fuzz.lua --loop --enum --type num --depth 1
 # rather than LuaJIT miscompiles.
 luajit ljopt/irfuzz/fuzz.lua --include-gaps --seed 1 --count 2000
 
+# FP narrowing: num ADD/SUB trees converted back to an integer, the
+# only shape that reaches lj_opt_narrow.c from an IR replay.
+luajit ljopt/irfuzz/fuzz.lua --narrow --limit 2000
+
+# Allocation sinking: stores into a TNEW the trace created itself,
+# the only shape that makes lj_opt_sink.c do anything.
+luajit ljopt/irfuzz/fuzz.lua --sink
+
+# String buffers: the BUFHDR/BUFPUT/BUFSTR chain Lua's `..` records
+# as, and the only way into lj_opt_fold.c's buffer rules.
+luajit ljopt/irfuzz/fuzz.lua --buffers
+
 # Exhaustive mode: walk EVERY depth-D op chain over the SLOAD inputs
 # and the fold-rule constants (enum.lua), instead of random seeds.
 luajit ljopt/irfuzz/fuzz.lua --enum --type int --depth 1
@@ -143,6 +155,29 @@ order still goes to z3.
   (`ADD SUB MUL DIV MOD`, `BAND BOR BXOR`, shifts, rotates); unary num
   `NEG`/`ABS`, unary int `NEG`/`BNOT`/`BSWAP`; `FPMATH` rounding modes
   and `LDEXP`.
+- **FP narrowing** (`--narrow`) — `CONV`/`TOBIT` sinks over num
+  `ADD`/`SUB` trees whose leaves are `CONV num<-int`, overflow-checked
+  `ADDOV`/`SUBOV`/`MULOV`, FP constants across the `checki16` and
+  int64 range tests, and non-narrowable num `SLOAD`s. This is the
+  only shape that reaches `lj_opt_narrow.c` from an IR replay — every
+  other entry point there is called by the recorder. Two sinks are
+  deliberately excluded as recorder-impossible in isolation; see the
+  comments on `NARROW_SINKS` in `enum.lua`.
+- **Allocation sinking** (`--sink`) — `TNEW` plus stores addressed
+  through `AREF` (constant and loaded index), `NEWREF` and an
+  `SLOAD`'d table, under the shapes that decide eligibility in
+  `sink_mark_ins`: a snapshot-live allocation, a surviving load, a
+  `TBAR`, an `FLOAD tab.meta`, and the allocation used as a stored
+  value. Sinking itself is *covered but not verified* — its result
+  lives in `ir->prev`, which never reaches the decoded IR; what the
+  sweep does verify is FOLD and `lj_opt_mem.c` on a trace-local
+  table. See the comment on `SINK_ALLOCS` in `enum.lua`.
+- **String buffers** (`--buffers`) — `BUFHDR`/`BUFPUT`/`BUFSTR`
+  chains and `CALLL lj_buf_putstr_reverse`, over constant and
+  symbolic strings: constant-put joining, empty puts, the one-put
+  shortcut, `BUFSTR` spliced back into a following `BUFHDR`, and
+  whole-chain CSE. ljopt models a buffer as a string cell and a put
+  as `str.++`, so this is a value oracle and not only coverage.
 - **Tables / arrays** (`--tables`) — `SLOAD tab`, `FLOAD tab.array`,
   `AREF`/`HREF`, `ALOAD`/`HLOAD`, `ASTORE`/`HSTORE`. Array indices and
   hash keys are drawn from disjoint value ranges (positive vs negative

@@ -30,6 +30,8 @@ local IRT_U32, IRT_U64 = 20, 22
 local IRT_FLT = 13
 local IRT_CDT = 10
 local IRT_P64 = 9
+-- Interned string, and the void type CARG carries.
+local IRT_STR, IRT_NIL, IRT_FUNC = 4, 0, 8
 
 -- Operand kinds -- must match the IRFUZZ_OPND_* enum in
 -- lib_jit.c.
@@ -73,6 +75,20 @@ local irop_num = setmetatable({}, {
       end
     end
     error("gen: unknown IR opcode " .. name)
+  end,
+})
+
+-- Resolve an IRCALL name to the id a CALL's op2 literal carries.
+-- vmdef.ircall is already indexed by that id (it starts at [0]).
+local ircall_num = setmetatable({}, {
+  __index = function(t, name)
+    for i = 0, #vmdef.ircall do
+      if vmdef.ircall[i] == name then
+        t[name] = i
+        return i
+      end
+    end
+    error("gen: unknown IRCALL " .. name)
   end,
 })
 
@@ -456,6 +472,10 @@ return {
   roots = roots,
   menu_for = menu_for,
   op_num = function(name) return irop_num[name] end,
+  ircall_num = function(name) return ircall_num[name] end,
+  IRT_STR = IRT_STR,
+  IRT_NIL = IRT_NIL,
+  IRT_FUNC = IRT_FUNC,
   IRT_NUM = IRT_NUM,
   IRT_INT = IRT_INT,
   IRT_I64 = IRT_I64,

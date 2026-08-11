@@ -17,6 +17,7 @@ local ffi = require("ffi")
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local vmdef = require("jit.vmdef")
+local arith_utils = require("ljopt.ir.arith_utils")
 
 -- Double -> SMT bitvector literal. A self-contained copy of the
 -- same one-liner ir_dump_utils and tests/ir_tests.lua use;
@@ -80,6 +81,13 @@ local litname = {
   ["FPMATH"] = vmdef.irfpm,
   ["BUFHDR"] = { [0] = "RESET", "APPEND", "WRITE" },
   ["TOSTR "] = { [0] = "INT", "NUM", "CHAR" },
+  -- A CALL's op2 is an IRCALL id, which ljopt's nodes dispatch on
+  -- by name (CALLL.is_implemented matches the literal string), so
+  -- it has to arrive resolved and not as "#19".
+  ["CALLN "] = vmdef.ircall,
+  ["CALLA "] = vmdef.ircall,
+  ["CALLL "] = vmdef.ircall,
+  ["CALLS "] = vmdef.ircall,
 }
 
 local function trim(s)
@@ -117,6 +125,38 @@ local function decode_const(pass, v)
   return tostring(k), nil
 end
 
+-- Flatten a CALL's argument list, following the CARG chain, into
+-- the { {txt=, tab=}, ... } list ljopt's nodes read through
+-- op_type:get_carg(). Mirrors dumpcallargs in ljopt/ir_dump.lua:
+-- a CALL's op1 is either a single argument or a left-leaning CARG
+-- spine whose op2s are the arguments in order.
+local function decode_callargs(pass, ref)
+  local args = {}
+  if ref < 0 then
+    local txt, tab = decode_const(pass, ref)
+    args[1] = { txt = txt, tab = tab }
+    return args
+  end
+  local oidx = 6 * shr(pass.ot[ref], 8)
+  if vmdef.irnames:sub(oidx + 1, oidx + 6) == "CARG  " then
+    for _, a in ipairs(decode_callargs(pass, pass.op1[ref])) do
+      args[#args + 1] = a
+    end
+    local op2 = pass.op2[ref]
+    if op2 < 0 then
+      local txt, tab = decode_const(pass, op2)
+      args[#args + 1] = { txt = txt, tab = tab }
+    else
+      args[#args + 1] = { txt = ("%04d"):format(op2),
+        tab = { type = "ssa", value = op2 } }
+    end
+    return args
+  end
+  args[1] = { txt = ("%04d"):format(ref),
+    tab = { type = "ssa", value = ref } }
+  return args
+end
+
 -- Decode one replay pass buffer into { trace = <nodes> }.
 local function decode(pass, linktype)
   local irnames = vmdef.irnames
@@ -136,7 +176,14 @@ local function decode(pass, linktype)
     local m1, m2 = band(m, 3), band(m, 3 * 4)
     local op1_tab, op1_txt, op2_tab, op2_txt
 
-    if m1 ~= 3 then -- op1 present
+    if op6:sub(1, 4) == "CALL" and op1 ~= -1 then
+      -- A CALL takes its arguments as a carg list, not a ref.
+      local args = decode_callargs(pass, op1)
+      op1_tab = { type = "carg", value = args }
+      local parts = {}
+      for ai = 1, #args do parts[ai] = args[ai].txt end
+      op1_txt = table.concat(parts, " ")
+    elseif m1 ~= 3 then -- op1 present
       if op1 < 0 then
         op1_txt, op1_tab = decode_const(pass, op1)
       elseif m1 == 0 then -- IRMref
@@ -185,17 +232,22 @@ local function decode(pass, linktype)
   return { trace = nodes, linktype = linktype }
 end
 
--- SMT bitvector literal (#x...) for a folded-constant ref (< 0) in
--- a pass buffer, used to materialize a constant output into a
--- snapshot slot. Returns (bv, const_type): a "number" bv is the
--- double bit-pattern (snap wraps it in to_fp directly); an "i64" bv
--- is the raw 64-bit integer (snap must value-convert via
--- smt_i64_to_fp, matching the i64-node side, so a folded constant
--- and a computed i64 compare equal).
+-- SMT literal for a folded-constant ref (< 0) in a pass buffer,
+-- used to materialize a constant output into a snapshot slot.
+-- Returns (literal, const_type): a "number" bv is the double bit
+-- pattern (snap wraps it in to_fp directly); an "i64" bv is the
+-- raw 64-bit integer (snap must value-convert via smt_i64_to_fp,
+-- matching the i64-node side, so a folded constant and a computed
+-- i64 compare equal); a "string" is an SMT String literal, which
+-- goes into the slot as-is -- the same way SNAP passes a str-typed
+-- SSA slot through, since the snap stack is numeric.
 local function const_smt_bv(pass, ref)
   local k = pass.kval[-ref]
   if type(k) == "number" then return float_to_smt_bv(k), "number" end
   if type(k) == "cdata" then return i64_to_smt_bv(k), "i64" end
+  if type(k) == "string" then
+    return arith_utils.const_str_to_smt_str(k), "string"
+  end
   assert(false, "irfuzz: non-numeric constant output")
 end
 
