@@ -1980,6 +1980,23 @@ f(1)
         ins = {
             {type = "i64", name = "BSHR"},
         },
+    }, {
+        name = "a 64-bit rotate takes its operand at 64-bit width",
+        code = [[
+local rol = bit.rol
+local acc = 0LL
+local function f(x)
+  acc = acc + rol(0x123456789abcdef0LL, x)
+  return acc
+end
+f(8)
+f(8)
+f(8)
+f(8)
+]],
+        ins = {
+            {type = "i64", name = "BROL"},
+        },
     }}
     test:plan(3 * #srcs)
 

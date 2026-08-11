@@ -7,7 +7,7 @@ impls.IRNodeBRORI64 = {}
 ir_node.extended(impls.IRNodeBRORI64, ir_node.ir_node_base)
 
 function impls.IRNodeBRORI64:to_smt_lib(ctx)
-    local left_op = ir_node.retrieve_int_op(
+    local left_op = ir_node.retrieve_i64_op(
         self:get_left_op(), ctx, self:get_type()
     )
     local right_op = ir_node.retrieve_int_op(
