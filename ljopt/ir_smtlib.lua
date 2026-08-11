@@ -211,6 +211,25 @@ local function translate(trace_record, ctx_src,
             nodes[i]:to_smt_lib(ctx_src), i, utils.trim(parsed_ir))
     end
     jit.on(true, true)
+
+    -- Pin the exit of every guarded node that wrote none. The te
+    -- array is uninterpreted, so a guard ljopt does not model
+    -- (an NYI node, or one whose impl only produces a value)
+    -- leaves its slot a free boolean -- and the two sides pick
+    -- opposite values, which reads as a removed guard. Assuming
+    -- such a guard holds is the same convention CONV and TNEW
+    -- already use for exits ljopt cannot express; it can only
+    -- weaken the check, never invent a divergence.
+    for i = 1, table.getn(nodes) do
+        local ref = nodes[i]:get_ssa_reference()
+        if nodes[i]:get_flags().irt_guard
+            and not ctx_src.te_stack.stored[ref] then
+            smtlib_buf = ('%s%s\n'):format(
+                smtlib_buf, ctx_src.te_stack:store(ref, 'true')
+            )
+        end
+    end
+
     -- 4th stage. Construct SNAPSHOTs
     local snap_nums = {}
     local failed = false

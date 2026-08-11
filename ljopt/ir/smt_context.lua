@@ -269,11 +269,15 @@ function TEStackBV.init_smt(self, name)
     dev_checks('table', 'string')
 
     self._name = name
+    -- Which refs actually got an exit condition, so translate()
+    -- can pin the ones no node wrote (see default_missing_exits).
+    self.stored = {}
     return string.format('(declare-fun %s () (Array Int Bool))', self._name)
 end
 
 function TEStackBV.store(self, op_num, data)
     dev_checks('table', 'number', 'string')
+    self.stored[op_num] = true
     -- Narrowed guards (those whose operands trace back only to
     -- C-flagged SLOAD inputs and constants) are domain
     -- preconditions LJ's narrower introduces. Lift them to
