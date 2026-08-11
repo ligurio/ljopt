@@ -1997,6 +1997,21 @@ f(8)
         ins = {
             {type = "i64", name = "BROL"},
         },
+    }, {
+        name = "a buffer put republishes the buffer pointer",
+        code = [[
+local function f(s, t)
+  return s:reverse() .. t
+end
+f("abc", "de")
+f("abc", "de")
+f("abc", "de")
+]],
+        ins = {
+            {type = "p32", name = "BUFHDR"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
+        },
     }}
     test:plan(3 * #srcs)
 
