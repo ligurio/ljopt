@@ -212,9 +212,49 @@ function IRNodeBinOpGuardU32:to_smt_lib(ctx)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 
+-- Overflow-checked integer arithmetic (ADDOV/SUBOV/MULOV). These
+-- sit between the two families above: a BinOp produces only a
+-- value and a BinOpGuard only a trace exit, while an OV op
+-- produces BOTH -- the wrapped result and the exit taken when the
+-- operation overflowed -- so it writes both stacks. `op_str` is
+-- the SMT operator and `const_fn` folds a constant pair for
+-- ctx.const_nums.
+local IRNodeBinOpOvInt = {}
+ir_node.extended(IRNodeBinOpOvInt, IRNodeBinOpBase)
+
+function IRNodeBinOpOvInt:to_smt_lib(ctx)
+    local type = self:get_type()
+    local left_op = ir_node.retrieve_int_op(
+        self:get_left_op(), ctx, type
+    )
+    local right_op = ir_node.retrieve_int_op(
+        self:get_right_op(), ctx, type
+    )
+    local data = string.format(
+        '(%s %s %s)', self.op_str, left_op, right_op
+    )
+    local ssa_ref = self:get_ssa_reference()
+
+    local lc = utils.resolve_const(self:get_left_op(), ctx)
+    local rc = utils.resolve_const(self:get_right_op(), ctx)
+    if lc ~= nil and rc ~= nil then
+        ctx.const_nums[ssa_ref] = self.const_fn(lc, rc)
+    end
+
+    -- int operands are sign-extended into a 64-bit cell, so the
+    -- unwrapped result still has the spare bits an overflow would
+    -- have run into: range-checking it detects one.
+    return ('%s\n%s'):format(
+        ctx.te_stack:store(ssa_ref,
+            arith_utils.i32_overflow_check(data)),
+        ctx.op_stack:store(ssa_ref, type, data)
+    )
+end
+
 return {
     BinOpNum = IRNodeBinOpNum,
     BinOpInt = IRNodeBinOpInt,
+    BinOpOvInt = IRNodeBinOpOvInt,
     BinOpShiftInt = IRNodeBinOpShiftInt,
     BinOpShiftI64 = IRNodeBinOpShiftI64,
     BinOpI64 = IRNodeBinOpI64,

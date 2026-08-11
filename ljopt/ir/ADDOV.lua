@@ -1,36 +1,13 @@
+local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
-local arith_utils = require('ljopt.ir.arith_utils')
-local utils = require('ljopt.utils')
-
-local IRNodeADDOVBase = {}
-ir_node.extended(IRNodeADDOVBase, ir_node.ir_node_base)
 
 local impls = {}
 
-impls.IRNodeADDOVInt = {}
-ir_node.extended(impls.IRNodeADDOVInt, IRNodeADDOVBase)
-
-function impls.IRNodeADDOVInt:to_smt_lib(ctx)
-    local left_op = ir_node.retrieve_int_op(
-        self:get_left_op(), ctx, self:get_type()
-    )
-    local right_op = ir_node.retrieve_int_op(
-        self:get_right_op(), ctx, self:get_type()
-    )
-    local data = string.format('(bvadd %s %s)', left_op, right_op)
-    local ssa_ref = self:get_ssa_reference()
-
-    local lc = utils.resolve_const(self:get_left_op(), ctx)
-    local rc = utils.resolve_const(self:get_right_op(), ctx)
-    if lc ~= nil and rc ~= nil then
-        ctx.const_nums[ssa_ref] = lc + rc
-    end
-
-    return ('%s\n%s'):format(
-        ctx.te_stack:store(ssa_ref, arith_utils.i32_overflow_check(data)),
-        ctx.op_stack:store(ssa_ref, self:get_type(), data)
-    )
-end
+impls.IRNodeADDOVInt = {
+    op_str = 'bvadd',
+    const_fn = function(a, b) return a + b end,
+}
+ir_node.extended(impls.IRNodeADDOVInt, bin_op.BinOpOvInt)
 
 local function instance(node_str)
     return impls[node_str]
