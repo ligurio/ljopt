@@ -6,7 +6,12 @@
 --
 -- One mode per process: gcov merges counters across runs, so a
 -- crash in one mode keeps the coverage of the others.
-if os.getenv("COV_JITOFF") then jit.off() end
+--
+-- The `recorded` mode is the exception to everything above: it
+-- compiles real Lua with the real JIT instead of replaying a
+-- synthetic stream, because the recorder-driven half of the
+-- optimizer has no other caller. It needs the JIT left on.
+if os.getenv("COV_JITOFF") and arg[1] ~= "recorded" then jit.off() end
 
 local check = require("ljopt.irfuzz.check")
 local enum = require("ljopt.irfuzz.enum")
@@ -45,6 +50,41 @@ local function drive_iter(make_iter)
     return ok, skipped
 end
 
+-- Compile every chunk in recorded.lua at -O3 and count the traces
+-- it produced. Hot thresholds are lowered so a 200-iteration loop
+-- is enough, and each chunk runs in a pcall: a chunk that cannot
+-- run on this build (no FFI, say) must not take the run down.
+-- Each optimization is also switched off once on its own. A
+-- disabled pass is not dead weight for coverage: several rules
+-- have a "this optimization is off" arm that no -O3 run can
+-- reach, and turning one pass off changes what the others are
+-- handed.
+local RECORDED_OPTS = {
+    "", "-abc", "-fold", "-cse", "-dse", "-fwd", "-narrow",
+    "-loop", "-sink", "-fuse",
+}
+
+local function drive_recorded()
+    local recorded = require("ljopt.irfuzz.recorded")
+    local ok, failed = 0, 0
+    jit.on()
+    for _, flag in ipairs(RECORDED_OPTS) do
+        jit.opt.start(3, "hotloop=3", "hotexit=3", "tryside=3")
+        if flag ~= "" then jit.opt.start(flag) end
+        local nok, nerr = 0, 0
+        for _, chunk in ipairs(recorded.chunks) do
+            jit.flush()
+            local fn = assert(load(chunk.code, chunk.name))
+            if pcall(fn) then nok = nok + 1 else nerr = nerr + 1 end
+        end
+        ok, failed = ok + nok, failed + nerr
+        io.stderr:write(("  %-8s %3d ok %3d err\n"):format(
+            flag == "" and "-O3" or flag, nok, nerr))
+    end
+    jit.flush()
+    return ok, failed
+end
+
 local function chain(t, d)
     return function()
         return enum.iter({ type = IRT[t], depth = d, ninputs = 1 })
@@ -64,6 +104,17 @@ local MODES = {
     strings = function() return drive_iter(enum.iter_strings) end,
     xmem = function() return drive_iter(enum.iter_xmem) end,
     guard = function() return drive_iter(enum.iter_guard) end,
+    narrow = function() return drive_iter(enum.iter_narrow) end,
+    sink = function() return drive_iter(enum.iter_sink) end,
+    buffers = function() return drive_iter(enum.iter_buffers) end,
+    abc = function() return drive_iter(enum.iter_abc) end,
+    upval = function() return drive_iter(enum.iter_upval) end,
+    ahref = function() return drive_iter(enum.iter_ahref) end,
+    strops = function() return drive_iter(enum.iter_strops) end,
+    bufcalls = function() return drive_iter(enum.iter_bufcalls) end,
+    shapes = function() return drive_iter(enum.iter_shapes) end,
+    xref = function() return drive_iter(enum.iter_xref) end,
+    recorded = function() return drive_recorded() end,
 }
 for _, t in ipairs({ "int", "num", "i64" }) do
     for d = 1, 2 do
