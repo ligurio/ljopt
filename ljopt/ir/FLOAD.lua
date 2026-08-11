@@ -90,8 +90,12 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
             smt_constants.FIELD_TAB_PREFIX .. right_op
         )
         local ct = ctx.const_tabs[left_op:get_ssa()]
+        -- The table id is a term, not a slot number: memory is
+        -- addressed by it directly.
         local tab_left = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
-        data = ctx.mem_stack:load_index(tab_left, field_hash, op_type.INT)
+        data = ctx.mem_stack:load_index(
+            tab_left, field_hash, op_type.INT
+        )
         -- Propagate constant table metadata for const-folding.
         if ct ~= nil then
             if right_op == 'tab.asize' and ct.asize ~= nil then
@@ -245,13 +249,23 @@ end
 
 function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
                                              _left_op, right_op_val)
-    -- tab.* are temporary disabled here,
-    -- because we are not taking into account
-    -- table/array size modification during
-    -- insertions.
-    -- See: https://github.com/ligurio/ljopt/issues/51
     local right_op = right_op_val:get_lit()
     if right_op == 'str.len' then
+        return true
+    end
+    -- tab.asize is the bound an ABC is checked against, so
+    -- leaving it out drops every bounds check in the trace along
+    -- with it. It is read out of the table's own memory, which
+    -- the two passes share, so both sides see the same size and a
+    -- check the optimizer dropped shows up as a difference in the
+    -- exits taken.
+    --
+    -- tab.hmask stays out. It is the hash *layout* the recorder
+    -- guards for an HREFK, no bounds check needs it, and saying
+    -- what it becomes after an insertion would mean saying which
+    -- node a rehash puts a key in. See:
+    -- https://github.com/ligurio/ljopt/issues/51
+    if right_op == 'tab.asize' then
         return true
     end
     return false
