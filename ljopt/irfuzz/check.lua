@@ -73,8 +73,19 @@ end
 
 -- Classify an output ref on one side: nil if comparable, else
 -- the op name that makes it a gap (dummy/NYI or uninterpreted).
-local function gap_op(trace, nyi, ref)
-  if ref < 0 then return nil end
+local function gap_op(trace, nyi, pass, ref)
+  if ref < 0 then
+    -- A folded GC/pointer constant (HREF on a fresh table folds
+    -- to the global nil slot, for one) has no bitvector encoding,
+    -- so it cannot go into a snapshot slot. Report the gap
+    -- instead of letting const_smt_bv assert.
+    local k = pass.kval[-ref]
+    local t = type(k)
+    if t ~= "number" and t ~= "cdata" and t ~= "string" then
+      return "K" .. t
+    end
+    return nil
+  end
   if nyi[ref] then return trace.trace[ref].irop end
   local op = trace.trace[ref].irop
   if UNINTERPRETED[op] then return op end
@@ -205,8 +216,8 @@ local function build_from(insns, outputs, opts, seed)
   local nyi_o = ir_nodes.get_nyi_nodes(trace_o.trace)
   local cmp, gaps = {}, {}
   for _, g in ipairs(outputs) do
-    local bad = gap_op(trace_u, nyi_u, unopt_pass.map[g])
-      or gap_op(trace_o, nyi_o, opt_pass.map[g])
+    local bad = gap_op(trace_u, nyi_u, unopt_pass, unopt_pass.map[g])
+      or gap_op(trace_o, nyi_o, opt_pass, opt_pass.map[g])
     if bad then
       gaps[#gaps + 1] = { genref = g, op = bad }
     else

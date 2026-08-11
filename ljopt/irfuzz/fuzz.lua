@@ -105,8 +105,9 @@ local function parse_args(argv)
     elseif a == "--enum" then
       o.enum = true; i = i + 1
     elseif a == "--mixed" then
-      -- Mixed-type CONV enumeration (enum.iter_mixed): chains that
-      -- CONV between int/i64/num, exercising the CONV fold rules.
+      -- Mixed-type CONV enumeration (enum.iter_mixed): chains
+      -- that CONV between int/i64/num, exercising the CONV fold
+      -- rules.
       o.enum = true; o.mixed = true; i = i + 1
     elseif a == "--alias" then
       -- Aliasing enumeration (enum.iter_alias): store/load
@@ -128,6 +129,21 @@ local function parse_args(argv)
       -- compare op over every modeled type. Checked through the
       -- snapshot trace-exit bitvector, not a value slot.
       o.enum = true; o.guard = true; i = i + 1
+    elseif a == "--narrow" then
+      -- FP-narrowing enumeration (enum.iter_narrow): num ADD/SUB
+      -- trees converted back to an integer, the only shape that
+      -- reaches lj_opt_narrow.c from an IR replay.
+      o.enum = true; o.narrow = true; i = i + 1
+    elseif a == "--sink" then
+      -- Allocation-sinking enumeration (enum.iter_sink): stores
+      -- into a TNEW created inside the trace, the only shape that
+      -- makes lj_opt_sink.c do anything.
+      o.enum = true; o.sink = true; i = i + 1
+    elseif a == "--buffers" then
+      -- String-buffer enumeration (enum.iter_buffers): BUFHDR /
+      -- BUFPUT / BUFSTR chains, the shape Lua's `..` records as
+      -- and the only way into lj_opt_fold.c's buffer rules.
+      o.enum = true; o.buffers = true; i = i + 1
     elseif a == "--type" then
       o.type = argv[i + 1]
       assert(o.type == "num" or o.type == "int" or o.type == "i64",
@@ -224,7 +240,8 @@ local function enum_opts(o)
 end
 
 -- Reproduce one enumerated trace by its 1-based index (stable:
--- enumeration order is deterministic for fixed type/depth/ninputs).
+-- enumeration order is deterministic for fixed
+-- type/depth/ninputs).
 local function show_enum(idx, o)
   local i = 0
   for tr in enum.iter(enum_opts(o)) do
@@ -490,6 +507,69 @@ local function show_guard(idx, o)
     :format(idx, i))
 end
 
+local function run_narrow(o)
+  local total = enum.count_narrow()
+  io.write(("narrow sweep: %d traces in space"):format(total))
+  return sweep(o, function() return enum.iter_narrow() end, total,
+    "--narrow --show")
+end
+
+local function show_narrow(idx, o)
+  local i = 0
+  for tr in enum.iter_narrow() do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("narrow #%d"):format(idx))
+      return
+    end
+  end
+  error(("narrow index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
+local function run_sink(o)
+  local total = enum.count_sink()
+  io.write(("sink sweep: %d traces in space"):format(total))
+  return sweep(o, function() return enum.iter_sink() end, total,
+    "--sink --show")
+end
+
+local function show_sink(idx, o)
+  local i = 0
+  for tr in enum.iter_sink() do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("sink #%d"):format(idx))
+      return
+    end
+  end
+  error(("sink index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
+local function run_buffers(o)
+  local total = enum.count_buffers()
+  io.write(("buffer sweep: %d traces in space"):format(total))
+  return sweep(o, function() return enum.iter_buffers() end, total,
+    "--buffers --show")
+end
+
+local function show_buffers(idx, o)
+  local i = 0
+  for tr in enum.iter_buffers() do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("buffers #%d"):format(idx))
+      return
+    end
+  end
+  error(("buffers index %d out of range (space has %d traces)")
+    :format(idx, i))
+end
+
 -- Reproduce one mixed-enumeration trace by its 1-based index.
 local function show_mixed(idx, o)
   local i = 0
@@ -511,6 +591,9 @@ if o.show ~= nil then
   elseif o.xmem then show_xmem(o.show, o)
   elseif o.alias then show_alias(o.show, o)
   elseif o.guard then show_guard(o.show, o)
+  elseif o.narrow then show_narrow(o.show, o)
+  elseif o.sink then show_sink(o.show, o)
+  elseif o.buffers then show_buffers(o.show, o)
   elseif o.mixed then show_mixed(o.show, o)
   elseif o.enum then show_enum(o.show, o)
   else show(o.show, o) end
@@ -520,6 +603,9 @@ local n_sat = o.strings and run_strings(o)
   or (o.xmem and run_xmem(o))
   or (o.alias and run_alias(o))
   or (o.guard and run_guard(o))
+  or (o.narrow and run_narrow(o))
+  or (o.sink and run_sink(o))
+  or (o.buffers and run_buffers(o))
   or (o.mixed and run_mixed(o))
   or (o.enum and run_enum(o)) or run(o)
 os.exit(n_sat == 0 and 0 or 1)
