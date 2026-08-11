@@ -184,6 +184,60 @@ order still goes to z3.
   ints) because LuaJIT's array and hash parts are separate address
   spaces and ljopt keys both by value.
 
+## Optimizer coverage
+
+The `covrun.lua` driver runs one mode against a gcov-instrumented
+LuaJIT and skips the solver, so the counters show which optimizer
+paths the generator reaches. Build it with `LUAJIT_ENABLE_COVERAGE=ON`
+and report with the gcov matching the compiler (`gcov-11` for gcc 11):
+
+```sh
+COV_JITOFF=1 LUA_PATH="./?/init.lua;;" \
+  build/luajit_cov/src/luajit ljopt/irfuzz/covrun.lua <mode> [limit]
+```
+
+`COV_JITOFF=1` is required for every mode but `recorded`: without it
+the host JIT compiles ljopt's own Lua and pollutes the counters.
+`COV_LOOP=1` replays each trace as a loop, which is what reaches
+`lj_opt_loop.c` and the PHI paths.
+
+The full sweep (every mode, with and without `COV_LOOP`) currently
+covers 2450 of 2513 lines, 97.5%:
+
+| file | lines | hit | |
+|---|---|---|---|
+| `lj_opt_fold.c`   | 1241 | 1207 | 97.3% |
+| `lj_opt_mem.c`    |  572 |  558 | 97.6% |
+| `lj_opt_loop.c`   |  245 |  238 | 97.1% |
+| `lj_opt_dce.c`    |   35 |   35 | 100%  |
+| `lj_opt_sink.c`   |  148 |  145 | 98.0% |
+| `lj_opt_narrow.c` |  272 |  267 | 98.2% |
+
+Sixteen of the 63 lines left are unreachable by construction:
+
+- `lj_opt_fold.c` 286, 358, 389, 489, 2017 -- `default:` arms behind
+  an `lj_assert*`, i.e. "cannot happen".
+- `lj_opt_fold.c` 386 -- the `IR_BSAR` case of `kfold_int64arith`. No
+  fold rule passes BSAR to it: `simplify_shiftk_andk` is keyed on
+  BSHL, BSHR, BROL and BROR only.
+- `lj_opt_fold.c` 2219, 2229, 2246, 2262, 2271, 2282 -- the "folding
+  disabled" arm of the constant-object load rules. With FOLD off,
+  `lj_opt_fold` emits loads raw (`lj_opt_fold.c:2452`) and never
+  reaches the fold table, so the arm cannot run at any -O level.
+- `lj_opt_mem.c` 240 -- the fall-through after `tvispri` / `tvisnum`
+  / `tvisint` / `tvisgcv`, which is every TValue type.
+- `lj_opt_mem.c` 578, 579, 581 -- the redundant-FSTORE elimination.
+  The recorder emits exactly two FSTOREs: `tab.meta`, always preceded
+  by the `FLOAD tab.meta` of the `__metatable` check that the scan
+  treats as a conflict, and `tab.nomm`, always storing the same
+  constant 0, so the equal-value store is dropped before the
+  elimination is considered.
+
+The rest are reachable and simply not generated yet -- the widest
+gaps are `abc_invar` (a P32 bounds check re-emitted inside the loop),
+`fwd_sload` on a frame slot, the `aa_cnew` escape arms, and the
+recorder's `lj_opt_narrow_toint` type error.
+
 ### Known limitation
 
 `--tables` with repeated or dead stores to an *escaping* (SLOAD'd)
