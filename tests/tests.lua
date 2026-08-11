@@ -310,6 +310,30 @@ foo()
             {type = "int", name = "FLOAD"}
         },
     }, {
+        -- An array read is an ABC against the table's own size,
+        -- so the size load has to survive as well -- both are
+        -- dropped as NYI if either one is. Integer keys also
+        -- grow the array part, so the sizes here are the
+        -- rehashed ones.
+        code = [[
+local function foo(x)
+    x[1] = 1
+    x[2] = 2
+    x[3] = 3
+    return x[1] + x[3]
+end
+
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "int", name = "FLOAD"},
+            {type = "int", name = "ABC"},
+            {type = "num", name = "ALOAD"},
+        },
+    }, {
         code = [[
 local function foo(c)
   return 1 == c

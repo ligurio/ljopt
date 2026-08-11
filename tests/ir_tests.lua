@@ -43,6 +43,11 @@ local function f2bv(x)
   return string.format("#x%08X%08X", hi, lo)
 end
 
+-- Field ids of the two constants FLOAD reads out of the VM. They
+-- are laid out differently with and without GC64.
+local FL_SIGNMASK = ffi.abi('gc64') and '#306' or '#226'
+local FL_NAN = ffi.abi('gc64') and '#302' or '#222'
+
 local function num(v) return {type = "number", value = v} end
 local function imm(v) return {type = "imm", value = v} end
 local function ssa(v) return {type = "ssa", value = v} end
@@ -159,9 +164,12 @@ test:test("IR arithmetic tests", function(test)
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", num(23.), num(4.)),
                         result = 5, error = 1.},
-        {node = create_node("num", "FLOAD", 'nil', '#226'),
+        -- The two VM constants an FLOAD with no object loads sit
+        -- at different field ids in a GC64 build, which is what
+        -- FLOAD.lua switches on.
+        {node = create_node("num", "FLOAD", 'nil', FL_SIGNMASK),
                         result = -0.0, error = 0.0},
-        {node = create_node("num", "FLOAD", 'nil', '#222'),
+        {node = create_node("num", "FLOAD", 'nil', FL_NAN),
                         result = 0/0, error = 0},
         {node = create_node("int", "FLOAD", str("test_str"), "str.len"),
                         result = #"test_str", error = 1},
@@ -355,6 +363,7 @@ test:test("IR guards tests", function(test)
                         result = "true", error = "false"},
         {node = create_node("int", "ULT", num(3), num(3)),
                         result = "false", error = "true"},
+
     }
     test:plan(3 * #nodes_to_test)
     -- Test each node in a loop.

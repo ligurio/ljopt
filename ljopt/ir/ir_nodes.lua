@@ -46,7 +46,7 @@ local opcodes_table = {
     ['UGT'] = require('ljopt.ir.UGT'),
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
-    ['ABC'] = false,
+    ['ABC'] = require('ljopt.ir.ABC'),
     ['RETF'] = false,
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),

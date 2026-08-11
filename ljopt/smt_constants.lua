@@ -70,6 +70,18 @@ local LJOPT_SMTLIB = ([[
 
 (declare-fun math_atan2 ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 
+; Uninterpreted functions for a table rehash. Inserting a key can
+; resize both parts of a table, and by how much is lj_tab.c's
+; business, not ours -- what the equivalence check needs is only
+; that the same insertion into the same table gives the same new
+; sizes on both sides, which is exactly what an uninterpreted
+; function says. The arguments are the sizes before the insertion
+; and the key that went in.
+(declare-fun tab_rehash_asize
+  ((_ BitVec 64) (_ BitVec 64) MemCell) (_ BitVec 64))
+(declare-fun tab_rehash_hmask
+  ((_ BitVec 64) (_ BitVec 64) MemCell) (_ BitVec 64))
+
 ; Uninterpreted functions for FFI external C calls (CALLXS).
 ; Indexed by arity. Both unopt and opt traces apply the same
 ; function to congruent arguments, so equivalent FFI calls
