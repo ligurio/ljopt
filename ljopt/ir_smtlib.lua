@@ -211,6 +211,24 @@ local function translate(trace_record, ctx_src,
     end
     jit.on(true, true)
 
+    -- Pin the exit of every guarded node that wrote none. The te
+    -- array is uninterpreted, so a guard ljopt does not model
+    -- (an NYI node, or one whose impl only produces a value)
+    -- leaves its slot a free boolean -- and the two sides pick
+    -- opposite values, which reads as a removed guard. Assuming
+    -- such a guard holds is the same convention CONV and TNEW
+    -- already use for exits ljopt cannot express; it can only
+    -- weaken the check, never invent a divergence.
+    for i = 1, table.getn(nodes) do
+        local ref = nodes[i]:get_ssa_reference()
+        if nodes[i]:get_flags().irt_guard
+            and not ctx_src.te_stack.stored[ref] then
+            smtlib_buf = ('%s%s\n'):format(
+                smtlib_buf, ctx_src.te_stack:store(ref, 'true')
+            )
+        end
+    end
+
     -- Pin the guards the *recording* covered: the trace ran them,
     -- so none of them can have failed. Without this the solver is
     -- free to exit early and still compare memory written after
@@ -219,11 +237,8 @@ local function translate(trace_record, ctx_src,
     -- The iterations this unroller synthesized are not covered.
     -- Pinning those asserts something no recording established,
     -- and it is worse than imprecise: an iteration whose guard is
-    -- statically false -- a bounds check against a table that was
-    -- replaced mid-loop, say -- contradicts the pin, and the
-    -- whole query turns unsatisfiable. Every question about the
-    -- trace pair then answers "unsat", which reads as "the two
-    -- traces agree".
+    -- statically false contradicts the pin, and the whole query
+    -- turns unsatisfiable -- which reads as "the two traces agree".
     if last_iter_ref ~= nil and not os.getenv('LJOPT_NO_PIN') then
         for i = 1, table.getn(nodes) do
             local ref = nodes[i]:get_ssa_reference()
