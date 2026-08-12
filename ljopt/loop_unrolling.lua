@@ -312,8 +312,12 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx)
         end
     end
 
-    -- Prologue + body copies 1..n-1 are known to have run.
-    return result, new_snapshots, prologue_len + (n - 1) * body_len + 1
+    -- Only the prologue and the one body execution the trace
+    -- recorded are known to have run. The copies after it are
+    -- this unroller's own work: the recording says nothing about
+    -- them, so their guards must stay free (see the pin in
+    -- ir_smtlib).
+    return result, new_snapshots, prologue_len + body_len + 1
 end
 
 -- Unroll a loop trace that has NO LOOP/PHI markers
@@ -415,8 +419,10 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
         end
     end
 
-    -- Copies 1..n are known to have run; copy n+1 is the last.
-    return result, new_snapshots, n * body_len + 1
+    -- Only the first copy is the recorded trace; the rest are
+    -- synthesized from it, so nothing is known about their
+    -- guards (see the pin in ir_smtlib).
+    return result, new_snapshots, body_len + 1
 end
 
 -- Main entry point. Dispatches to the appropriate
