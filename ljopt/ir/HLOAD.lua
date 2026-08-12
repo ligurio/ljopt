@@ -59,9 +59,13 @@ function impls.IRNodeHLOADTab:to_smt_lib(ctx)
     local _, _, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
-    local tab_id = ir_node.get_table_uid(raw_cell, (ctx.mem_stack:alloc_slot()))
-    return ('(assert ((_ is tab-val) %s))\n%s\n%s'):format(
-        raw_cell,
+    -- A cell that holds no table is a state the trace can be
+    -- in, so decode it with get_table_uid()'s fallback rather
+    -- than asserting otherwise: one unsatisfiable assert makes
+    -- every question about the trace pair answer "unsat", which
+    -- reads as "equivalent".
+    local tab_id = ir_node.get_table_uid(raw_cell)
+    return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.TAB, tab_id)
     )

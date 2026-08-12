@@ -504,8 +504,15 @@ function MemoryStack.allocate(self, inherited_from)
     end
     local slot_num
     current_slot, slot_num = self:alloc_slot()
-    local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
-        :format(self._name, current_slot)
+    -- The table is fresh *now*, not at version 0: a TNEW that
+    -- follows a store must be empty in the version the trace has
+    -- reached. Pinning version 0 instead both leaves the store
+    -- that follows reading whatever the earlier chain held at
+    -- this key, and constrains the shared base memory the other
+    -- pass is tied to -- two allocations claiming the same key at
+    -- version 0 make the whole query vacuously unsat.
+    local result = ('\n(assert (= (select (select %s %s) %s) zero_pointer))')
+        :format(self._name, self:get_version(), current_slot)
     return current_slot, result, slot_num
 end
 

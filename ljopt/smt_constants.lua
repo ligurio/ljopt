@@ -70,6 +70,14 @@ local LJOPT_SMTLIB = ([[
 
 (declare-fun math_atan2 ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 
+; The table id of a cell that does not hold a table -- an env or
+; metatable field that is still nil, an array slot that never got
+; one. It has to be a function of the cell rather than a fresh
+; slot per load: the two passes allocate slots independently, so a
+; fresh one would have them read different tables for the same
+; cell and every such load would look like a divergence.
+(declare-fun tab_uid (MemCell) Int)
+
 ; Uninterpreted functions for a table rehash. Inserting a key can
 ; resize both parts of a table, and by how much is lj_tab.c's
 ; business, not ours -- what the equivalence check needs is only

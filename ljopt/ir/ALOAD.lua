@@ -27,9 +27,13 @@ function impls.IRNodeALOADTab:to_smt_lib(ctx)
     local _, _, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
-    local tab_id = ('(get-tab %s)'):format(raw_cell)
-    return ('(assert ((_ is tab-val) %s))\n%s\n%s'):format(
-        raw_cell,
+    -- An array slot that holds no table is a state the trace
+    -- can be in -- a fresh table's slots are all nil -- so decode
+    -- it with get_table_uid()'s fallback instead of asserting it
+    -- holds a table. One unsatisfiable assert makes every
+    -- question about the trace pair answer "unsat".
+    local tab_id = ir_node.get_table_uid(raw_cell)
+    return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.TAB, tab_id)
     )

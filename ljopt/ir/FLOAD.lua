@@ -212,13 +212,17 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local raw_cell = ('(select %s %s)'):format(
         ctx.mem_stack:load(parent_ptr), field_hash
     )
-    local data = ctx.mem_stack:load_index(
-        parent_ptr, field_hash, op_type.TAB
-    )
-    return ('(assert ((_ is tab-val) %s))\n%s'):format(
-        raw_cell,
-        ctx.op_stack:store(ssa_ref, op_type.TAB, data)
-    )
+    -- A table has no metatable until something sets one, and a
+    -- table allocated in this trace starts out with every field
+    -- nil -- which is exactly the state the `EQ tab.meta NULL`
+    -- guard the recorder emits next is there to check. Decode the
+    -- field the same way an HLOAD does, falling back to a fresh
+    -- slot, rather than asserting the cell holds a table: that
+    -- assert cannot hold for a fresh table, and one unsatisfiable
+    -- assert makes every question about the trace pair answer
+    -- "unsat", which reads as "equivalent".
+    local data = ir_node.get_table_uid(raw_cell)
+    return ctx.op_stack:store(ssa_ref, op_type.TAB, data)
 end
 
 impls.IRNodeFLOADP32 = {}
