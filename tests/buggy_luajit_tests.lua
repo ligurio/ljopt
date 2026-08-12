@@ -483,7 +483,13 @@ test:test("Fix IR_ABC hoisting (LuaJIT#1194)", function(test)
     local filename = "lj_1194.lua"
     test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
         "reproduce in runtime")
-    test:skip("reproduce with SMT")
+    -- The optimized trace checks the bound once, hoisted out of
+    -- the loop, and the table it covers is replaced on every
+    -- iteration -- so the unoptimized trace, which checks per
+    -- iteration, exits where the optimized one carries on.
+    test:ok(reproduce_bug_using_smt(
+        read_reproducer_file("lj_1194_smt.lua")),
+        "reproduce with SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/794
@@ -494,7 +500,26 @@ test:test("Fix ABC FOLD rule with constants (LuaJIT#794)", function(test)
     local filename = "lj_794.lua"
     test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
         "reproduce in runtime")
-    test:skip("reproduce using SMT")
+    -- `abc_k` merges two constant bounds checks into one, and
+    -- has to keep the unsigned-larger constant.  The buggy fold
+    -- keeps 1 rather than -1000000, so the hoisted check passes
+    -- and the out-of-bounds read runs unguarded, while the
+    -- unoptimized trace still checks -1000000 and exits.
+    --
+    -- Two unrolled bodies are enough to reach the second
+    -- iteration, where `s` has already become -1000000; more
+    -- only make the formula harder to solve.
+    --
+    -- Proving the fixed build equivalent takes z3 about 140s,
+    -- so this arm needs LJOPT_Z3_TIMEOUT above the 120s
+    -- default.  Finding the counterexample on the buggy build
+    -- takes only ~25s.
+    local unroll_n = ljopt_config.get_loop_unroll_count()
+    ljopt_config.set_loop_unroll_count(math.min(unroll_n, 2))
+    test:ok(reproduce_bug_using_smt(
+        read_reproducer_file("lj_794_smt.lua")),
+        "reproduce with SMT")
+    ljopt_config.set_loop_unroll_count(unroll_n)
 end)
 
 -- https://www.freelists.org/post/luajit/Segmentation-fault-with-JITed-code,1
