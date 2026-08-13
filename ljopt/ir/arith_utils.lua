@@ -199,14 +199,23 @@ local function fp_to_bits(fp, width)
         ('(assert (= %s (%s (%s %s))))'):format(fp, kind.sort, kind.fn, fp)
 end
 
--- LuaJIT treats -0.0 and +0.0 as the same table key.
--- Accepts a MemCell and returns a MemCell: for int-val keys,
--- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
+-- Lua has a single number type, so `t[1]` and `t[1.0]` name the
+-- same slot, and -0.0 keys the same slot as +0.0.  A key reaches
+-- the IR either as a float or, once the recorder narrowed the
+-- index, as an integer -- and one trace may narrow where the
+-- other folded a constant.  Canonicalize every numeric key to
+-- its float form so both spell the same MemCell.
+--
+-- Accepts a MemCell and returns a MemCell; str-val and tab-val
+-- keys pass through unchanged.
 local function normalize_table_key(memcell)
-    return ('(ite ((_ is fp-val) %s)' ..
+    return ('(ite ((_ is int-val) %s)' ..
+            ' (fp-val ((_ to_fp 11 53) RNE (get-bv %s)))' ..
+            ' (ite ((_ is fp-val) %s)' ..
             ' (ite (fp.isZero (get-fp %s))' ..
-            ' (fp-val ((_ to_fp 11 53) #x0000000000000000)) %s) %s)'):format(
-               memcell, memcell, memcell, memcell
+            ' (fp-val ((_ to_fp 11 53) #x0000000000000000))' ..
+            ' %s) %s))'):format(
+               memcell, memcell, memcell, memcell, memcell, memcell
             )
 end
 
