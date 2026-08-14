@@ -79,6 +79,7 @@ function impls.IRNodeHSTORETab:to_smt_lib(ctx)
 
     local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
     local src_tab = ctx.op_stack:load(src_slot, op_type.TAB)
+    ctx.mem_stack:mark_escaped(src_slot)
     return ctx.mem_stack:store_index(tab_left, idx_left, src_tab, op_type.TAB)
 end
 
