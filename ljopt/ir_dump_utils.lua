@@ -267,6 +267,8 @@ local function ljopt_formatsmt(tr, idx, sn)
   local tn = type(k)
   local s
   local const_type = nil
+  -- Only set for a table constant: the parts a TDUP copies.
+  local tab_asize, tab_hmask
   if tn == "number" then
     const_type = "number"
     if t < 12 then
@@ -288,10 +290,9 @@ local function ljopt_formatsmt(tr, idx, sn)
     const_type = "function"
     s = fmtfunc(k)
   elseif tn == "table" then
-    -- TODO: const value should be printed and parsed
-    -- later as well. For now only asize and hmask are supported.
     const_type = "table"
     local hmask, asize = tablesize(k)
+    tab_asize, tab_hmask = asize, hmask
     s = format("{%p:%d:%d}", k, asize, hmask)
   elseif tn == "userdata" then
     if t == 12 then
@@ -323,7 +324,10 @@ local function ljopt_formatsmt(tr, idx, sn)
   -- Return whether this constant supported in Snapshot.
   -- Currently only num works.
   -- https://github.com/ligurio/ljopt/issues/36
-  return s, {type = const_type, value = k}
+  return s, {
+    type = const_type, value = k,
+    asize = tab_asize, hmask = tab_hmask,
+  }
 end
 
 -- Returns array<(snap_num, type, slot, Option(slot))>>

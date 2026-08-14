@@ -365,6 +365,28 @@ end
                 -- enabled.
                 left_op = op_type.new("ssa", 3)},
         },
+    }, {
+        -- A constructor with constant contents records as TDUP,
+        -- and the read that follows is an ABC against the size
+        -- the template was built with. -O3 drops the copy and
+        -- folds the read, so unsat says the modelled copy holds
+        -- what the optimizer folded to.
+        code = [[
+local function foo(i)
+    local t = {10, 20, 30}
+    return t[i] + t[1]
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        ins = {
+            {type = "tab", name = "TDUP"},
+            {type = "int", name = "FLOAD"},
+            {type = "int", name = "ABC"},
+            {type = "num", name = "ALOAD"},
+        },
 --[[
     }, {
 -- Fix BV <-> FP casts, now it's too slow:
