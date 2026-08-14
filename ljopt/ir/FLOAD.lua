@@ -264,10 +264,10 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
     -- check the optimizer dropped shows up as a difference in the
     -- exits taken.
     --
-    -- tab.hmask stays out. It is the hash *layout* the recorder
-    -- guards for an HREFK, no bounds check needs it, and saying
-    -- what it becomes after an insertion would mean saying which
-    -- node a rehash puts a key in. See:
+    -- tab.hmask stays out. The two recordings can catch a table
+    -- in different states -- one creating a key, one finding it
+    -- there -- so the layout each guards is neither a shared
+    -- precondition nor a comparable exit. See:
     -- https://github.com/ligurio/ljopt/issues/51
     if right_op == 'tab.asize' then
         return true
