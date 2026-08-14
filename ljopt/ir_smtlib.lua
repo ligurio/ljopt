@@ -278,19 +278,36 @@ local function trace2smt(trace, ctx, suffix, traceno, shared_stacks)
     return tr_smtlib_unopt, snap_unopt, failed
 end
 
+-- Pairs up the tables the two traces allocated -- the k-th to
+-- escape on one side is the k-th on the other -- and returns the
+-- pointers the memory comparison may therefore look at.
+local function local_tabs2smt(stack1, stack2)
+    local smt = stack1:local_tabs_constraints() ..
+        stack2:local_tabs_constraints()
+    local escaped1, escaped2 = stack1.escaped_tabs, stack2.escaped_tabs
+    local paired = math.min(#escaped1, #escaped2)
+    local ptrs = {}
+    for i = 1, paired do
+        smt = smt .. ('(assert (= %s %s))\n'):format(escaped1[i], escaped2[i])
+        table.insert(ptrs, escaped1[i])
+    end
+    return smt, ptrs
+end
+
 local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
+    local locals_smt, local_ptrs = local_tabs2smt(stack1, stack2)
     -- Sanity mode: drop the equivalence-check disjunct so the
     -- formula contains only the constraints accumulated during
     -- both traces. That formula must be SAT.
     if ljopt_config.is_verify_ljopt_correctness() then
-        return ''
+        return locals_smt
     end
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Check whether both traces exited by a guard.
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
         snapshots1.te, snapshots2.te
     )
-    smt_result = '(declare-const witness_ptr Int)\n' .. smt_result
+    smt_result = locals_smt .. '(declare-const witness_ptr Int)\n' .. smt_result
     for _snap_id, values in pairs(merged_snaps) do
         local value1, value2 = unpack(values)
         if (value1 ~= nil) then
@@ -304,10 +321,22 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     end
     smt_result = smt_result .. '    ; Memory part\n'
 
-    smt_result = smt_result .. ([[    (and (>= witness_ptr 0)
+    -- A VM slot (>= 0) is the same table on both sides by
+    -- construction; a table the trace allocated is only
+    -- comparable once it has been paired up above.
+    local witness_dom = '(>= witness_ptr 0)'
+    if #local_ptrs > 0 then
+        local alts = {witness_dom}
+        for _, ptr in ipairs(local_ptrs) do
+            table.insert(alts, ('(= witness_ptr %s)'):format(ptr))
+        end
+        witness_dom = ('(or %s)'):format(table.concat(alts, ' '))
+    end
+    smt_result = smt_result .. ([[    (and %s
          (not (= (select (select %s %s) witness_ptr)
                  (select (select %s %s) witness_ptr))))
 ]]):format(
+        witness_dom,
         stack1._name, stack1:get_version(),
         stack2._name, stack2:get_version()
     )

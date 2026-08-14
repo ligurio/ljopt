@@ -1907,6 +1907,31 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        -- `dead` is allocated at -O0 and gone at -O3, so the two
+        -- traces allocate a different number of tables; the one
+        -- that escapes into `dst` has to be recognized as the
+        -- same table anyway. Reads sat if local tables are
+        -- matched by allocation order instead of by escape.
+        name = "local table matched across a dropped allocation",
+        code = [[
+local function fill(dst)
+    for _ = 1, 6 do
+        local dead = {}
+        dst.x = {}
+    end
+end
+
+local d = {}
+fill(d)
+fill(d)
+fill(d)
+]],
+        unroll_n = 2,
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "HSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 
