@@ -117,7 +117,7 @@ local opcodes_table = {
     ['SNEW'] = false,
     ['XSNEW'] = false,
     ['TNEW'] = require('ljopt.ir.TNEW'),
-    ['TDUP'] = false,
+    ['TDUP'] = require('ljopt.ir.TDUP'),
     ['CNEW'] = require('ljopt.ir.CNEW'),
     ['CNEWI'] = require('ljopt.ir.CNEWI'),
     -- Strings.
