@@ -125,9 +125,9 @@ local opcodes_table = {
     ['BUFPUT'] = require('ljopt.ir.BUFPUT'),
     ['BUFSTR'] = require('ljopt.ir.BUFSTR'),
     -- Barriers.
-    ['TBAR'] = false,
-    ['OBAR'] = false,
-    ['XBAR'] = false,
+    ['TBAR'] = require('ljopt.ir.TBAR'),
+    ['OBAR'] = require('ljopt.ir.TBAR'),
+    ['XBAR'] = require('ljopt.ir.TBAR'),
     -- Type Conversions.
     ['CONV'] = ir_node_CONV,
     ['TOBIT'] = require('ljopt.ir.TOBIT'),
