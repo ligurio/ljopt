@@ -54,6 +54,32 @@ ir_node.extended(impls.IRNodeEQI64, bin_op.BinOpGuardI64)
 impls.IRNodeEQU32 = { op_str = '=' }
 ir_node.extended(impls.IRNodeEQU32, bin_op.BinOpGuardU32)
 
+-- `EQ tab.meta NULL`, the guard the recorder puts in front of a
+-- table access to prove no metatable can intercept it.
+--
+-- A field holding no table decodes to `(tab_uid <cell>)`, and
+-- tab_uid is a function of the cell, so every nil field already
+-- shares one id -- that id *is* NULL, and both traces reach it by
+-- congruence. Nothing has to be declared for it.
+impls.IRNodeEQTab = {}
+ir_node.extended(impls.IRNodeEQTab, ir_node.ir_node_base)
+
+local NULL_TAB = '(tab_uid nil-val)'
+
+function impls.IRNodeEQTab:to_smt_lib(ctx)
+    local left = ctx.op_stack:load(self:get_left_op():get_ssa(), 'tab')
+    return ctx.te_stack:store(
+        self:get_ssa_reference(),
+        ('(= %s %s)'):format(left, NULL_TAB)
+    )
+end
+
+function impls.IRNodeEQTab.is_implemented(_flags, _type, _opcode,
+                                          left_op, right_op_val)
+    return left_op ~= nil and left_op:is_ssa()
+        and op_type.to_string(right_op_val) == 'NULL'
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
