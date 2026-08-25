@@ -2011,6 +2011,28 @@ foo({})
         -- that escapes into `dst` has to be recognized as the
         -- same table anyway. Reads sat if local tables are
         -- matched by allocation order instead of by escape.
+        -- An upvalue still open -- the chunk that owns it is
+        -- running -- is named by UREFO rather than UREFC. It was
+        -- NYI, so the body of any closure writing a file-scope
+        -- local went missing.
+        name = "open upvalue read and written",
+        code = [[
+local up = 0
+local function foo(i)
+    up = i
+    return up + 1
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        ins = {
+            {type = "p32", name = "UREFO"},
+            {type = "num", name = "USTORE"},
+            {type = "num", name = "ULOAD"},
+        },
+    }, {
         -- A closure counting in an upvalue: UREFC names the
         -- upvalue, ULOAD/USTORE read and write it. All four were
         -- NYI, so the whole closure body vanished from the
