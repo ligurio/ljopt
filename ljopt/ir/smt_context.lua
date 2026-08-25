@@ -664,6 +664,9 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- ssa_ref -> length of a string whose contents are unknown
     -- but whose size is not (see ir/SNEW.lua).
     self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -689,6 +692,9 @@ function SMTContext:restart()
     -- ssa_ref -> length of a string whose contents are unknown
     -- but whose size is not (see ir/SNEW.lua).
     self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
