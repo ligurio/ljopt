@@ -110,6 +110,24 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.INT, data)
 end
 
+-- FLOADNum reads two VM constants and a boxed cdata double, and
+-- asserts on anything else. Without a gate that assert kills the
+-- run; an unmodelled field should degrade to NYI like every
+-- other one.
+function impls.IRNodeFLOADNum.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    local right_op = op_type.to_string(right_op_val)
+    if right_op == 'cdata.int64' then
+        return true
+    end
+    if left_op == nil or op_type.to_string(left_op) ~= 'nil' then
+        return false
+    end
+    local consts = ffi.abi('gc64') and {['#306'] = true, ['#302'] = true}
+        or {['#226'] = true, ['#222'] = true}
+    return consts[right_op] == true
+end
+
 impls.IRNodeFLOADI64 = {}
 ir_node.extended(impls.IRNodeFLOADI64, ir_node.ir_node_base)
 
@@ -139,6 +157,15 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
+
+-- Same reasoning as IRNodeFLOADNum: only `cdata.int64` off a
+-- constant or an SSA cdata box is modelled, and the rest has to
+-- become NYI rather than reach utils.unreachable().
+function impls.IRNodeFLOADI64.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    return op_type.to_string(right_op_val) == 'cdata.int64'
+        and left_op ~= nil and (left_op:is_i64() or left_op:is_ssa())
+end
 
 impls.IRNodeFLOADU32 = {}
 ir_node.extended(impls.IRNodeFLOADU32, ir_node.ir_node_base)
