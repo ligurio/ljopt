@@ -1158,4 +1158,28 @@ end
 return s
 ]])
 
+-- The loop pass coerces a carried slot whose type differs from
+-- the value written back, which needs a local that really flips
+-- int/num every iteration -- a flip guarded by a late `i == k`
+-- happens long after the trace is recorded and does not count.
+-- The two flipping locals start in opposite phases, so whichever
+-- iteration is recorded has one going int->num and the other the
+-- other way. Paired with a narrowed float index.
+add("loop_typeflip", [[
+local t = {}
+for i = 1, 64 do t[i] = i end
+local a = 0
+local f = 1.0
+local u = 0
+local w = 1.5
+for i = 1, 300 do
+  a = a + t[f]
+  f = f + 1.0
+  if f > 60.0 then f = 1.0 end
+  if u == 0 then u = 1.5 else u = 0 end
+  if w == 0 then w = 2.5 else w = 0 end
+end
+return a + u + w
+]])
+
 return { chunks = chunks }
