@@ -2872,7 +2872,10 @@ local XREF_WIDTHS = {
   { name = "num", t = IRT_NUM, shift = 3, size = 8 },
 }
 
-local XREF_BASES = { "sload", "cnew", "cnew2" }
+-- Exactly one side from an allocation is the only way into
+-- aa_cnew's last arm, and both orders are here because that arm
+-- asks aa_escape about the other ref, which is not symmetric.
+local XREF_BASES = { "sload", "cnew", "cnew2", "mixed", "mixed_rev" }
 
 local XREF_SHAPES = {
   "load_next",   -- a[i] then a[i+1]: the reassociation shape
@@ -2883,6 +2886,7 @@ local XREF_SHAPES = {
   "dse",         -- two stores to one address, then a load
   "fref",        -- FREF/FSTORE/FLOAD on the cdata payload field
   "fref_two",    -- two field stores, then a load of the first
+  "escape",      -- the allocation is stored before the load
 }
 
 local FIELD_CDATA_PTR = 15
@@ -2921,15 +2925,26 @@ local function iter_xref(opts)
             return add({ op = gen.op_num("CNEW"), t = CDT + 0x80,
               ak = K.KINT, av = 21, bk = K.REF, bv = sz })
           end
+          local function sload_base()
+            return add({ op = SL, t = CDT, ak = K.LIT, av = 5,
+              bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+          end
           local base, base2
           if basekind == "sload" then
-            base = add({ op = SL, t = CDT, ak = K.LIT, av = 5,
-              bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+            base = sload_base()
             base2 = base
+          elseif basekind == "mixed" then
+            base, base2 = cnew(), sload_base()
+          elseif basekind == "mixed_rev" then
+            base, base2 = sload_base(), cnew()
           else
             base = cnew()
             base2 = basekind == "cnew2" and cnew() or base
           end
+          -- Which of the two is the allocation, for the shape
+          -- that has to make it escape.
+          local alloc = basekind ~= "sload"
+            and (basekind == "mixed_rev" and base2 or base) or nil
           -- base + (idx << shift) + HDR + extra
           local function addr(b, idx_ref, extra)
             local p = idx_ref
@@ -2994,11 +3009,29 @@ local function iter_xref(opts)
             outputs = { add({ op = gen.op_num("FLOAD"), t = I64,
               ak = K.REF, av = base, bk = K.LIT,
               bv = FIELD_CDATA_INT64 }) }
+          elseif shape == "escape" then
+            -- Only an allocation whose pointer was stored away
+            -- before the ref it is compared with reads as
+            -- escaped; anything else is "did not escape".
+            if alloc then
+              -- The escape scan runs alloc -> other address, so
+              -- the pointer store sits between them; the XSTORE
+              -- is searched only above the load's address ref.
+              local pa = addr(base, i)
+              local f = fref(alloc, FIELD_CDATA_PTR)
+              add({ op = gen.op_num("FSTORE"), t = P64, ak = K.REF,
+                av = f, bk = K.REF, bv = alloc })
+              local pb = addr(base2, i)
+              xstore(pa, v1)
+              outputs = { xload(pb) }
+            end
           else
             outputs = { xload(addr(base, i)),
                         xload(addr(base2, next_idx())) }
           end
-          coroutine.yield({ insns = insns, outputs = outputs })
+          if outputs then
+            coroutine.yield({ insns = insns, outputs = outputs })
+          end
         end
       end
     end
