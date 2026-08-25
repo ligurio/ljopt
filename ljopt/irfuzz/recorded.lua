@@ -1142,4 +1142,20 @@ end
 return s
 ]])
 
+-- loop_unroll drops the final snapshot when no guard was emitted
+-- after the last one it substituted. That needs an unconditional
+-- back-edge, so the loop test is not the last guard, and an
+-- FP-only tail: an int counter's ADDOV is a guard and re-arms
+-- J->guardemit.
+add("loop_snap_drop", [[
+local s = 0.0
+local i = 0.0
+while true do
+  if i >= 200.0 then break end
+  i = i + 1.0
+  s = s + i * 0.75
+end
+return s
+]])
+
 return { chunks = chunks }
