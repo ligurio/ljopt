@@ -446,6 +446,57 @@ local function gen(seed, opts)
   return insns, roots(insns)
 end
 
+-- Order `outs` for a loop replay, which writes out[i] into the
+-- slot SLOAD #i reads. Position i therefore has to hold a value
+-- of that SLOAD's type: an int root landing in a num slot makes
+-- the two passes model the type change differently, and the
+-- traces then disagree over what the optimizer never touched.
+--
+-- A slot with no root of its type is fed its own SLOAD, which
+-- writes back what it read and just makes the slot invariant.
+-- Positions past the last SLOAD are unconstrained, since nothing
+-- reads those slots, so the leftover roots go there.
+--
+-- The result is used for the comparison *and* the slot feedback:
+-- attach_snapshot pairs compared output i with slot i, so handing
+-- the replay a different order than the compared one would
+-- desynchronise the model from the trace.
+local function loop_order(insns, outs)
+  local sload_of, sload_t, maxslot = {}, {}, 0
+  for i, ins in ipairs(insns) do
+    if ins.op == SLOAD_OP and sload_of[ins.av] == nil then
+      sload_of[ins.av] = i
+      sload_t[ins.av] = ins.t
+      if ins.av > maxslot then maxslot = ins.av end
+    end
+  end
+  local by_type, used = {}, {}
+  for _, ref in ipairs(outs) do
+    local t = insns[ref].t
+    by_type[t] = by_type[t] or {}
+    table.insert(by_type[t], ref)
+  end
+  local ordered = {}
+  for slot = 1, maxslot do
+    local pick
+    for _, ref in ipairs(by_type[sload_t[slot]] or {}) do
+      if not used[ref] then
+        pick = ref
+        used[ref] = true
+        break
+      end
+    end
+    ordered[slot] = pick or sload_of[slot]
+  end
+  for _, ref in ipairs(outs) do
+    if not used[ref] then
+      ordered[#ordered + 1] = ref
+      used[ref] = true
+    end
+  end
+  return ordered
+end
+
 -- Pack an instruction stream into the flat spec table
 -- jit.util.irfuzz expects: parallel arrays indexed 1..n.
 -- `outputs` (optional) lists the stream indexes the replay must
@@ -468,6 +519,7 @@ end
 
 return {
   gen = gen,
+  loop_order = loop_order,
   to_spec = to_spec,
   roots = roots,
   menu_for = menu_for,
