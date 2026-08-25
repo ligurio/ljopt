@@ -1,5 +1,7 @@
--- GC write barriers: TBAR (table), OBAR (object), XBAR (a fence
--- the optimizer may not move loads and stores across).
+-- Nodes with no effect on any value a trace computes: the GC
+-- write barriers TBAR (table), OBAR (object) and XBAR (a fence
+-- loads and stores may not move across), and GCSTEP, which just
+-- lets the collector run.
 --
 -- None of them changes a value the trace computes -- they exist
 -- to keep the collector's invariants while it runs incrementally
@@ -15,10 +17,10 @@ function IRNodeBarrier:to_smt_lib(ctx)
     return ctx.te_stack:store(self:get_ssa_reference(), 'true')
 end
 
--- A barrier carries no value, so its IR type says nothing about
--- what to emit: TBAR shows up as both `nil` and `tab`. This
--- module is registered only for the three barriers, so whatever
--- type variant arrives is one of them.
+-- None of them carries a value, so the IR type says nothing
+-- about what to emit -- TBAR shows up as both `nil` and `tab`.
+-- This module is registered only for those four opcodes, so
+-- whatever type variant arrives is one of them.
 local function instance(_node_str)
     return IRNodeBarrier
 end

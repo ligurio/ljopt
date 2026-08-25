@@ -23,19 +23,16 @@ local ir_node_SLOAD = require('ljopt.ir.SLOAD')
 local ir_node_SUB = require('ljopt.ir.SUB')
 local ir_node_ULE = require('ljopt.ir.ULE')
 
+-- Only opcodes that reach construct_nodes() belong here.
+-- Deliberately absent, because they never arrive as nodes:
+--   * K* constants live at negative IR refs and reach a handler
+--     as *operands* (see op_type.from_raw).
+--   * FPM_* are op2 literals of FPMATH, not opcodes.
+--   * SNAP is a parallel stream translated by ir/SNAP.lua.
+--   * LOOP, PHI and RENAME are consumed by loop_unrolling before
+--     nodes are built; BASE, USE and OP carry no semantics.
 local opcodes_table = {
-    -- Constants.
-    ['KPRI'] = false,
-    ['KINT'] = false,
-    ['KGC'] = false,
-    ['KPTR'] = false,
-    ['KKPTR'] = false,
-    ['KNULL'] = false,
-    ['KNUM'] = false,
-    ['KINT64'] = false,
-    ['KSLOT'] = false,
     -- Guarded Assertions.
-    ['OP'] = false,
     ['LT'] = require('ljopt.ir.LT'),
     ['GE'] = require('ljopt.ir.GE'),
     ['LE'] = ir_node_LE,
@@ -47,7 +44,7 @@ local opcodes_table = {
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
     ['ABC'] = require('ljopt.ir.ABC'),
-    ['RETF'] = false,
+    ['RETF'] = require('ljopt.ir.RETF'),
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
     ['BSWAP'] = require('ljopt.ir.BSWAP'),
@@ -79,18 +76,6 @@ local opcodes_table = {
     ['ADDOV'] = require('ljopt.ir.ADDOV'),
     ['SUBOV'] = require('ljopt.ir.SUBOV'),
     ['MULOV'] = require('ljopt.ir.MULOV'),
-    ['FPM_FLOOR'] = false,
-    ['FPM_CEIL'] = false,
-    ['FPM_TRUNC'] = false,
-    ['FPM_SQRT'] = false,
-    ['FPM_EXP'] = false,
-    ['FPM_EXP2'] = false,
-    ['FPM_LOG'] = false,
-    ['FPM_LOG2'] = false,
-    ['FPM_LOG10'] = false,
-    ['FPM_SIN'] = false,
-    ['FPM_COS'] = false,
-    ['FPM_TAN'] = false,
     -- Memory References.
     ['AREF'] = require('ljopt.ir.AREF'),
     ['HREFK'] = require('ljopt.ir.HREFK'),
@@ -107,6 +92,8 @@ local opcodes_table = {
     ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = require('ljopt.ir.XLOAD'),
     ['SLOAD'] = ir_node_SLOAD,
+    -- Reads a vararg slot, reached through frame-pointer
+    -- arithmetic rather than a table, so AREF cannot address it.
     ['VLOAD'] = false,
     ['ASTORE'] = require('ljopt.ir.ASTORE'),
     ['HSTORE'] = require('ljopt.ir.HSTORE'),
@@ -136,21 +123,22 @@ local opcodes_table = {
     -- Calls.
     ['CALLN'] = require('ljopt.ir.CALLN'),
     ['CALLL'] = require('ljopt.ir.CALLL'),
+    -- A call to a lua_State-taking helper. Which helpers occur
+    -- is unknown here -- none was recordable -- and guessing at
+    -- their operand shapes would model them wrongly.
     ['CALLS'] = false,
     ['CALLXS'] = require('ljopt.ir.CALLXS'),
     -- CARG is indeed dummy node. Pass arguments in CALLL.
     ['CARG'] = require('ljopt.ir.ir_node_dummy'),
     -- Miscellaneous Ops.
-    ['SNAP'] = false,
     ['NOP'] = ir_node_NOP,
-    ['BASE'] = false,
+    -- Parent-trace value forwarding: side traces only, and
+    -- ir_dump_utils disables those, so it cannot arrive.
     ['PVAL'] = false,
-    ['GCSTEP'] = false,
+    ['GCSTEP'] = require('ljopt.ir.TBAR'),
+    -- The high word of a split 64-bit operation on 32-bit or
+    -- soft-float builds. Never emitted on x64 hard-float.
     ['HIOP'] = false,
-    ['LOOP'] = false,
-    ['USE'] = false,
-    ['PHI'] = false,
-    ['RENAME'] = false,
 }
 
 local function get_all_count()
