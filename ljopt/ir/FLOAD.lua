@@ -72,8 +72,12 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         else
             -- Propagate len when the SSA string was tracked as
             -- a known constant via HSTORE->HLOAD chains.
+            local known_len = ctx.const_str_lens[left_op:get_ssa()]
             local known = ctx.const_strs[left_op:get_ssa()]
-            if known ~= nil then
+            if known == nil and known_len ~= nil then
+                data = arith_utils.const_i64_to_smt_bv(known_len)
+                ctx.const_nums[self:get_ssa_reference()] = known_len
+            elseif known ~= nil then
                 local len = #known
                 data = arith_utils.const_i64_to_smt_bv(len)
                 ctx.const_nums[self:get_ssa_reference()] = len

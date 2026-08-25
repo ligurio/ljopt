@@ -653,6 +653,9 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -675,6 +678,9 @@ end
 function SMTContext:restart()
     self.const_nums = {}
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
