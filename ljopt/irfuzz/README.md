@@ -240,6 +240,21 @@ Sixteen of the 65 lines left are unreachable by construction:
   constant 0, so the equal-value store is dropped before the
   elimination is considered.
 
+`lj_opt_loop.c` 374 -- the redundant-snapshot drop -- is reached by
+the `loop_snap_drop` chunk. It needs a loop whose back-edge is
+unconditional, so the exit test is not the last guard, and whose
+tail is FP-only: the LOOP marker is itself a guard, only a snapshot
+substitution clears `J->guardemit`, and an int counter's `ADDOV`
+re-arms it after that snapshot.
+
+`lj_opt_loop.c` 167 and 366 are the two remaining `LJ_TRERR_PHIOV`
+raises. They need `nphi` to be exactly at `LJ_MAX_PHI` (64) when
+pass #3's subst walk, or the phiconv path, adds one more: a loop
+with more than 64 carried values trips the third raise (line 339)
+first, and that one is already covered. Fewer than 64 carried
+values never reach the limit at all, so the shape has to arrive at
+64 through the main pass and then cross it elsewhere.
+
 Of the rest, one needs a harness change rather than a new shape:
 `lj_opt_mem.c` 642-644 folds two `KPTR` bases into base vs.
 base+offset, and the replay spec has no constant-pointer operand
@@ -248,6 +263,24 @@ pair. `lj_opt_narrow.c` 257-259 is the backtrack after
 `narrow_conv_backprop` overruns `nc->maxsp`, which needs a
 narrowing tree deeper than the sweep builds. The remainder are
 reachable and simply not generated yet.
+
+### Known limitation: loop mode is not yet a sound oracle
+
+`--loop` (and `COV_LOOP`) feeds each generator output back into the
+slot its SLOAD reads, and does it positionally: `out[i]` goes to
+slot `i-1`, with no regard for the type that slot's SLOAD expects.
+An `int` root landing in a `num` slot makes the two passes model the
+type change differently and the traces then disagree for reasons the
+optimizer had no part in -- e.g. seed 4 reports a signed-zero
+difference that reduces to `-2^31 * -0.0` on one side against a
+symbolic num chain on the other. Its SAT verdicts are therefore not
+bug candidates until this is fixed.
+
+Fixing it means type-matching the feedback *and* teaching
+`attach_snapshot` the same slot assignment: it currently hard-codes
+"output `i` is in slot `i`", so reordering `spec.out` alone
+desynchronises ljopt's model of the slots from what the replay did
+and makes things worse, not better.
 
 ### Known limitation
 
