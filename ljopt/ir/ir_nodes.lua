@@ -134,11 +134,11 @@ local opcodes_table = {
     ['NOP'] = ir_node_NOP,
     -- Parent-trace value forwarding: side traces only, and
     -- ir_dump_utils disables those, so it cannot arrive.
-    ['PVAL'] = false,
+    ['PVAL'] = require('ljopt.ir.unreachable'),
     ['GCSTEP'] = require('ljopt.ir.TBAR'),
     -- The high word of a split 64-bit operation on 32-bit or
     -- soft-float builds. Never emitted on x64 hard-float.
-    ['HIOP'] = false,
+    ['HIOP'] = require('ljopt.ir.unreachable'),
 }
 
 local function get_all_count()
