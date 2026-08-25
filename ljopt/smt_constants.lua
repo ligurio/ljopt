@@ -90,6 +90,14 @@ local LJOPT_SMTLIB = ([[
 (declare-fun tab_rehash_hmask
   ((_ BitVec 64) (_ BitVec 64) MemCell) (_ BitVec 64))
 
+; Uninterpreted results for the lua_State-taking helpers (CALLS).
+; Indexed by callee, so the same helper gives the same value on
+; both sides and equivalent calls match by congruence. What the
+; helper computes is not modelled, and neither is the state it
+; advances -- two draws from math.random come out equal here.
+(declare-fun calls_num (Int) (_ FloatingPoint 11 53))
+(declare-fun calls_int (Int) (_ BitVec 64))
+
 ; Uninterpreted functions for FFI external C calls (CALLXS).
 ; Indexed by arity. Both unopt and opt traces apply the same
 ; function to congruent arguments, so equivalent FFI calls
