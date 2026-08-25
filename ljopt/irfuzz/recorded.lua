@@ -884,11 +884,56 @@ local n = 0
 for i = 1, 300 do
   pcall(function() n = n + bit.band(true, 1) end)
   pcall(function() n = n + ("x"):sub(true) end)
+  pcall(function() n = n + #("a"):rep(true) end)
   pcall(function() n = n + ("bad" + 1) end)
   pcall(function() n = n + bit.band("bad", 1) end)
   n = n + bit.band(i, 255)
 end
 return n
+]])
+
+-- A Lua call and a multiple-return inside the loop body, so the
+-- unroller has a call frame and a result pair to substitute --
+-- neither of which a builtin call in the body produces.
+add("loop_call_ret", [[
+local function add1(x) return x + 1 end
+local function pair(x) return x + 1, x - 1 end
+local s = 0
+for i = 1, 200 do
+  s = add1(s)
+  local a, b = pair(i)
+  s = s + a - b
+end
+return s
+]])
+
+-- A trace that *returns* out of the function it started in: the
+-- inner loop goes hot first, so the recorder leaves a frame it
+-- never recorded entering and emits RETF.
+add("retf_loop", [[
+local function inner(x)
+  local s = 0
+  for i = 1, 4 do s = s + x + i end
+  return s
+end
+local t = 0
+for i = 1, 300 do t = t + inner(i) end
+return t
+]])
+
+-- rec_varg is the only place that sets IRSLOAD_FRAME, and only on
+-- its "unknown number of varargs" arm -- so the loop has to sit
+-- *inside* the vararg function, where the count is not recorded.
+add("varg_loop", [[
+local function varg(...)
+  local s = 0
+  for i = 1, 200 do
+    local a, b = ...
+    s = s + a + b + select("#", ...)
+  end
+  return s
+end
+return varg(3, 4)
 ]])
 
 -- lj_opt_narrow_unm's integer path leaves the two constants it
