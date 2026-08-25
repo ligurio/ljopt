@@ -372,6 +372,27 @@ end
                 left_op = op_type.new("ssa", 3)},
         },
     }, {
+        -- Reading `...` inside the function that owns it records
+        -- VLOAD over an AREF into the vararg region, reached by
+        -- frame arithmetic from REF_BASE rather than through a
+        -- table. All of it was NYI, so the loop body was empty.
+        name = "vararg slots read through VLOAD",
+        code = [[
+local function foo(...)
+    local s = 0
+    for i = 1, 200 do
+        local a, b = ...
+        s = s + a + b
+    end
+    return s
+end
+foo(3, 4)
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "p32", name = "AREF"},
+            {type = "num", name = "VLOAD"},
+        },    }, {
         -- string.sub lowers to STRREF + SNEW. Both were NYI, so
         -- the slice and everything reading it -- including the
         -- str.len of the result -- left the formula. -O3 folds

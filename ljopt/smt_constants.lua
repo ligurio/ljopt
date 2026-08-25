@@ -134,9 +134,16 @@ local FIELD_TAB_PREFIX = '```'
 -- String buffer slot.
 local STRING_BUFF_SLOT = FIELD_TAB_PREFIX .. 'bufhdr'
 
+-- The vararg region of the frame the trace was entered from,
+-- modelled as one object. Far above any VM slot so it collides
+-- with none, and non-negative so the memory comparison reaches
+-- it like any other shared table.
+local VARARG_SLOT = 1000000
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
     FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
+    VARARG_SLOT = VARARG_SLOT,
     STRING_BUFF_SLOT = STRING_BUFF_SLOT,
 }
