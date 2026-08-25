@@ -92,9 +92,7 @@ local opcodes_table = {
     ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = require('ljopt.ir.XLOAD'),
     ['SLOAD'] = ir_node_SLOAD,
-    -- Reads a vararg slot, reached through frame-pointer
-    -- arithmetic rather than a table, so AREF cannot address it.
-    ['VLOAD'] = false,
+    ['VLOAD'] = require('ljopt.ir.VLOAD'),
     ['ASTORE'] = require('ljopt.ir.ASTORE'),
     ['HSTORE'] = require('ljopt.ir.HSTORE'),
     ['USTORE'] = require('ljopt.ir.USTORE'),
