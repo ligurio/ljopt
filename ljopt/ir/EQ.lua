@@ -80,6 +80,19 @@ function impls.IRNodeEQTab.is_implemented(_flags, _type, _opcode,
         and op_type.to_string(right_op_val) == 'NULL'
 end
 
+-- Interned-string identity. LuaJIT interns strings, so the
+-- recorder compares two of them by pointer -- which is equality
+-- of the values themselves, the String terms the op stack holds.
+impls.IRNodeEQStr = {}
+ir_node.extended(impls.IRNodeEQStr, ir_node.ir_node_base)
+
+function impls.IRNodeEQStr:to_smt_lib(ctx)
+    return ctx.te_stack:store(self:get_ssa_reference(), ('(= %s %s)'):format(
+        ir_node.retrieve_str_op(self:get_left_op(), ctx),
+        ir_node.retrieve_str_op(self:get_right_op(), ctx)
+    ))
+end
+
 local function instance(node_str)
     return impls[node_str]
 end

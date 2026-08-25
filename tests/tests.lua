@@ -366,6 +366,21 @@ end
                 left_op = op_type.new("ssa", 3)},
         },
     }, {
+        -- Comparing two interned strings records as a str-typed
+        -- guard. Without a class for that type variant the guard
+        -- was dropped, and with it the branch it decides.
+        code = [[
+local function foo(s, u)
+    if s == u then return 1 end
+    return 2
+end
+foo("aa", "bb")
+foo("aa", "bb")
+foo("aa", "bb")
+]],
+        ins = {
+            {type = "str", name = "NE"},
+        },    }, {
         -- A constructor with constant contents records as TDUP,
         -- and the read that follows is an ABC against the size
         -- the template was built with. -O3 drops the copy and
