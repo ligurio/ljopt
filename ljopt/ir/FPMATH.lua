@@ -69,27 +69,20 @@ local function instance(node_str)
     return impls[node_str]
 end
 
+-- An allowlist of what to_smt_lib actually emits, not a list of
+-- what it does not: anything outside both sets used to pass the
+-- gate and then hit `unreachable`, which killed the run. `tan`
+-- was such a case.
+local native_fns = {floor = true, ceil = true, trunc = true, sqrt = true}
+
 function impls.IRNodeFPMATHNum.is_implemented(_flags, _type, _opcode,
                                               _left_op, right_op_val)
-    local right_op = right_op_val:get_lit()
-    local nyi_table = {
-        'cos',
-        'exp',
-        'exp2',
-        'log10',
-        'log2',
-        'sin',
-    }
-    -- SMT can't handle most of the nonlinear functions.
-    -- It can be implemented in future using uninterpreted
-    -- functions theory and axioms/properties of each function.
-    -- In this way all possible optimizations will be handled.
-    for _, value in ipairs(nyi_table) do
-        if value == right_op then
-            return false
-        end
+    if right_op_val == nil or not right_op_val:is_lit() then
+        return false
     end
-    return true
+    local right_op = right_op_val:get_lit()
+    return native_fns[right_op] == true
+        or uninterpreted_fns[right_op] ~= nil
 end
 
 return {
