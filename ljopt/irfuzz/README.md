@@ -247,6 +247,15 @@ tail is FP-only: the LOOP marker is itself a guard, only a snapshot
 substitution clears `J->guardemit`, and an int counter's `ADDOV`
 re-arms it after that snapshot.
 
+`lj_opt_loop.c` 183-185 is pass #4's mark propagation, and needs a
+PHI whose right ref is a *still-marked* PHI. A mark is set in pass
+#1 when the right ref is not a simple recurrence, and cleared in
+pass #2 for every ref used as an operand in the variant part, so
+the marked PHI has to be consumed by nothing but another PHI's
+right ref. Copy chains between carried slots (`a, b = b, f(a)`, and
+longer rotations) do not do it: they never set `passx`, so the pass
+does not run at all.
+
 `lj_opt_loop.c` 167 and 366 are the two remaining `LJ_TRERR_PHIOV`
 raises. They need `nphi` to be exactly at `LJ_MAX_PHI` (64) when
 pass #3's subst walk, or the phiconv path, adds one more: a loop
