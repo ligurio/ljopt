@@ -12,6 +12,12 @@ local loop_unrolling = require("ljopt.loop_unrolling")
 local op_type = require("ljopt.ir.op_type")
 local test = require("tests.tap").test("ljopt")
 
+-- The suite runs strict: an unimplemented node should fail a
+-- test rather than quietly shrink the formula it was meant to
+-- prove something about. Blocks that need a chunk ljopt cannot
+-- fully model turn it off around themselves.
+ljopt_config.set_strict_mode(true)
+
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
