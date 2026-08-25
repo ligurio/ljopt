@@ -6,6 +6,7 @@
 -- exactly a base, a start and a length.
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
+local utils = require('ljopt.utils')
 
 local impls = {}
 
@@ -18,6 +19,15 @@ function IRNodeSNEWStr:to_smt_lib(ctx)
     local len = ir_node.retrieve_int_op(self:get_right_op(), ctx, op_type.INT)
     local data = ('(str.substr (get-str (get-p32-idx %s)) (get-p32-tab %s) %s)')
         :format(ptr, ptr, ('(bv2nat %s)'):format(len))
+    -- The slice is exactly as long as it was asked for -- the
+    -- guard in front of it is what makes that true, and LuaJIT
+    -- folds the length on the same grounds. Without saying so,
+    -- the side that measures and the side that folded disagree
+    -- wherever the guard does not hold.
+    local n = utils.resolve_const(self:get_right_op(), ctx)
+    if n ~= nil then
+        ctx.const_str_lens[ssa_ref] = n
+    end
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.STR, data)
