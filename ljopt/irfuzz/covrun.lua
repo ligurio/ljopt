@@ -35,12 +35,14 @@ local function drive_seeds(opts)
     return ok, skipped
 end
 
-local function drive_iter(make_iter)
+local function drive_iter(make_iter, extra)
     local ok, skipped, n = 0, 0, 0
     for tr in make_iter() do
         n = n + 1
         if n > skip then
-            local r = check.build_from(tr.insns, tr.outputs, { loop = loop })
+            local o = { loop = loop }
+            for k, v in pairs(extra or {}) do o[k] = v end
+            local r = check.build_from(tr.insns, tr.outputs, o)
             if r.skipped then skipped = skipped + 1 else ok = ok + 1 end
             local step = skip > 0 and 1 or 5000
             if n % step == 0 then io.stderr:write(("  %d\n"):format(n)) end
@@ -114,6 +116,9 @@ local MODES = {
     bufcalls = function() return drive_iter(enum.iter_bufcalls) end,
     shapes = function() return drive_iter(enum.iter_shapes) end,
     xref = function() return drive_iter(enum.iter_xref) end,
+    licm = function()
+        return drive_iter(enum.iter_licm, { raw_slots = true })
+    end,
     recorded = function() return drive_recorded() end,
 }
 for _, t in ipairs({ "int", "num", "i64" }) do

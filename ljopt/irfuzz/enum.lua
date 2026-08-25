@@ -3038,6 +3038,57 @@ local function iter_xref(opts)
   end)
 end
 
+-- -- Loop-pass (LICM) enumeration ------------------------------
+--
+-- COVERAGE ONLY, and unusually so: these shapes write a value
+-- back into a slot whose SLOAD has another type, which is what
+-- gen.loop_order exists to prevent. The loop pass has to coerce
+-- such a slot, and the coercion promotes an extra PHI -- the only
+-- way to cross LJ_MAX_PHI anywhere but the raise in the main slot
+-- walk, which is already covered. The mode passes raw_slots so
+-- the wiring survives, and no solver driver runs it.
+--
+-- The counts bracket LJ_MAX_PHI (64): 65 crosses it in pass #3,
+-- fewer never reach it, more trip the main raise first.
+local LICM_SLOTS = { 63, 64, 65, 66, 70 }
+
+local function iter_licm()
+  local INT = gen.IRT_INT
+  local SL, ADD = gen.op_num("SLOAD"), gen.op_num("ADD")
+
+  return coroutine.wrap(function()
+    for _, n in ipairs(LICM_SLOTS) do
+      for _, mistype in ipairs({ true, false }) do
+        local insns = {}
+        local function add(x)
+          insns[#insns + 1] = x
+          return #insns
+        end
+        local sl = {}
+        for i = 1, n do
+          local t = (mistype and i == n) and INT or IRT_NUM
+          sl[i] = add({ op = SL, t = t, ak = K.LIT, av = i,
+            bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
+        end
+        local outputs = {}
+        for i = 1, n - 1 do
+          outputs[i] = add({ op = ADD, t = IRT_NUM, ak = K.REF,
+            av = sl[i], bk = K.KNUM, bv = 1.5 })
+        end
+        outputs[n] = add({ op = ADD, t = IRT_NUM, ak = K.REF,
+          av = sl[1], bk = K.KNUM, bv = 2.5 })
+        coroutine.yield({ insns = insns, outputs = outputs })
+      end
+    end
+  end)
+end
+
+local function count_licm()
+  local n = 0
+  for _ in iter_licm() do n = n + 1 end
+  return n
+end
+
 local function count_xref()
   local n = 0
   for _ in iter_xref() do n = n + 1 end
@@ -3076,6 +3127,8 @@ return {
   iter_shapes = iter_shapes,
   count_shapes = count_shapes,
   iter_xref = iter_xref,
+  iter_licm = iter_licm,
+  count_licm = count_licm,
   count_xref = count_xref,
   leaves_for = leaves_for,
   OPS = OPS,
