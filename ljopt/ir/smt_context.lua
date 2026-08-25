@@ -426,6 +426,12 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.next_free = -1
     -- base_slot -> { slot }
     self.vm_slot_map = {}
+    -- Tables this trace allocated, in allocation order, and the
+    -- ones whose id reached memory, in the order it did.
+    self.local_tabs = {}
+    self.local_by_ssa = {}
+    self.escaped_tabs = {}
+    self.escaped_set = {}
     -- [Version][Slot][Data]
     local mutable_memory = string.format(
         '(declare-fun %s () MemPtr)',
@@ -447,6 +453,65 @@ function MemoryStack.alloc_slot(self)
     local current_slot = self.next_free
     self.next_free = self.next_free - 1
     return ('(- %d)'):format(-current_slot), current_slot
+end
+
+-- Allocates a table the trace creates itself. The id is a
+-- symbolic constant, not the next counter value: which id stands
+-- for which table is settled by local_tabs2smt() in ir_smtlib.
+function MemoryStack.allocate_local(self, ssa_ref)
+    dev_checks('table', 'number')
+
+    local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
+    table.insert(self.local_tabs, name)
+    self.local_by_ssa[ssa_ref] = name
+    -- zero_pointer is unconstrained, not all-nil, so being fresh
+    -- does not by itself say the metatable field is empty -- and
+    -- the recorder guards exactly that in front of a fresh
+    -- table, while the optimizer knows it and drops the guard.
+    return name, ('(declare-const %s Int)\n'):format(name) ..
+        ('(assert (= (select (select %s %s) %s) zero_pointer))\n'):format(
+            self._name, self:get_version(), name
+        ) ..
+        ('(assert (= (select (select (select %s %s) %s) %s) nil-val))'):format(
+            self._name, self:get_version(), name,
+            ('(str-val "%stab.meta")'):format(smt_constants.FIELD_TAB_PREFIX)
+        )
+end
+
+-- Records that a table the trace allocated had its id written
+-- into memory. Anything that never gets here is unreachable once
+-- the trace ends, and is left out of the comparison.
+function MemoryStack.mark_escaped(self, ssa_ref)
+    dev_checks('table', 'number')
+
+    local name = self.local_by_ssa[ssa_ref]
+    if name == nil or self.escaped_set[name] then
+        return
+    end
+    self.escaped_set[name] = true
+    table.insert(self.escaped_tabs, name)
+end
+
+-- Keeps the locally allocated tables apart from each other and
+-- from every counter-allocated slot.
+function MemoryStack.local_tabs_constraints(self)
+    if #self.local_tabs == 0 then
+        return ''
+    end
+    local out = {}
+    for _, name in ipairs(self.local_tabs) do
+        table.insert(out,
+            ('(assert (< %s %d))'):format(name, self.next_free + 1)
+        )
+    end
+    if #self.local_tabs > 1 then
+        table.insert(out,
+            ('(assert (distinct %s))'):format(
+                table.concat(self.local_tabs, ' ')
+            )
+        )
+    end
+    return table.concat(out, '\n') .. '\n'
 end
 
 -- Takes as input op num (e.g. 0001) or
@@ -504,8 +569,15 @@ function MemoryStack.allocate(self, inherited_from)
     end
     local slot_num
     current_slot, slot_num = self:alloc_slot()
-    local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
-        :format(self._name, current_slot)
+    -- The table is fresh *now*, not at version 0: a TNEW that
+    -- follows a store must be empty in the version the trace has
+    -- reached. Pinning version 0 instead both leaves the store
+    -- that follows reading whatever the earlier chain held at
+    -- this key, and constrains the shared base memory the other
+    -- pass is tied to -- two allocations claiming the same key at
+    -- version 0 make the whole query vacuously unsat.
+    local result = ('\n(assert (= (select (select %s %s) %s) zero_pointer))')
+        :format(self._name, self:get_version(), current_slot)
     return current_slot, result, slot_num
 end
 
@@ -589,6 +661,12 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -611,6 +689,12 @@ end
 function SMTContext:restart()
     self.const_nums = {}
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}

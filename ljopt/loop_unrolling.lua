@@ -84,6 +84,31 @@ local function remap_snap_slots(slots, remap)
     return new_slots
 end
 
+-- The prologue refs a loop-carried value was computed from. A
+-- snapshot taken at the loop entry records the slot as it was
+-- *before* the prologue updated it -- `i`, where the PHI's left
+-- input is `i + 1` -- so remapping the PHI input alone leaves
+-- that slot pointing at the value the loop started with, one
+-- update behind the copy the snapshot belongs to.
+local function preloop_sources(nodes, ref, loop_idx, seen, out)
+    seen = seen or {}
+    out = out or {}
+    if ref == nil or seen[ref] or ref >= loop_idx then
+        return out
+    end
+    seen[ref] = true
+    out[#out + 1] = ref
+    local node = nodes[ref]
+    if node ~= nil then
+        for _, op in ipairs({node.op1, node.op2}) do
+            if op ~= nil and op.type == 'ssa' then
+                preloop_sources(nodes, op.value, loop_idx, seen, out)
+            end
+        end
+    end
+    return out
+end
+
 local function infer_phi_map_opt(phi_nodes)
     local phi_map = {}
     for _, phi in ipairs(phi_nodes) do
@@ -260,6 +285,13 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx)
         table.insert(result, node)
     end
 
+    -- Where each body instruction sat in the recorded trace, so a
+    -- snapshot can tell what the copy had already recomputed.
+    local body_pos = {}
+    for j, bnode in ipairs(body) do
+        body_pos[bnode.num] = body_orig_pos[j]
+    end
+
     local n = ljopt_config.get_loop_unroll_count()
     local prev_phi_remap = {}
 
@@ -294,10 +326,35 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx)
                     end
                 end
 
+                -- What a loop-carried slot holds at this
+                -- snapshot depends on where the snapshot sits: if
+                -- the copy has already recomputed the slot by
+                -- then it holds the new value, otherwise the one
+                -- the copy was entered with -- the prologue's own
+                -- value for the first copy, the previous copy's
+                -- output after that. The prologue refs a PHI
+                -- input was computed from stand for the same
+                -- slot, so they move with it; leaving them behind
+                -- is what made the two traces disagree about the
+                -- induction variable by one step at every
+                -- snapshot after the first.
+                local snap_pos = 0
+                for _, nins in ipairs(snap.nins) do
+                    if nins > snap_pos then snap_pos = nins end
+                end
                 local snap_remap = {}
                 for k, v in pairs(remap) do snap_remap[k] = v end
                 for body_ref, prologue_ref in pairs(phi_map) do
-                    snap_remap[prologue_ref] = remap[body_ref]
+                    local target = remap[prologue_ref] or prologue_ref
+                    if body_pos[body_ref] ~= nil
+                        and body_pos[body_ref] <= snap_pos then
+                        target = remap[body_ref] or target
+                    end
+                    snap_remap[prologue_ref] = target
+                    for _, src in ipairs(preloop_sources(
+                            raw_nodes, prologue_ref, loop_idx)) do
+                        snap_remap[src] = target
+                    end
                 end
                 local uid = snap_id + iter * SNAPSHOT_INC
                 new_snapshots[uid] = clone_snap(
@@ -312,8 +369,12 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx)
         end
     end
 
-    -- Prologue + body copies 1..n-1 are known to have run.
-    return result, new_snapshots, prologue_len + (n - 1) * body_len + 1
+    -- Only the prologue and the one body execution the trace
+    -- recorded are known to have run. The copies after it are
+    -- this unroller's own work: the recording says nothing about
+    -- them, so their guards must stay free (see the pin in
+    -- ir_smtlib).
+    return result, new_snapshots, prologue_len + body_len + 1
 end
 
 -- Unroll a loop trace that has NO LOOP/PHI markers
@@ -415,8 +476,10 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
         end
     end
 
-    -- Copies 1..n are known to have run; copy n+1 is the last.
-    return result, new_snapshots, n * body_len + 1
+    -- Only the first copy is the recorded trace; the rest are
+    -- synthesized from it, so nothing is known about their
+    -- guards (see the pin in ir_smtlib).
+    return result, new_snapshots, body_len + 1
 end
 
 -- Main entry point. Dispatches to the appropriate

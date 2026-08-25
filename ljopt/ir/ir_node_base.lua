@@ -149,7 +149,7 @@ local function retrieve_str_op(op, ctx)
     if op:is_ssa() then
         return ctx.op_stack:load(op:get_ssa(), op_type.STR)
     elseif op:is_str() then
-        return '"' .. op:get_str() .. '"'
+        return arith_utils.const_str_to_smt_str(op:get_str())
     end
     utils.unreachable(
         'retrieve_str_op: unsupported op type: ' .. tostring(op and op.type)
@@ -227,9 +227,14 @@ local function retrieve_tab_ref(op, ctx)
     return tab_id, tab_ptr, raw_cell
 end
 
-local function get_table_uid(raw_cell, fresh_slot)
-    return ('(ite ((_ is tab-val) %s) (get-tab %s) %s)'):format(
-        raw_cell, raw_cell, fresh_slot
+-- Decode a memory cell as a table id. A cell holding no table --
+-- a metatable field still nil, an array slot that never got one
+-- -- gets an id derived from the cell itself, so both passes
+-- agree on it by congruence.
+local function get_table_uid(raw_cell)
+    return ('(ite ((_ is tab-val) %s) (get-tab %s)'
+        .. ' (tab_uid %s))'):format(
+        raw_cell, raw_cell, raw_cell
     )
 end
 

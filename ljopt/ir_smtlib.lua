@@ -147,6 +147,23 @@ local function translate(trace_record, ctx_src,
         ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix .. tr_id) ..
         '\n'
 
+    if os.getenv("LJOPT_DBG_RAW") then
+        local abc, loopm = 0, false
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then abc = abc + 1 end
+            if n.irop == 'LOOP' then loopm = true end
+        end
+        io.stderr:write(("[raw] %s link=%s nodes=%d ABC=%d loop=%s\n")
+            :format(tostring(smt_suffix), tostring(trace_record.linktype),
+                #trace_record.trace, abc, tostring(loopm)))
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then
+                io.stderr:write(("[raw]   ABC %s %s\n"):format(
+                    tostring(n.op1_txt), tostring(n.op2_txt)))
+            end
+        end
+    end
+
     -- 1st stage. Loop unrolling on raw nodes (removes LOOP/PHI).
     local last_iter_ref
     trace_record.trace, trace_record.snapshots, last_iter_ref =
@@ -158,6 +175,22 @@ local function translate(trace_record, ctx_src,
     -- 2nd stage. Constructing list of `ir_nodes`
     -- from raw string data.
     local nodes, filtered_nodes = construct_nodes(trace_record)
+    if os.getenv("LJOPT_DBG_ABC") then
+        local raw_abc, has_loop = 0, false
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then raw_abc = raw_abc + 1 end
+            if n.irop == 'LOOP' then has_loop = true end
+        end
+        local built_abc = 0
+        for _, n in ipairs(nodes) do
+            if n:get_opcode() == 'ABC' then built_abc = built_abc + 1 end
+        end
+        io.stderr:write(("[dbg] %s link=%s post-transform nodes=%d " ..
+            "ABC=%d loop_marker=%s built=%d builtABC=%d\n"):format(
+            tostring(smt_suffix), tostring(trace_record.linktype),
+            #trace_record.trace, raw_abc, tostring(has_loop),
+            #nodes, built_abc))
+    end
 
     if ljopt_config.is_narrowing() then
         ir_passes.mark_narrowed_refs(nodes, ctx_src)
@@ -178,14 +211,20 @@ local function translate(trace_record, ctx_src,
     end
     jit.on(true, true)
 
-    -- Pin the guards of every unrolled iteration but the last:
-    -- the recorded trace ran them all, so none of those guards
-    -- can have failed. Without this the solver is free to exit
-    -- the loop early and still compare memory written by the
-    -- iterations that follow. The final iteration is left alone
-    -- -- its guard is the loop exit, and it is the one an
-    -- optimizer may legitimately have removed.
-    if last_iter_ref ~= nil then
+    -- Pin the guards the *recording* covered: the trace ran them,
+    -- so none of them can have failed. Without this the solver is
+    -- free to exit early and still compare memory written after
+    -- the exit.
+    --
+    -- The iterations this unroller synthesized are not covered.
+    -- Pinning those asserts something no recording established,
+    -- and it is worse than imprecise: an iteration whose guard is
+    -- statically false -- a bounds check against a table that was
+    -- replaced mid-loop, say -- contradicts the pin, and the
+    -- whole query turns unsatisfiable. Every question about the
+    -- trace pair then answers "unsat", which reads as "the two
+    -- traces agree".
+    if last_iter_ref ~= nil and not os.getenv('LJOPT_NO_PIN') then
         for i = 1, table.getn(nodes) do
             local ref = nodes[i]:get_ssa_reference()
             if nodes[i]:get_flags().irt_guard and ref < last_iter_ref then
@@ -239,19 +278,36 @@ local function trace2smt(trace, ctx, suffix, traceno, shared_stacks)
     return tr_smtlib_unopt, snap_unopt, failed
 end
 
+-- Pairs up the tables the two traces allocated -- the k-th to
+-- escape on one side is the k-th on the other -- and returns the
+-- pointers the memory comparison may therefore look at.
+local function local_tabs2smt(stack1, stack2)
+    local smt = stack1:local_tabs_constraints() ..
+        stack2:local_tabs_constraints()
+    local escaped1, escaped2 = stack1.escaped_tabs, stack2.escaped_tabs
+    local paired = math.min(#escaped1, #escaped2)
+    local ptrs = {}
+    for i = 1, paired do
+        smt = smt .. ('(assert (= %s %s))\n'):format(escaped1[i], escaped2[i])
+        table.insert(ptrs, escaped1[i])
+    end
+    return smt, ptrs
+end
+
 local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
+    local locals_smt, local_ptrs = local_tabs2smt(stack1, stack2)
     -- Sanity mode: drop the equivalence-check disjunct so the
     -- formula contains only the constraints accumulated during
     -- both traces. That formula must be SAT.
     if ljopt_config.is_verify_ljopt_correctness() then
-        return ''
+        return locals_smt
     end
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Check whether both traces exited by a guard.
     local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
         snapshots1.te, snapshots2.te
     )
-    smt_result = '(declare-const witness_ptr Int)\n' .. smt_result
+    smt_result = locals_smt .. '(declare-const witness_ptr Int)\n' .. smt_result
     for _snap_id, values in pairs(merged_snaps) do
         local value1, value2 = unpack(values)
         if (value1 ~= nil) then
@@ -265,10 +321,22 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     end
     smt_result = smt_result .. '    ; Memory part\n'
 
-    smt_result = smt_result .. ([[    (and (>= witness_ptr 0)
+    -- A VM slot (>= 0) is the same table on both sides by
+    -- construction; a table the trace allocated is only
+    -- comparable once it has been paired up above.
+    local witness_dom = '(>= witness_ptr 0)'
+    if #local_ptrs > 0 then
+        local alts = {witness_dom}
+        for _, ptr in ipairs(local_ptrs) do
+            table.insert(alts, ('(= witness_ptr %s)'):format(ptr))
+        end
+        witness_dom = ('(or %s)'):format(table.concat(alts, ' '))
+    end
+    smt_result = smt_result .. ([[    (and %s
          (not (= (select (select %s %s) witness_ptr)
                  (select (select %s %s) witness_ptr))))
 ]]):format(
+        witness_dom,
         stack1._name, stack1:get_version(),
         stack2._name, stack2:get_version()
     )

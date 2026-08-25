@@ -12,6 +12,12 @@ local loop_unrolling = require("ljopt.loop_unrolling")
 local op_type = require("ljopt.ir.op_type")
 local test = require("tests.tap").test("ljopt")
 
+-- The suite runs strict: an unimplemented node should fail a
+-- test rather than quietly shrink the formula it was meant to
+-- prove something about. Blocks that need a chunk ljopt cannot
+-- fully model turn it off around themselves.
+ljopt_config.set_strict_mode(true)
+
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 require("tests.coverage").enable()
 
@@ -364,6 +370,97 @@ end
                 -- Make sure phi is correct when optimizations
                 -- enabled.
                 left_op = op_type.new("ssa", 3)},
+        },
+    }, {
+        -- math.random goes through a helper that takes the
+        -- lua_State, which records as CALLS. It was NYI, so the
+        -- call and the value it produced left the formula.
+        name = "lua_State helper called through CALLS",
+        code = [[
+local r = math.random
+local x = 0
+for i = 1, 40 do x = r() end
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "num", name = "CALLS"},
+        },    }, {
+        -- Reading `...` inside the function that owns it records
+        -- VLOAD over an AREF into the vararg region, reached by
+        -- frame arithmetic from REF_BASE rather than through a
+        -- table. All of it was NYI, so the loop body was empty.
+        name = "vararg slots read through VLOAD",
+        code = [[
+local function foo(...)
+    local s = 0
+    for i = 1, 200 do
+        local a, b = ...
+        s = s + a + b
+    end
+    return s
+end
+foo(3, 4)
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "p32", name = "AREF"},
+            {type = "num", name = "VLOAD"},
+        },    }, {
+        -- string.sub lowers to STRREF + SNEW. Both were NYI, so
+        -- the slice and everything reading it -- including the
+        -- str.len of the result -- left the formula. -O3 folds
+        -- the slice away, so unsat says the modelled substring
+        -- is what the optimizer computed.
+        name = "string.sub through STRREF and SNEW",
+        code = [[
+local sub = string.sub
+local s = "hello world"
+local acc = 0
+for i = 1, 30 do
+    acc = acc + #sub(s, 2, 4)
+end
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "p32", name = "STRREF"},
+            {type = "str", name = "SNEW"},
+            {type = "int", name = "FLOAD"},
+        },    }, {
+        -- Comparing two interned strings records as a str-typed
+        -- guard. Without a class for that type variant the guard
+        -- was dropped, and with it the branch it decides.
+        code = [[
+local function foo(s, u)
+    if s == u then return 1 end
+    return 2
+end
+foo("aa", "bb")
+foo("aa", "bb")
+foo("aa", "bb")
+]],
+        ins = {
+            {type = "str", name = "NE"},
+        },    }, {
+        -- A constructor with constant contents records as TDUP,
+        -- and the read that follows is an ABC against the size
+        -- the template was built with. -O3 drops the copy and
+        -- folds the read, so unsat says the modelled copy holds
+        -- what the optimizer folded to.
+        code = [[
+local function foo(i)
+    local t = {10, 20, 30}
+    return t[i] + t[1]
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        ins = {
+            {type = "tab", name = "TDUP"},
+            {type = "int", name = "FLOAD"},
+            {type = "int", name = "ABC"},
+            {type = "num", name = "ALOAD"},
         },
 --[[
     }, {
@@ -1882,6 +1979,119 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XSTORE"},
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
+        },
+    }, {
+        -- An array read is an ABC against the table's own size,
+        -- so the size load has to survive as well -- both are
+        -- dropped as NYI if either one is. Integer keys also
+        -- grow the array part, so the sizes here are the
+        -- rehashed ones.
+        name = "ABC against the table's own size",
+        code = [[
+local function foo(x)
+    x[1] = 1
+    x[2] = 2
+    x[3] = 3
+    return x[1] + x[3]
+end
+
+foo({})
+foo({})
+foo({})
+]],
+        ins = {
+            {type = "p32", name = "NEWREF"},
+            {type = "int", name = "FLOAD"},
+            {type = "int", name = "ABC"},
+            {type = "num", name = "ALOAD"},
+        },
+    }, {
+        -- `dead` is allocated at -O0 and gone at -O3, so the two
+        -- traces allocate a different number of tables; the one
+        -- that escapes into `dst` has to be recognized as the
+        -- same table anyway. Reads sat if local tables are
+        -- matched by allocation order instead of by escape.
+        -- An upvalue still open -- the chunk that owns it is
+        -- running -- is named by UREFO rather than UREFC. It was
+        -- NYI, so the body of any closure writing a file-scope
+        -- local went missing.
+        name = "open upvalue read and written",
+        code = [[
+local up = 0
+local function foo(i)
+    up = i
+    return up + 1
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        ins = {
+            {type = "p32", name = "UREFO"},
+            {type = "num", name = "USTORE"},
+            {type = "num", name = "ULOAD"},
+        },
+    }, {
+        -- A closure counting in an upvalue: UREFC names the
+        -- upvalue, ULOAD/USTORE read and write it. All four were
+        -- NYI, so the whole closure body vanished from the
+        -- formula.
+        name = "closed upvalue read and written",
+        code = [[
+local function mk()
+    local n = 0
+    return function() n = n + 1 return n end
+end
+local f = mk()
+f() f() f() f() f()
+]],
+        ins = {
+            {type = "p32", name = "UREFC"},
+            {type = "num", name = "ULOAD"},
+            {type = "num", name = "USTORE"},
+        },
+    }, {
+        -- setmetatable() lowers to FREF + FSTORE. FSTORE was
+        -- implemented but its FREF operand was not, so the
+        -- transitive NYI poisoning dropped every field store
+        -- from the formula.
+        name = "metatable stored through an FREF",
+        code = [[
+local function foo(t, m)
+    setmetatable(t, m)
+    return t
+end
+
+local mt = {}
+foo({}, mt)
+foo({}, mt)
+foo({}, mt)
+]],
+        ins = {
+            {type = "p32", name = "FREF"},
+            {type = "tab", name = "FSTORE"},
+            {type = "tab", name = "TBAR"},
+        },
+    }, {
+        name = "local table matched across a dropped allocation",
+        code = [[
+local function fill(dst)
+    for _ = 1, 6 do
+        local dead = {}
+        dst.x = {}
+    end
+end
+
+local d = {}
+fill(d)
+fill(d)
+fill(d)
+]],
+        unroll_n = 2,
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "HSTORE"},
         },
     }}
     test:plan(3 * #srcs)

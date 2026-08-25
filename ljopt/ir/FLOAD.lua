@@ -72,8 +72,12 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         else
             -- Propagate len when the SSA string was tracked as
             -- a known constant via HSTORE->HLOAD chains.
+            local known_len = ctx.const_str_lens[left_op:get_ssa()]
             local known = ctx.const_strs[left_op:get_ssa()]
-            if known ~= nil then
+            if known == nil and known_len ~= nil then
+                data = arith_utils.const_i64_to_smt_bv(known_len)
+                ctx.const_nums[self:get_ssa_reference()] = known_len
+            elseif known ~= nil then
                 local len = #known
                 data = arith_utils.const_i64_to_smt_bv(len)
                 ctx.const_nums[self:get_ssa_reference()] = len
@@ -90,8 +94,12 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
             smt_constants.FIELD_TAB_PREFIX .. right_op
         )
         local ct = ctx.const_tabs[left_op:get_ssa()]
+        -- The table id is a term, not a slot number: memory is
+        -- addressed by it directly.
         local tab_left = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
-        data = ctx.mem_stack:load_index(tab_left, field_hash, op_type.INT)
+        data = ctx.mem_stack:load_index(
+            tab_left, field_hash, op_type.INT
+        )
         -- Propagate constant table metadata for const-folding.
         if ct ~= nil then
             if right_op == 'tab.asize' and ct.asize ~= nil then
@@ -104,6 +112,24 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         utils.unreachable('FLOADInt: unsupported right_op: ' .. right_op)
     end
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.INT, data)
+end
+
+-- FLOADNum reads two VM constants and a boxed cdata double, and
+-- asserts on anything else. Without a gate that assert kills the
+-- run; an unmodelled field should degrade to NYI like every
+-- other one.
+function impls.IRNodeFLOADNum.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    local right_op = op_type.to_string(right_op_val)
+    if right_op == 'cdata.int64' then
+        return true
+    end
+    if left_op == nil or op_type.to_string(left_op) ~= 'nil' then
+        return false
+    end
+    local consts = ffi.abi('gc64') and {['#306'] = true, ['#302'] = true}
+        or {['#226'] = true, ['#222'] = true}
+    return consts[right_op] == true
 end
 
 impls.IRNodeFLOADI64 = {}
@@ -135,6 +161,15 @@ function impls.IRNodeFLOADI64:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), op_type.I64, data)
 end
 
+
+-- Same reasoning as IRNodeFLOADNum: only `cdata.int64` off a
+-- constant or an SSA cdata box is modelled, and the rest has to
+-- become NYI rather than reach utils.unreachable().
+function impls.IRNodeFLOADI64.is_implemented(_flags, _type, _opcode,
+                                             left_op, right_op_val)
+    return op_type.to_string(right_op_val) == 'cdata.int64'
+        and left_op ~= nil and (left_op:is_i64() or left_op:is_ssa())
+end
 
 impls.IRNodeFLOADU32 = {}
 ir_node.extended(impls.IRNodeFLOADU32, ir_node.ir_node_base)
@@ -208,13 +243,17 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local raw_cell = ('(select %s %s)'):format(
         ctx.mem_stack:load(parent_ptr), field_hash
     )
-    local data = ctx.mem_stack:load_index(
-        parent_ptr, field_hash, op_type.TAB
-    )
-    return ('(assert ((_ is tab-val) %s))\n%s'):format(
-        raw_cell,
-        ctx.op_stack:store(ssa_ref, op_type.TAB, data)
-    )
+    -- A table has no metatable until something sets one, and a
+    -- table allocated in this trace starts out with every field
+    -- nil -- which is exactly the state the `EQ tab.meta NULL`
+    -- guard the recorder emits next is there to check. Decode the
+    -- field the same way an HLOAD does, falling back to a fresh
+    -- slot, rather than asserting the cell holds a table: that
+    -- assert cannot hold for a fresh table, and one unsatisfiable
+    -- assert makes every question about the trace pair answer
+    -- "unsat", which reads as "equivalent".
+    local data = ir_node.get_table_uid(raw_cell)
+    return ctx.op_stack:store(ssa_ref, op_type.TAB, data)
 end
 
 impls.IRNodeFLOADP32 = {}
@@ -245,13 +284,26 @@ end
 
 function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
                                              _left_op, right_op_val)
-    -- tab.* are temporary disabled here,
-    -- because we are not taking into account
-    -- table/array size modification during
-    -- insertions.
-    -- See: https://github.com/ligurio/ljopt/issues/51
     local right_op = right_op_val:get_lit()
     if right_op == 'str.len' then
+        return true
+    end
+    -- tab.asize is the bound an ABC is checked against, so
+    -- leaving it out drops every bounds check in the trace along
+    -- with it. It is read out of the table's own memory, which
+    -- the two passes share, so both sides see the same size and a
+    -- check the optimizer dropped shows up as a difference in the
+    -- exits taken.
+    --
+    -- tab.hmask stays out. Enabling it leaves the unoptimized
+    -- trace guarding a layout the optimized one proved it need
+    -- not, and an exit one side can take alone reads as a
+    -- difference -- the general guard-elimination problem, which
+    -- ABC escapes only because a kept check implies a dropped
+    -- one. Measured: the guards agree on their constants and
+    -- both hold, and the pair still comes out sat. See:
+    -- https://github.com/ligurio/ljopt/issues/51
+    if right_op == 'tab.asize' then
         return true
     end
     return false
