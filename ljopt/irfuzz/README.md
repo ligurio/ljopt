@@ -271,6 +271,18 @@ wrong type on purpose, so it passes `raw_slots` to keep
 `gen.loop_order` from correcting it, and it is coverage-only -- the
 mistyped wiring is exactly what makes a comparison unsound.
 
+`lj_opt_loop.c` 395 -- `loop_undo`'s backprop-cache purge -- cannot
+be reached from the replay at all today, and not for want of a
+shape: `irfuzz_reset` never initializes `J->instunroll`, which the
+recorder sets from `J->param[JIT_P_instunroll]`. A failed unroll
+therefore takes the `--J->instunroll < 0` break and propagates the
+error instead of calling `loop_undo`, so every `loop_undo` in the
+counters comes from `recorded` mode. Beyond initializing it, the
+line wants a cache entry created *during* the copy -- so a narrowed
+CONV emitted there -- and then a failure after it, which points at
+FAILFOLD/GFAIL mid-copy rather than the type instability the slot
+walk reports, since that aborts before the copy narrows anything.
+
 Of the rest, one needs a harness change rather than a new shape:
 `lj_opt_mem.c` 642-644 folds two `KPTR` bases into base vs.
 base+offset, and the replay spec has no constant-pointer operand
