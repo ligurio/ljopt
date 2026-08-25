@@ -149,7 +149,7 @@ local function retrieve_str_op(op, ctx)
     if op:is_ssa() then
         return ctx.op_stack:load(op:get_ssa(), op_type.STR)
     elseif op:is_str() then
-        return '"' .. op:get_str() .. '"'
+        return arith_utils.const_str_to_smt_str(op:get_str())
     end
     utils.unreachable(
         'retrieve_str_op: unsupported op type: ' .. tostring(op and op.type)
