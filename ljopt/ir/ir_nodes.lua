@@ -98,7 +98,7 @@ local opcodes_table = {
     ['NEWREF'] = require('ljopt.ir.NEWREF'),
     ['UREFO'] = false,
     ['UREFC'] = false,
-    ['FREF'] = false,
+    ['FREF'] = require('ljopt.ir.FREF'),
     ['STRREF'] = false,
     -- Loads and Stores.
     ['ALOAD'] = require('ljopt.ir.ALOAD'),
