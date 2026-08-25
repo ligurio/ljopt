@@ -1951,6 +1951,25 @@ foo({})
         -- that escapes into `dst` has to be recognized as the
         -- same table anyway. Reads sat if local tables are
         -- matched by allocation order instead of by escape.
+        -- A closure counting in an upvalue: UREFC names the
+        -- upvalue, ULOAD/USTORE read and write it. All four were
+        -- NYI, so the whole closure body vanished from the
+        -- formula.
+        name = "closed upvalue read and written",
+        code = [[
+local function mk()
+    local n = 0
+    return function() n = n + 1 return n end
+end
+local f = mk()
+f() f() f() f() f()
+]],
+        ins = {
+            {type = "p32", name = "UREFC"},
+            {type = "num", name = "ULOAD"},
+            {type = "num", name = "USTORE"},
+        },
+    }, {
         -- setmetatable() lowers to FREF + FSTORE. FSTORE was
         -- implemented but its FREF operand was not, so the
         -- transitive NYI poisoning dropped every field store

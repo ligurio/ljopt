@@ -384,7 +384,10 @@ local function dump_ir(tr, dumpsnap, dumpreg)
 	      op2_txt = litn[op2]
 	      write_out("  ", op2_txt)
 	    elseif op == "UREFO " or op == "UREFC " then
+	      -- op2 is (uv_index << 8) | dhash8. The hash is a
+	      -- recording artefact, so only the index travels.
 	      op2_txt = format("  #%-3d", shr(op2, 8))
+	      op2_tab = {type = "imm", value = shr(op2, 8)}
 	      write_out(op2_txt)
 	    else
 	      op2_txt = format("  #%-3d", op2)
