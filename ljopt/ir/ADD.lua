@@ -9,7 +9,10 @@ impls.IRNodeADDNum = {
 }
 ir_node.extended(impls.IRNodeADDNum, bin_op.BinOpNum)
 
-impls.IRNodeADDInt = { op_str = 'bvadd' }
+impls.IRNodeADDInt = {
+    op_str = 'bvadd',
+    const_fn = function(a, b) return a + b end
+}
 ir_node.extended(impls.IRNodeADDInt, bin_op.BinOpInt)
 
 impls.IRNodeADDI64 = { op_str = 'bvadd' }
