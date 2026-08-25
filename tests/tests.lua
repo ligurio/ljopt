@@ -366,6 +366,26 @@ end
                 left_op = op_type.new("ssa", 3)},
         },
     }, {
+        -- string.sub lowers to STRREF + SNEW. Both were NYI, so
+        -- the slice and everything reading it -- including the
+        -- str.len of the result -- left the formula. -O3 folds
+        -- the slice away, so unsat says the modelled substring
+        -- is what the optimizer computed.
+        name = "string.sub through STRREF and SNEW",
+        code = [[
+local sub = string.sub
+local s = "hello world"
+local acc = 0
+for i = 1, 30 do
+    acc = acc + #sub(s, 2, 4)
+end
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "p32", name = "STRREF"},
+            {type = "str", name = "SNEW"},
+            {type = "int", name = "FLOAD"},
+        },    }, {
         -- Comparing two interned strings records as a str-typed
         -- guard. Without a class for that type variant the guard
         -- was dropped, and with it the branch it decides.
