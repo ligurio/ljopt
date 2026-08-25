@@ -201,19 +201,26 @@ the host JIT compiles ljopt's own Lua and pollutes the counters.
 `COV_LOOP=1` replays each trace as a loop, which is what reaches
 `lj_opt_loop.c` and the PHI paths.
 
-The full sweep (every mode, with and without `COV_LOOP`) currently
-covers 2450 of 2513 lines, 97.5%:
+The full sweep (every mode, with and without `COV_LOOP`, each
+capped at 8000 traces) currently covers 2448 of 2513 lines, 97.4%:
 
 | file | lines | hit | |
 |---|---|---|---|
-| `lj_opt_fold.c`   | 1241 | 1207 | 97.3% |
-| `lj_opt_mem.c`    |  572 |  558 | 97.6% |
+| `lj_opt_fold.c`   | 1241 | 1209 | 97.4% |
+| `lj_opt_mem.c`    |  572 |  554 | 96.9% |
 | `lj_opt_loop.c`   |  245 |  238 | 97.1% |
 | `lj_opt_dce.c`    |   35 |   35 | 100%  |
 | `lj_opt_sink.c`   |  148 |  145 | 98.0% |
 | `lj_opt_narrow.c` |  272 |  267 | 98.2% |
 
-Sixteen of the 63 lines left are unreachable by construction:
+The `COV_LOOP` half of that only works against a LuaJIT built from
+the *current* `lua_patches`. `make` rebuilds `build/luajit_<tag>/`
+only when the directory is missing, so a build that predates the
+loop-replay patch still runs and silently ignores `spec.loop` --
+`grep -c "lj_opt_loop(J)" build/luajit_<tag>/src/lib_jit.c` must
+print 1.
+
+Sixteen of the 65 lines left are unreachable by construction:
 
 - `lj_opt_fold.c` 286, 358, 389, 489, 2017 -- `default:` arms behind
   an `lj_assert*`, i.e. "cannot happen".
@@ -233,10 +240,14 @@ Sixteen of the 63 lines left are unreachable by construction:
   constant 0, so the equal-value store is dropped before the
   elimination is considered.
 
-The rest are reachable and simply not generated yet -- the widest
-gaps are `abc_invar` (a P32 bounds check re-emitted inside the loop),
-`fwd_sload` on a frame slot, the `aa_cnew` escape arms, and the
-recorder's `lj_opt_narrow_toint` type error.
+Of the rest, one needs a harness change rather than a new shape:
+`lj_opt_mem.c` 642-644 folds two `KPTR` bases into base vs.
+base+offset, and the replay spec has no constant-pointer operand
+kind (`gen.kinds` stops at `KSTR`), so no shape can produce that
+pair. `lj_opt_narrow.c` 257-259 is the backtrack after
+`narrow_conv_backprop` overruns `nc->maxsp`, which needs a
+narrowing tree deeper than the sweep builds. The remainder are
+reachable and simply not generated yet.
 
 ### Known limitation
 
