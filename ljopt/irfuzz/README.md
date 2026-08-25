@@ -202,13 +202,13 @@ the host JIT compiles ljopt's own Lua and pollutes the counters.
 `lj_opt_loop.c` and the PHI paths.
 
 The full sweep (every mode, with and without `COV_LOOP`, each
-capped at 8000 traces) currently covers 2448 of 2513 lines, 97.4%:
+capped at 8000 traces) currently covers 2449 of 2513 lines, 97.5%:
 
 | file | lines | hit | |
 |---|---|---|---|
 | `lj_opt_fold.c`   | 1241 | 1209 | 97.4% |
 | `lj_opt_mem.c`    |  572 |  554 | 96.9% |
-| `lj_opt_loop.c`   |  245 |  238 | 97.1% |
+| `lj_opt_loop.c`   |  245 |  239 | 97.6% |
 | `lj_opt_dce.c`    |   35 |   35 | 100%  |
 | `lj_opt_sink.c`   |  148 |  145 | 98.0% |
 | `lj_opt_narrow.c` |  272 |  267 | 98.2% |
@@ -220,7 +220,7 @@ loop-replay patch still runs and silently ignores `spec.loop` --
 `grep -c "lj_opt_loop(J)" build/luajit_<tag>/src/lib_jit.c` must
 print 1.
 
-Sixteen of the 65 lines left are unreachable by construction:
+Sixteen of the 64 lines left are unreachable by construction:
 
 - `lj_opt_fold.c` 286, 358, 389, 489, 2017 -- `default:` arms behind
   an `lj_assert*`, i.e. "cannot happen".
