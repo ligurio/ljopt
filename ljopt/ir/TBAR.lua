@@ -8,8 +8,6 @@
 -- guards out of the encoding with it.
 local ir_node = require('ljopt.ir.ir_node_base')
 
-local impls = {}
-
 local IRNodeBarrier = {}
 ir_node.extended(IRNodeBarrier, ir_node.ir_node_base)
 
@@ -17,12 +15,12 @@ function IRNodeBarrier:to_smt_lib(ctx)
     return ctx.te_stack:store(self:get_ssa_reference(), 'true')
 end
 
-impls.IRNodeTBAR = IRNodeBarrier
-impls.IRNodeOBAR = IRNodeBarrier
-impls.IRNodeXBAR = IRNodeBarrier
-
-local function instance(node_str)
-    return impls[node_str]
+-- A barrier carries no value, so its IR type says nothing about
+-- what to emit: TBAR shows up as both `nil` and `tab`. This
+-- module is registered only for the three barriers, so whatever
+-- type variant arrives is one of them.
+local function instance(_node_str)
+    return IRNodeBarrier
 end
 
 return {

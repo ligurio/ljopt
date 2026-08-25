@@ -1936,6 +1936,28 @@ foo({})
         -- that escapes into `dst` has to be recognized as the
         -- same table anyway. Reads sat if local tables are
         -- matched by allocation order instead of by escape.
+        -- setmetatable() lowers to FREF + FSTORE. FSTORE was
+        -- implemented but its FREF operand was not, so the
+        -- transitive NYI poisoning dropped every field store
+        -- from the formula.
+        name = "metatable stored through an FREF",
+        code = [[
+local function foo(t, m)
+    setmetatable(t, m)
+    return t
+end
+
+local mt = {}
+foo({}, mt)
+foo({}, mt)
+foo({}, mt)
+]],
+        ins = {
+            {type = "p32", name = "FREF"},
+            {type = "tab", name = "FSTORE"},
+            {type = "tab", name = "TBAR"},
+        },
+    }, {
         name = "local table matched across a dropped allocation",
         code = [[
 local function fill(dst)
