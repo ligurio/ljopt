@@ -99,7 +99,7 @@ local opcodes_table = {
     ['UREFO'] = require('ljopt.ir.UREF'),
     ['UREFC'] = require('ljopt.ir.UREF'),
     ['FREF'] = require('ljopt.ir.FREF'),
-    ['STRREF'] = false,
+    ['STRREF'] = require('ljopt.ir.STRREF'),
     -- Loads and Stores.
     ['ALOAD'] = require('ljopt.ir.ALOAD'),
     ['HLOAD'] = require('ljopt.ir.HLOAD'),
@@ -114,8 +114,8 @@ local opcodes_table = {
     ['FSTORE'] = require('ljopt.ir.FSTORE'),
     ['XSTORE'] = require('ljopt.ir.XSTORE'),
     -- Allocations.
-    ['SNEW'] = false,
-    ['XSNEW'] = false,
+    ['SNEW'] = require('ljopt.ir.SNEW'),
+    ['XSNEW'] = require('ljopt.ir.SNEW'),
     ['TNEW'] = require('ljopt.ir.TNEW'),
     ['TDUP'] = require('ljopt.ir.TDUP'),
     ['CNEW'] = require('ljopt.ir.CNEW'),
