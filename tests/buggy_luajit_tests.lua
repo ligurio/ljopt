@@ -339,6 +339,16 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/issues/6163
 -- https://github.com/tarantool/luajit/commit/c05d103305da0626e025dbf81370ca9f4f788c83
 -- https://github.com/LuaJIT/LuaJIT/commit/03208c8162af9cc01ca76ee1676ca79e5abe9b60
+-- Not decidable yet, and not for the min/max reason the issue is
+-- about: of the three trace pairs the chunk records, the one that
+-- reports sat holds no MIN/MAX at all -- it is the `samevalues()`
+-- scan. It is unsat at unroll depth 0 and sat from depth 1, and
+-- the model says why: at every snapshot after the first the
+-- optimised side is exactly one iteration ahead (1.0 against 2.0,
+-- then 2.0 against 3.0). Both sides are unrolled and carry the
+-- same snapshot ids, so the two traces disagree about which
+-- iteration a carried slot belongs to. LuaJIT#1244 fails with the
+-- same signature.
 test:test("(LuaJIT#6163)", function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_6163.lua")
@@ -437,6 +447,10 @@ function(test)
     -- one is compared against a different program point and the check
     -- reports sat on the fixed build too. Unsat at unroll depth 0,
     -- but the bug needs at least one unrolled iteration to appear.
+    -- The depth-0/depth-1 split is shared with LuaJIT#6163, whose
+    -- model shows the optimised side one iteration ahead at every
+    -- snapshot but the first -- so the snapshot count is not the
+    -- whole story, the unroll misaligns the two sides.
     test:skip("reproduce with SMT")
 end)
 
