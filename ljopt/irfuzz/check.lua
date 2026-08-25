@@ -188,6 +188,12 @@ local function build_from(insns, outputs, opts, seed)
   -- A loop replay runs lj_opt_loop, so the optimized trace gets a
   -- LOOP marker and PHIs while the unoptimized one stays straight;
   -- ljopt unrolls each shape once it knows the link is a loop.
+  -- A loop replay writes out[i] into the slot SLOAD #i reads, so
+  -- the order has to be type-matched -- and the same order has to
+  -- drive the comparison, which pairs output i with slot i.
+  if opts.loop then
+    outputs = gen.loop_order(insns, outputs)
+  end
   local spec = gen.to_spec(insns, outputs)
   spec.loop = opts.loop or nil
   local replay_ok, unopt_pass, opt_pass = pcall(jutil.irfuzz, spec)

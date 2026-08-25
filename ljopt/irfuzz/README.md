@@ -273,23 +273,24 @@ pair. `lj_opt_narrow.c` 257-259 is the backtrack after
 narrowing tree deeper than the sweep builds. The remainder are
 reachable and simply not generated yet.
 
-### Known limitation: loop mode is not yet a sound oracle
+### Loop mode: outputs are ordered by slot type
 
 `--loop` (and `COV_LOOP`) feeds each generator output back into the
-slot its SLOAD reads, and does it positionally: `out[i]` goes to
-slot `i-1`, with no regard for the type that slot's SLOAD expects.
-An `int` root landing in a `num` slot makes the two passes model the
-type change differently and the traces then disagree for reasons the
-optimizer had no part in -- e.g. seed 4 reports a signed-zero
-difference that reduces to `-2^31 * -0.0` on one side against a
-symbolic num chain on the other. Its SAT verdicts are therefore not
-bug candidates until this is fixed.
+slot its SLOAD reads -- `out[i]` goes to the slot `SLOAD #i` reads --
+so `gen.loop_order` permutes the outputs to put a value of that
+SLOAD's type at each position. Without it an `int` root lands in a
+`num` slot, the two passes model the type change differently, and
+the traces disagree over something the optimizer never touched: it
+was reporting a signed-zero difference that reduced to
+`-2^31 * -0.0` on one side against a symbolic num chain on the
+other.
 
-Fixing it means type-matching the feedback *and* teaching
-`attach_snapshot` the same slot assignment: it currently hard-codes
-"output `i` is in slot `i`", so reordering `spec.out` alone
-desynchronises ljopt's model of the slots from what the replay did
-and makes things worse, not better.
+The same order drives the comparison, and that is not incidental:
+`attach_snapshot` pairs compared output `i` with slot `i`, so
+handing the replay a different order than the compared one models a
+slot mapping the replay never performed. A slot with no root of its
+type is fed its own SLOAD, which makes it invariant; that is about
+1% of slots.
 
 ### Known limitation
 
