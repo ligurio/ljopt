@@ -191,7 +191,9 @@ local function build_from(insns, outputs, opts, seed)
   -- A loop replay writes out[i] into the slot SLOAD #i reads, so
   -- the order has to be type-matched -- and the same order has to
   -- drive the comparison, which pairs output i with slot i.
-  if opts.loop then
+  -- raw_slots is for the coverage-only shapes that need the
+  -- mistyped wiring on purpose (see iter_licm).
+  if opts.loop and not opts.raw_slots then
     outputs = gen.loop_order(insns, outputs)
   end
   local spec = gen.to_spec(insns, outputs)

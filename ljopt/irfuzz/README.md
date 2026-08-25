@@ -256,13 +256,20 @@ right ref. Copy chains between carried slots (`a, b = b, f(a)`, and
 longer rotations) do not do it: they never set `passx`, so the pass
 does not run at all.
 
-`lj_opt_loop.c` 167 and 366 are the two remaining `LJ_TRERR_PHIOV`
-raises. They need `nphi` to be exactly at `LJ_MAX_PHI` (64) when
-pass #3's subst walk, or the phiconv path, adds one more: a loop
-with more than 64 carried values trips the third raise (line 339)
-first, and that one is already covered. Fewer than 64 carried
-values never reach the limit at all, so the shape has to arrive at
-64 through the main pass and then cross it elsewhere.
+`lj_opt_loop.c` 167 -- pass #3's `LJ_TRERR_PHIOV` -- is reached by
+the `licm` mode. Crossing `LJ_MAX_PHI` (64) anywhere but the raise
+in the main slot walk needs an extra PHI from somewhere else, and
+the loop pass's type coercion supplies one: a slot whose SLOAD type
+differs from the value written back has to be converted, and the
+conversion promotes its operand. 65 slots with the top one mistyped
+crosses the limit in pass #3; more than that trips the main raise
+first. 366, the same raise on the phiconv path, still needs a
+carried CONV whose operand is loop-invariant.
+
+That mode is the one place the harness writes a slot a value of the
+wrong type on purpose, so it passes `raw_slots` to keep
+`gen.loop_order` from correcting it, and it is coverage-only -- the
+mistyped wiring is exactly what makes a comparison unsound.
 
 Of the rest, one needs a harness change rather than a new shape:
 `lj_opt_mem.c` 642-644 folds two `KPTR` bases into base vs.
