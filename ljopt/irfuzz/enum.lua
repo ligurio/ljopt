@@ -1563,13 +1563,16 @@ local function iter_abc(opts)
       for _, kb in ipairs(ABC_KEYS) do
         for _, shape in ipairs(ABC_SHAPES) do
           local insns = {}
+          local carried = false
           local function add(x)
             insns[#insns + 1] = x
             return #insns
           end
-          local v = add({ op = SL, t = IRT_NUM, ak = K.LIT, av = 1,
+          -- The index is in slot 1 so a loop replay can carry it
+          -- back with a single output; see the invariant shapes.
+          local idx = add({ op = SL, t = IRT_INT, ak = K.LIT, av = 1,
             bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
-          local idx = add({ op = SL, t = IRT_INT, ak = K.LIT, av = 2,
+          local v = add({ op = SL, t = IRT_NUM, ak = K.LIT, av = 2,
             bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
           local tab = add({ op = SL, t = IRT_TAB, ak = K.LIT, av = 3,
             bk = K.LIT, bv = gen.SLOAD_TYPECHECK })
@@ -1578,9 +1581,10 @@ local function iter_abc(opts)
           -- Guarded and int-typed, as emitir(IRTGI(IR_ABC)) does
           -- for an ordinary t[i]; the invariant shapes override
           -- it.
-          local function abc(key_kind, key, t)
+          local function abc(key_kind, key, t, ak, av)
             add({ op = ABC, t = (t or IRT_INT) + 0x80,
-              ak = K.REF, av = asize, bk = key_kind, bv = key })
+              ak = ak or K.REF, av = av or asize,
+              bk = key_kind, bv = key })
           end
           -- (i + k) + (-k): the shape abc_fwd recognizes.
           local function roundtrip(k)
@@ -1605,8 +1609,13 @@ local function iter_abc(opts)
             abc(K.REF, roundtrip(ka))
           elseif shape == "invar" then
             abc(K.REF, idx, IRT_P32)
+            carried = true
           elseif shape == "invar_u32" then
-            abc(K.REF, idx, IRT_U32)
+            -- The recorder picks U32 exactly for a constant
+            -- array size, and a constant ref always sits below
+            -- the loop marker, which is what makes it droppable.
+            abc(K.REF, idx, IRT_U32, K.KINT, 64)
+            carried = true
           else
             abc(K.REF, idx)
           end
@@ -1622,7 +1631,15 @@ local function iter_abc(opts)
             ak = K.REF, av = aref, bk = K.REF, bv = v })
           local out = add({ op = gen.op_num("ALOAD"), t = IRT_NUM,
             ak = K.REF, av = aref, bk = K.NONE, bv = 0 })
-          coroutine.yield({ insns = insns, outputs = { out } })
+          -- An invariant check is re-emitted below LOOP only
+          -- when its key varies, so the index goes back into
+          -- the slot its SLOAD reads (outputs fill in order).
+          local outputs = { out }
+          if carried then
+            outputs[2] = add({ op = ADD, t = IRT_INT, ak = K.REF,
+              av = idx, bk = K.KINT, bv = 1 })
+          end
+          coroutine.yield({ insns = insns, outputs = outputs })
         end
       end
     end
