@@ -271,6 +271,15 @@ wrong type on purpose, so it passes `raw_slots` to keep
 `gen.loop_order` from correcting it, and it is coverage-only -- the
 mistyped wiring is exactly what makes a comparison unsound.
 
+`lj_opt_loop.c` 349 -- the loop pass converting a carried slot back
+to int -- was covered before the outputs were type-ordered, and
+only because of that: it needs the snapshot's slot type to differ
+from the loop-end value's type, and once each slot is fed a value
+of its own type those are the same ref. Recovering it needs the
+*substituted* value's type to differ from the snapshot's, which no
+shape here produces yet. Trading it for an oracle that does not
+report false divergences is the right way round, but it is a trade.
+
 `lj_opt_loop.c` 395 -- `loop_undo`'s backprop-cache purge -- cannot
 be reached from the replay at all today, and not for want of a
 shape: `irfuzz_reset` never initializes `J->instunroll`, which the
