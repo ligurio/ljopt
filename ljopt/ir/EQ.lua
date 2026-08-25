@@ -93,6 +93,32 @@ function impls.IRNodeEQStr:to_smt_lib(ctx)
     ))
 end
 
+-- `EQ REF_BASE, uref + k` is the guard in front of an *open*
+-- upvalue: it proves the upvalue still aliases the stack slot
+-- the trace was recorded reading, and the recorder then uses the
+-- slot directly -- no ULOAD is emitted at all.
+--
+-- The encoding never relies on that aliasing fact, since the
+-- value travels through the slot like any other. Both traces
+-- emit the guard and both mean the same thing by it, so it holds
+-- here. What is given up is noticing an optimizer that dropped
+-- it: REF_BASE has no value in this model to compare against.
+impls.IRNodeEQP32 = {}
+ir_node.extended(impls.IRNodeEQP32, ir_node.ir_node_base)
+
+local function is_ref_base(op)
+    return op ~= nil and op:is_ssa() and op:get_ssa() == 0
+end
+
+function impls.IRNodeEQP32:to_smt_lib(ctx)
+    return ctx.te_stack:store(self:get_ssa_reference(), 'true')
+end
+
+function impls.IRNodeEQP32.is_implemented(_flags, _type, _opcode,
+                                          left_op, right_op_val)
+    return is_ref_base(left_op) or is_ref_base(right_op_val)
+end
+
 local function instance(node_str)
     return impls[node_str]
 end
