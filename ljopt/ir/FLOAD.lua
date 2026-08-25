@@ -295,10 +295,13 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
     -- check the optimizer dropped shows up as a difference in the
     -- exits taken.
     --
-    -- tab.hmask stays out. The two recordings can catch a table
-    -- in different states -- one creating a key, one finding it
-    -- there -- so the layout each guards is neither a shared
-    -- precondition nor a comparable exit. See:
+    -- tab.hmask stays out. Enabling it leaves the unoptimized
+    -- trace guarding a layout the optimized one proved it need
+    -- not, and an exit one side can take alone reads as a
+    -- difference -- the general guard-elimination problem, which
+    -- ABC escapes only because a kept check implies a dropped
+    -- one. Measured: the guards agree on their constants and
+    -- both hold, and the pair still comes out sat. See:
     -- https://github.com/ligurio/ljopt/issues/51
     if right_op == 'tab.asize' then
         return true

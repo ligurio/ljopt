@@ -464,9 +464,17 @@ function MemoryStack.allocate_local(self, ssa_ref)
     local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
     table.insert(self.local_tabs, name)
     self.local_by_ssa[ssa_ref] = name
+    -- zero_pointer is unconstrained, not all-nil, so being fresh
+    -- does not by itself say the metatable field is empty -- and
+    -- the recorder guards exactly that in front of a fresh
+    -- table, while the optimizer knows it and drops the guard.
     return name, ('(declare-const %s Int)\n'):format(name) ..
-        ('(assert (= (select (select %s %s) %s) zero_pointer))'):format(
+        ('(assert (= (select (select %s %s) %s) zero_pointer))\n'):format(
             self._name, self:get_version(), name
+        ) ..
+        ('(assert (= (select (select (select %s %s) %s) %s) nil-val))'):format(
+            self._name, self:get_version(), name,
+            ('(str-val "%stab.meta")'):format(smt_constants.FIELD_TAB_PREFIX)
         )
 end
 
