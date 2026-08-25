@@ -25,17 +25,16 @@ ir_node.extended(impls.IRNodeADDU32, bin_op.BinOpU32)
 impls.IRNodeADDP64 = { op_str = 'bvadd' }
 ir_node.extended(impls.IRNodeADDP64, bin_op.BinOpI64)
 
--- The recorder offsets the vararg base by a constant before
--- indexing it. The offset is frame layout, not a value the trace
--- computes, so the result names the same region; AREF then adds
--- the index that does matter.
+-- The recorder offsets a p32 base by a constant -- frame layout
+-- for the vararg region, an alias check for an open upvalue.
+-- The offset is not a value the trace computes, so the result
+-- still names whatever the base named.
 impls.IRNodeADDP32 = {}
 ir_node.extended(impls.IRNodeADDP32, ir_node.ir_node_base)
 
 function impls.IRNodeADDP32:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local ssa_ref = self:get_ssa_reference()
-    ctx.vararg_refs[ssa_ref] = true
     return ctx.op_stack:store(ssa_ref, op_type.TAB,
         ctx.op_stack:load(left_op:get_ssa(), op_type.TAB))
 end

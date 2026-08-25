@@ -121,10 +121,7 @@ local opcodes_table = {
     -- Calls.
     ['CALLN'] = require('ljopt.ir.CALLN'),
     ['CALLL'] = require('ljopt.ir.CALLL'),
-    -- A call to a lua_State-taking helper. Which helpers occur
-    -- is unknown here -- none was recordable -- and guessing at
-    -- their operand shapes would model them wrongly.
-    ['CALLS'] = false,
+    ['CALLS'] = require('ljopt.ir.CALLS'),
     ['CALLXS'] = require('ljopt.ir.CALLXS'),
     -- CARG is indeed dummy node. Pass arguments in CALLL.
     ['CARG'] = require('ljopt.ir.ir_node_dummy'),

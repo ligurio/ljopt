@@ -13,19 +13,20 @@ local smt_constants = require('ljopt.smt_constants')
 
 local impls = {}
 
+
 local IRNodeUREF = {}
 ir_node.extended(IRNodeUREF, ir_node.ir_node_base)
 
 function IRNodeUREF:to_smt_lib(ctx)
     local left_op = self:get_left_op()
     local ssa_ref = self:get_ssa_reference()
-    local fn_ssa = left_op:get_ssa()
     local key = arith_utils.const_str_to_memcell(
         ('%suv.%d'):format(
             smt_constants.FIELD_TAB_PREFIX,
             ir_node.retrieve_slot_op(self:get_right_op())
         )
     )
+    local fn_ssa = left_op:get_ssa()
     ctx.const_tabs[ssa_ref] = ctx.const_tabs[fn_ssa]
     local fn_id = ctx.op_stack:load(fn_ssa, op_type.TAB)
     return ('%s\n%s'):format(
@@ -36,9 +37,14 @@ function IRNodeUREF:to_smt_lib(ctx)
     )
 end
 
--- A UREFO on a constant function has no op-stack entry to read
--- the closure out of, and the aliasing guards around it need a
--- p32 SUB against REF_BASE that is not modelled either.
+-- UREFO on a constant closure is rejected, and not for want of a
+-- name for it: its bytecode is identical in both recordings and
+-- keys it fine. An *open* upvalue still lives in the VM stack,
+-- and the recorder proves so with `EQ REF_BASE, uref + k` and
+-- then reads the stack slot directly -- so the optimized trace
+-- has a slot where this one would have an upvalue object, and
+-- the two are not connected. Modelling it as its own object
+-- makes equivalent traces read as different.
 function IRNodeUREF.is_implemented(_flags, _type, _opcode,
                                    left_op, right_op_val)
     return left_op ~= nil and left_op:is_ssa()

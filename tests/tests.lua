@@ -372,6 +372,19 @@ end
                 left_op = op_type.new("ssa", 3)},
         },
     }, {
+        -- math.random goes through a helper that takes the
+        -- lua_State, which records as CALLS. It was NYI, so the
+        -- call and the value it produced left the formula.
+        name = "lua_State helper called through CALLS",
+        code = [[
+local r = math.random
+local x = 0
+for i = 1, 40 do x = r() end
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "num", name = "CALLS"},
+        },    }, {
         -- Reading `...` inside the function that owns it records
         -- VLOAD over an AREF into the vararg region, reached by
         -- frame arithmetic from REF_BASE rather than through a
