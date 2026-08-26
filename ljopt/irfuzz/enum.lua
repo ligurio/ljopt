@@ -1894,23 +1894,20 @@ end
 -- -- Substring / string-compare enumeration
 -- ----------------------
 --
--- COVERAGE ONLY. ljopt models SNEW and STRREF now, but two
--- things still stop this from being a value oracle:
+-- COVERAGE ONLY. ljopt models SNEW and STRREF, and XLOAD.lua now
+-- reads a load through a STRREF from the string's bytes, which is
+-- what merge_eqne_snew_kgc's unaligned compares need. Two things
+-- still stop this from being a value oracle:
 --
---   * merge_eqne_snew_kgc rewrites `s:sub(a,b) == "ab"` for a
---     constant string of at most four bytes into an unaligned
---     XLOAD over the STRREF. ljopt reads every XLOAD out of the
---     flat xmem, so the STRREF -- carried as the (string,
---     offset) pair the String theory forces -- decodes with the
---     wrong ADT accessor and yields a free value. 55 of 189
---     traces reported SAT with no gap named. Marking that XLOAD
---     NYI does not help: it moves the false SAT into the NE that
---     consumes it.
 --   * SMT's str.substr clamps an out-of-range slice, while the
 --     recorder only ever emits SNEW on a range string.sub has
 --     already validated. The enumeration builds SNEW with a
 --     symbolic length, so fload_str_len_snew folding the length
 --     back to that operand disagrees with the clamped model.
+--   * The byte loads are expensive: of the 45 traces -O3 folds
+--     this way, 13 come back unsat, 6 SAT (the clamping above)
+--     and 26 time out at 20s. A sweep that times out on more
+--     than half of what it checks is not yet worth running.
 --
 -- What it reaches is the `string.sub` family of fold rules,
 -- which nothing else can produce:
