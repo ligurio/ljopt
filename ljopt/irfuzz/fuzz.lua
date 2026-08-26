@@ -110,9 +110,12 @@ end
 -- left the sampled slices at 0 SAT, and five traces rendered
 -- under the faulted build were identical to the clean ones -- the
 -- fault never arrives, so nothing is validated either way. And
--- the clean sweep over the whole space reports 25 SAT and 21 LINT
--- of 2166, none triaged. Triage those and find a fault its traces
--- reach before wiring it up.
+-- the clean sweep over the whole space reports 25 SAT and 21
+-- LINT of 2166. enum.lua triages those and none is a miscompile,
+-- but each has to be silenced or modelled before the sweep can
+-- report anything useful. Start from the two SAT on a load from
+-- a fresh empty TNEW: that shape is the one an injected fault is
+-- known to reach.
 local EXTRA_SWEEPS = {
   -- Clean value oracles: every output is one ljopt models.
   abc = { desc = "array bounds checks (ABC) and the folds that drop them" },
