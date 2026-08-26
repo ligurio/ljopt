@@ -8,14 +8,45 @@ local impls = {}
 -- byte-addressed xmem and `finalize` them into the value the
 -- op-stack expects for `typ` (a BitVec 64 for int/i64, a double
 -- for num). See arith_utils.xmem_load.
+-- A STRREF is not an xmem address. STRREF.lua carries it as the
+-- (string, offset) pair the SMT String theory forces, in a
+-- p32-val cell, so an xmem load through it would decode that cell
+-- with the wrong ADT accessor and hand the solver a free value.
+-- Read the string's bytes instead, little-endian, the way the
+-- unaligned compares merge_eqne_snew_kgc emits do.
+--
+-- str.at past the end gives "" and str.to_code gives -1 for it,
+-- which int2bv wraps to 0xff. That only shows up on a read the
+-- recorder guards against anyway: merge_eqne_snew_kgc compares
+-- the length first.
+local function str_bytes(cell, nbytes)
+    local off = ('(get-p32-tab %s)'):format(cell)
+    local base = ('(get-str (get-p32-idx %s))'):format(cell)
+    local byte = '((_ int2bv 8) (str.to_code (str.at %s (+ %s %d))))'
+    if nbytes == 1 then
+        return byte:format(base, off, 0)
+    end
+    local parts = {}
+    for i = nbytes - 1, 0, -1 do
+        parts[#parts + 1] = byte:format(base, off, i)
+    end
+    return ('(concat %s)'):format(table.concat(parts, ' '))
+end
+
 local function make_xload(typ, nbytes, finalize)
     local cls = {}
     ir_node.extended(cls, ir_node.ir_node_base)
     function cls:to_smt_lib(ctx)
-        local ptr = ir_node.retrieve_i64_op(
-            self:get_left_op(), ctx, 'p64'
-        )
-        local raw = arith_utils.xmem_load(ctx.xmem_cur, ptr, nbytes)
+        local left = self:get_left_op()
+        local raw
+        if left:is_ssa() and ctx.strref_ptrs[left:get_ssa()] then
+            raw = str_bytes(
+                ctx.op_stack:load(left:get_ssa(), op_type.ANY), nbytes
+            )
+        else
+            local ptr = ir_node.retrieve_i64_op(left, ctx, 'p64')
+            raw = arith_utils.xmem_load(ctx.xmem_cur, ptr, nbytes)
+        end
         return ctx.op_stack:store(self:get_ssa_reference(), typ, finalize(raw))
     end
     return cls

@@ -16,6 +16,7 @@ ir_node.extended(impls.IRNodeSTRREFP32, ir_node.ir_node_base)
 
 function impls.IRNodeSTRREFP32:to_smt_lib(ctx)
     local ssa_ref = self:get_ssa_reference()
+    ctx.strref_ptrs[ssa_ref] = true
     local base = ir_node.retrieve_str_op(self:get_left_op(), ctx)
     local off = ir_node.retrieve_int_op(self:get_right_op(), ctx, op_type.INT)
     return ('%s\n%s'):format(

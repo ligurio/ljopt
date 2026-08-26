@@ -679,6 +679,10 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- ssa_ref -> true for the frame arithmetic that names
     -- the vararg region (see ir/VLOAD.lua).
     self.vararg_refs = {}
+    -- ssa_ref -> true for a STRREF result. The pointer it stands
+    -- for is a (string, offset) pair, not an xmem address, so an
+    -- XLOAD through it reads the string's bytes -- see XLOAD.lua.
+    self.strref_ptrs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -707,6 +711,10 @@ function SMTContext:restart()
     -- ssa_ref -> true for the frame arithmetic that names
     -- the vararg region (see ir/VLOAD.lua).
     self.vararg_refs = {}
+    -- ssa_ref -> true for a STRREF result. The pointer it stands
+    -- for is a (string, offset) pair, not an xmem address, so an
+    -- XLOAD through it reads the string's bytes -- see XLOAD.lua.
+    self.strref_ptrs = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
