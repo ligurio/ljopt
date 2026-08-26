@@ -92,6 +92,42 @@ local function solve(formula, timeout_sec)
   return "error"
 end
 
+-- Enumerations covrun.lua already drives for coverage. Each has
+-- an iter_/count_ pair and feeds check.build_from the same way
+-- the hand-written sweeps do, so one table gives all of them a
+-- flag, a solver sweep and a --show. `opts` reaches the iterator.
+--
+-- iter_bufcalls, iter_licm, iter_strops and iter_shapes are
+-- absent. bufcalls leaves the BUFSTR a gap, licm wires outputs to
+-- slots of the wrong type on purpose (check.lua's raw_slots), and
+-- strops has two open modelling holes described in enum.lua --
+-- none of those three compares what the trace computed.
+--
+-- shapes is the undecided one, on two counts. It is one trace per
+-- fold rule over a long tail of rules, so a fault injected into
+-- any single rule reaches almost none of the space: fwd_ahload,
+-- the empty-TNEW load, kfold_int64comp and kfold_intarith each
+-- left the sampled slices at 0 SAT, and five traces rendered
+-- under the faulted build were identical to the clean ones -- the
+-- fault never arrives, so nothing is validated either way. And
+-- the clean sweep over the whole space reports 25 SAT and 21 LINT
+-- of 2166, none triaged. Triage those and find a fault its traces
+-- reach before wiring it up.
+local EXTRA_SWEEPS = {
+  -- Clean value oracles: every output is one ljopt models.
+  abc = { desc = "array bounds checks (ABC) and the folds that drop them" },
+  upval = { desc = "upvalue refs and ULOAD/USTORE forwarding" },
+  -- These two reach outputs ljopt cannot model, so they run
+  -- gap-tolerant: the gap is named and skipped, and what is left
+  -- is still a real check. Measured 2026-08-26 -- ahref 256 of
+  -- 1800 gapped (a Knil output), xref 105 of 132 (FLOAD and XLOAD
+  -- of cdata fields). xref is the weak one: 45 of 132 checked.
+  ahref = { desc = "AREF/HREF chains and their load forwarding",
+            gaps = true },
+  xref = { desc = "raw memory refs and their reassociation",
+           opts = { value_outputs = true }, gaps = true },
+}
+
 local function parse_args(argv)
   local o = { seed = 1, count = 1, insns = nil, show = nil, ints = true,
               include_gaps = false, tables = false,
@@ -179,6 +215,8 @@ local function parse_args(argv)
       -- Also generate table/array memory ops (SLOAD tab, FLOAD
       -- tab.array, AREF/HREF, ALOAD/HLOAD, ASTORE/HSTORE).
       o.tables = true; i = i + 1
+    elseif EXTRA_SWEEPS[tostring(a):match("^%-%-(%a+)$") or ""] then
+      o.enum = true; o.extra = a:match("^%-%-(%a+)$"); i = i + 1
     else
       error("unknown argument: " .. tostring(a))
     end
@@ -193,6 +231,14 @@ end
 
 local function show_result(r, label)
   local bar = string.rep("=", 66)
+  -- A replay the recorder refused leaves no trace to render, and
+  -- the skipped branch below is reached too late to catch it.
+  if r.trace_unopt == nil then
+    io.write(bar, "\n=== ", label, ": no trace -- the replay was refused",
+      r.trace_err and (" (error %d)"):format(r.trace_err) or "", "\n",
+      bar, "\n")
+    return
+  end
   io.write(bar, "\n=== ", label, ": UNOPT (-O0) IR trace\n", bar, "\n")
   io.write(check.render_trace(r.trace_unopt), "\n\n")
   io.write(bar, "\n=== ", label, ": OPT (-O3) IR trace\n", bar, "\n")
@@ -362,12 +408,12 @@ end
 -- mixed-type (iter_mixed/count_mixed) enumeration. `make_iter`
 -- returns a fresh trace iterator; `total` is the space size;
 -- `repro` is the reproduce command prefix (index appended).
-local function sweep(o, make_iter, total, repro)
+local function sweep(o, make_iter, total, repro, gaps_ok)
   local timeout_sec = tonumber(os.getenv("LJOPT_Z3_TIMEOUT")) or 15
   if o.skip > 0 then io.write((", skipping first %d"):format(o.skip)) end
   if o.limit then io.write((", checking at most %d"):format(o.limit)) end
   io.write("\n")
-  local strict = not o.include_gaps
+  local strict = not (o.include_gaps or gaps_ok)
   local c = counters()
   local idx, checked = 0, 0
   for tr in make_iter() do
@@ -585,9 +631,35 @@ local function show_mixed(idx, o)
     :format(idx, i))
 end
 
+-- Sweep and reproduce for every EXTRA_SWEEPS entry.
+local function run_extra(o)
+  local name = o.extra
+  local e = EXTRA_SWEEPS[name]
+  local total = enum["count_" .. name](e.opts)
+  io.write(("%s sweep: %s -- %d traces"):format(name, e.desc, total))
+  return sweep(o, function() return enum["iter_" .. name](e.opts) end,
+    total, ("--%s --show"):format(name), e.gaps)
+end
+
+local function show_extra(idx, o)
+  local name = o.extra
+  local i = 0
+  for tr in enum["iter_" .. name](EXTRA_SWEEPS[name].opts) do
+    i = i + 1
+    if i == idx then
+      show_result(check.build_from(tr.insns, tr.outputs, {}),
+        ("%s #%d"):format(name, idx))
+      return
+    end
+  end
+  error(("%s index %d out of range (space has %d traces)")
+    :format(name, idx, i))
+end
+
 local o = parse_args(arg)
 if o.show ~= nil then
-  if o.strings then show_strings(o.show, o)
+  if o.extra then show_extra(o.show, o)
+  elseif o.strings then show_strings(o.show, o)
   elseif o.xmem then show_xmem(o.show, o)
   elseif o.alias then show_alias(o.show, o)
   elseif o.guard then show_guard(o.show, o)
@@ -599,7 +671,8 @@ if o.show ~= nil then
   else show(o.show, o) end
   os.exit(0)
 end
-local n_sat = o.strings and run_strings(o)
+local n_sat = (o.extra and run_extra(o))
+  or (o.strings and run_strings(o))
   or (o.xmem and run_xmem(o))
   or (o.alias and run_alias(o))
   or (o.guard and run_guard(o))

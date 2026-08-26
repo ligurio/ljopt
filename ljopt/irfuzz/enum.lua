@@ -1894,10 +1894,26 @@ end
 -- -- Substring / string-compare enumeration
 -- ----------------------
 --
--- COVERAGE ONLY: ljopt models neither SNEW nor STRREF, so the
--- results here are gaps. What it reaches is the `string.sub`
--- family of fold rules, which nothing else can produce:
+-- COVERAGE ONLY. ljopt models SNEW and STRREF now, but two
+-- things still stop this from being a value oracle:
 --
+--   * merge_eqne_snew_kgc rewrites `s:sub(a,b) == "ab"` for a
+--     constant string of at most four bytes into an unaligned
+--     XLOAD over the STRREF. ljopt reads every XLOAD out of the
+--     flat xmem, so the STRREF -- carried as the (string,
+--     offset) pair the String theory forces -- decodes with the
+--     wrong ADT accessor and yields a free value. 55 of 189
+--     traces reported SAT with no gap named. Marking that XLOAD
+--     NYI does not help: it moves the false SAT into the NE that
+--     consumes it.
+--   * SMT's str.substr clamps an out-of-range slice, while the
+--     recorder only ever emits SNEW on a range string.sub has
+--     already validated. The enumeration builds SNEW with a
+--     symbolic length, so fload_str_len_snew folding the length
+--     back to that operand disagrees with the clamped model.
+--
+-- What it reaches is the `string.sub` family of fold rules,
+-- which nothing else can produce:
 --   kfold_strref_snew     strref(snew(ptr, len), 0) -> ptr, and the
 --                         reassociation of a strref of a strref
 --   merge_eqne_snew_kgc   `s:sub(a,b) == "abc"` rewritten into
@@ -2875,6 +2891,13 @@ local XREF_WIDTHS = {
 -- Exactly one side from an allocation is the only way into
 -- aa_cnew's last arm, and both orders are here because that arm
 -- asks aa_escape about the other ref, which is not symmetric.
+
+-- Store-to-load forwarding replaces the XLOAD with the SLOAD that
+-- fed the XSTORE, so a narrow width makes the compared output a
+-- u8/i16 SLOAD -- a slot type the recorder never produces and
+-- ljopt does not model. Those two widths stay coverage-only.
+local XREF_VALUE_WIDTHS = { int = true, i64 = true, num = true }
+
 local XREF_BASES = { "sload", "cnew", "cnew2", "mixed", "mixed_rev" }
 
 local XREF_SHAPES = {
@@ -2894,6 +2917,13 @@ local FIELD_CDATA_INT64 = 18
 
 local function iter_xref(opts)
   opts = opts or {}
+  local widths = XREF_WIDTHS
+  if opts.value_outputs then
+    widths = {}
+    for _, w in ipairs(XREF_WIDTHS) do
+      if XREF_VALUE_WIDTHS[w.name] then widths[#widths + 1] = w end
+    end
+  end
   local CDT, P64, I64 = gen.IRT_CDT, gen.IRT_P64, gen.IRT_I64
   local SL, ADD, BSHL = gen.op_num("SLOAD"), gen.op_num("ADD"),
     gen.op_num("BSHL")
@@ -2901,7 +2931,7 @@ local function iter_xref(opts)
   local HDR = 8  -- cdata payload starts past the header
 
   return coroutine.wrap(function()
-    for _, w in ipairs(XREF_WIDTHS) do
+    for _, w in ipairs(widths) do
       for _, basekind in ipairs(XREF_BASES) do
         for _, shape in ipairs(XREF_SHAPES) do
           local insns = {}
@@ -3089,9 +3119,9 @@ local function count_licm()
   return n
 end
 
-local function count_xref()
+local function count_xref(opts)
   local n = 0
-  for _ in iter_xref() do n = n + 1 end
+  for _ in iter_xref(opts) do n = n + 1 end
   return n
 end
 
