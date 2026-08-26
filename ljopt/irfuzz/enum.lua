@@ -2168,6 +2168,26 @@ end
 -- rule's result feeds. Rules over types ljopt cannot compare
 -- (i64 divisions, POW, the fp calls) still get replayed -- the
 -- driver reports them as gaps rather than findings.
+--
+-- COVERAGE ONLY for now: a solver sweep over the whole space
+-- reports 25 SAT and 21 LINT of 2166, and triage on 2026-08-26
+-- found no miscompile among them. What they are:
+--
+--   14 SAT  `i64 DIV/MOD k, 0LL` -- the seven SHAPE_I64S over
+--           both ops. Division by zero is undefined, and SMT's
+--           bvsdiv answers it one way, LuaJIT's helper another.
+--           The comment above expects these back as gaps; they
+--           do not come back that way.
+--    8 SAT  int/num/u64 CONV round-trips, where the pair is an
+--           identity for LuaJIT but not for the boundary values.
+--    2 SAT  `TOSTR k CHAR` with k out of string.char's range.
+--    2 SAT  a load from a fresh empty TNEW (#2163, #2164) --
+--           the one shape here an injected fault is known to
+--           reach, so validating this sweep starts there.
+--   21 LINT `i64 CONV k, u64.<src>`: IR type i64, mode dest
+--           u64. Those share a representation in LuaJIT and the
+--           mode carries the signedness, so the lint is likely
+--           wrong here rather than the IR.
 local SHAPE_I64S = { 0, 1, -1, 2, 7, 255, -256 }
 local SHAPE_INTS = { 0, 1, -1, 3, 31, 255, -256 }
 local SHAPE_NUMS = { 0.0, 1.0, -1.0, 0.5, 2.0, 3.0, -2.5 }
