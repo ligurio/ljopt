@@ -8,7 +8,8 @@
 -- rounding-mode difference -- only the order changes. Rounding 0.5
 -- first gives 0, rounding 1.5 gives 2.
 --
--- Still OPEN upstream, so the bug is present on every build.
+-- Fixed in lua_patches/fixes/luajit-v2.1-narrow-guarded-sink.patch,
+-- which is applied to the main build only.
 local z = 0.5
 local expected = bit.tobit(z + 1)
 local last

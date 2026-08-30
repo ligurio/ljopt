@@ -118,15 +118,7 @@ local function reproduce_bug_in_popen(filename, err_msg)
     if buggy_build then
        return string.match(output, err_msg) ~= nil
     end
-    return true
-end
-
--- Same, for a bug that is still OPEN upstream: no build has a fix,
--- so the reproducer must fail on the current build too.
-local function reproduce_open_bug_in_popen(filename, err_msg)
-    local cmd = ("%s %s/tests/reproducers/%s"):format(
-        progname(arg), coverage.cwd(), filename)
-    return string.match(run_shell_command(cmd), err_msg) ~= nil
+    return string.match(output, err_msg) == nil
 end
 
 -- https://github.com/LuaJIT/LuaJIT/pull/783
@@ -263,8 +255,8 @@ function(test)
 end)
 
 -- Narrowing across ADD/SUB rounds too early for an unguarded sink.
--- Found by the irfuzz `--narrow` enumeration; not yet reported
--- upstream, so ljopt reports SAT on every build (force_sat).
+-- Found by the irfuzz `--narrow` enumeration and fixed in
+-- lua_patches/fixes/luajit-v2.1-narrow-guarded-sink.patch.
 -- narrow_conv_backprop() pays for one conversion (`count <= 1`),
 -- which sinks the num->int conversion below the addition:
 -- `(int)(x + k)` becomes `(int)x + k`. That is only sound for the
@@ -274,12 +266,12 @@ test:test("Narrowing rounds too early across ADD", function(test)
     test:plan(4)
     local err_msg = "narrowing across ADD rounds too early: "
     local chunk = read_reproducer_file("narrow_tobit_fractional.lua")
-    test:ok(reproduce_open_bug_in_popen(
+    test:ok(reproduce_bug_in_popen(
         "narrow_tobit_fractional.lua", err_msg .. "bit.tobit"),
         "TOBIT sink: reproduce in runtime")
-    test:ok(reproduce_bug_using_smt(chunk, true),
+    test:ok(reproduce_bug_using_smt(chunk),
         "TOBIT sink: reproduce using SMT")
-    test:ok(reproduce_open_bug_in_popen(
+    test:ok(reproduce_bug_in_popen(
         "narrow_toint_fractional.lua", err_msg .. "string.sub"),
         "IRCONV_ANY sink: reproduce in runtime")
     -- No SMT check for the IRCONV_ANY sink: it is only reachable

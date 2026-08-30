@@ -4,7 +4,8 @@
 -- rewrites `(int)(y + 3)` to `(int)y + 3`, so truncation happens
 -- before the addition: trunc(-0.5) + 3 = 3, trunc(2.5) = 2.
 --
--- Still OPEN upstream, so the bug is present on every build.
+-- Fixed in lua_patches/fixes/luajit-v2.1-narrow-guarded-sink.patch,
+-- which is applied to the main build only.
 local y = -0.5
 local s = "abcdef"
 local expected = s:sub(y + 3)

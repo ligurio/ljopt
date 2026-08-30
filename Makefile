@@ -25,6 +25,7 @@ all: check test
 
 
 # @1 - commit to build LuaJIT on
+# @2 - directory with extra patches, relative to PROJECT_DIR
 define build_luajit
 	@if [ ! -d "$(BUILD_DIR)/luajit_$(1)" ]; then \
 		git clone https://github.com/tarantool/luajit $(BUILD_DIR)/luajit_$(1); \
@@ -34,6 +35,7 @@ define build_luajit
 		git reset --hard $(1) && \
 		echo "Applying patches..." && \
 		git apply $(PROJECT_DIR)/lua_patches/*.patch && \
+		$(if $(2),git apply $(PROJECT_DIR)/$(2)/*.patch &&,) \
 		cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)/luajit_$(1) && \
 		echo "Building..." && \
 		$(MAKE) install
@@ -41,7 +43,7 @@ endef
 
 $(LUA_BIN):
 	@echo "Building LuaJIT $(LUAJIT_TAG)"
-	$(call build_luajit,$(LUAJIT_TAG))
+	$(call build_luajit,$(LUAJIT_TAG),lua_patches/fixes)
 
 $(LUA_BUGGY_BIN):
 	@echo "Building buggy LuaJIT $(LUAJIT_BUGGY_TAG)"

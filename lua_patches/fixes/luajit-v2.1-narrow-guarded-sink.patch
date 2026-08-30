@@ -1,0 +1,17 @@
+diff --git a/src/lj_opt_narrow.c b/src/lj_opt_narrow.c
+index 6b6f20d3..7bbe3388 100644
+--- a/src/lj_opt_narrow.c
++++ b/src/lj_opt_narrow.c
+@@ -339,10 +339,11 @@ static int narrow_conv_backprop(NarrowConv *nc, IRRef ref, int depth)
+     }
+     if (++depth < NARROW_MAX_BACKPROP && nc->sp < nc->maxsp) {
+       NarrowIns *savesp = nc->sp;
++      int maxconv = (nc->mode & IRCONV_CONVMASK) >= IRCONV_INDEX ? 1 : 0;
+       int count = narrow_conv_backprop(nc, ir->op1, depth);
+       count += narrow_conv_backprop(nc, ir->op2, depth);
+       /* Limit total number of conversions. */
+-      if (count <= 1 && nc->sp < nc->maxsp) {
++      if (count <= maxconv && nc->sp < nc->maxsp) {
+ 	*nc->sp++ = NARROWINS(IRT(ir->o, nc->t), ref);
+ 	return count;
+       }
