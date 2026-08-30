@@ -20,7 +20,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(35)
+test:plan(36)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -119,6 +119,14 @@ local function reproduce_bug_in_popen(filename, err_msg)
        return string.match(output, err_msg) ~= nil
     end
     return string.match(output, err_msg) == nil
+end
+
+-- Same, for a bug that is still OPEN upstream: no build has a fix,
+-- so the reproducer must fail on the current build too.
+local function reproduce_open_bug_in_popen(filename, err_msg)
+    local cmd = ("%s %s/tests/reproducers/%s"):format(
+        progname(arg), coverage.cwd(), filename)
+    return string.match(run_shell_command(cmd), err_msg) ~= nil
 end
 
 -- https://github.com/LuaJIT/LuaJIT/pull/783
@@ -278,6 +286,22 @@ test:test("Narrowing rounds too early across ADD", function(test)
     -- through a string builtin, and ljopt models string.sub's
     -- result as an opaque memcell, so the two traces agree.
     test:skip("IRCONV_ANY sink: reproduce using SMT")
+end)
+
+-- FOLD rewrites `x ^ 2` into `x * x` (simplify_numpow_k in
+-- lj_opt_fold.c) while the interpreter keeps pow(). For
+-- x = 3.50000000025 the exact square rounds to 12.250000001750001,
+-- which is what x*x gives; pow() returns 12.25000000175. So the JIT
+-- is the accurate side, but the value changes once the trace is
+-- compiled. Same class as LuaJIT#817, a different fold rule; still
+-- open, so ljopt reports SAT on every build (force_sat).
+test:test("x^2 fold disagrees with pow()", function(test)
+    test:plan(2)
+    local chunk = read_reproducer_file("pow2_fold.lua")
+    test:ok(reproduce_open_bug_in_popen(
+        "pow2_fold.lua", "x^2 fold disagrees with pow"),
+        "reproduce in runtime")
+    test:ok(reproduce_bug_using_smt(chunk, true), "reproduce using SMT")
 end)
 
 -- Fix FOLD rules for math.abs() and FP negation.
