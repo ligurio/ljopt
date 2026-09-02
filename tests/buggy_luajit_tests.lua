@@ -6,6 +6,7 @@
 -- but due to requirement of old LuaJIT compiler we extracted
 -- them to separate file.
 
+local ffi = require("ffi")
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
 local smt = require("ljopt.smtlib2").new()
@@ -17,10 +18,23 @@ local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
 local buggy_build = os.getenv("BUGGY_BUILD") == "1"
 local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 
+-- Some bugs are reproduced in the DUALNUM mode only (e.g.
+-- LuaJIT#1418, LuaJIT#1422), while others rely on the
+-- single-number mode (e.g. LuaJIT#783). LuaJIT builds checked by
+-- this test can be either in single-number or in DUALNUM mode.
+local function is_dualnum_build()
+    local dualnum = os.getenv("LUAJIT_DUALNUM")
+    if dualnum ~= nil then
+        return dualnum == "1"
+    end
+    return ffi.abi("dualnum")
+end
+local dualnum_build = is_dualnum_build()
+
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(36)
+test:plan(38)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -133,8 +147,15 @@ end
 -- https://github.com/LuaJIT/LuaJIT/pull/783
 -- https://github.com/tarantool/luajit/commit/ab0c0793a43fc0fb0c7b71b6250339117d99254a
 -- https://github.com/LuaJIT/LuaJIT/commit/7b994e0ee0399caf6319865bbac88ddf62129a36
+-- The bug is about the `x - (-0) ==> x` FOLD rule for double
+-- operands; it is not reproduced in the DUALNUM mode.
 test:test("Fix FOLD rule for x-0 (LuaJIT#783)", function(test)
     test:plan(2)
+    if dualnum_build then
+        test:skip("reproduce in runtime")
+        test:skip("reproduce using SMT")
+        return
+    end
     local chunk = read_reproducer_file("lj_783.lua")
     test:ok(reproduce_bug_in_runtime(chunk,
         "-0 folding in simplify_numsub_k"), "reproduce in runtime")
@@ -572,6 +593,51 @@ function(test)
     test:plan(2)
     test:ok(reproduce_bug_in_popen("lj_1128.lua", "assertion is violated",
         {"-Otryside=1"}), "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1418
+-- https://github.com/LuaJIT/LuaJIT/commit/707c12bf00dafdfd3899b1a6c36435dbbf6c7022
+-- XXX: The bug is reproduced in the DUALNUM mode only. Runtime
+-- reproduction requires a JIT trace to be recorded, hence the
+-- `hotloop=1` command-line option.
+-- XXX: The `narrow` optimization is supported now (see
+-- https://github.com/ligurio/ljopt/issues/34), but SMT reproduction
+-- is still not enabled: checking the generated DUALNUM formula hangs
+-- cvc5 (verified), so the test stays runtime-only.
+test:test(
+  "Narrowing of unary minus operation for number 0 in DUALNUM mode \
+     (LuaJIT #1418)",
+function(test)
+    test:plan(4)
+    if not dualnum_build then
+        test:skip("slot variant: reproduce in runtime")
+        test:skip("slot variant: reproduce with SMT")
+        test:skip("const variant: reproduce in runtime")
+        test:skip("const variant: reproduce with SMT")
+        return
+    end
+    test:ok(reproduce_bug_in_popen("lj_1418_slot.lua", "assertion is violated"),
+        "slot variant: reproduce in runtime")
+    test:skip("slot variant: reproduce with SMT")
+    test:ok(reproduce_bug_in_popen("lj_1418_const.lua",
+        "assertion is violated"), "const variant: reproduce in runtime")
+    test:skip("const variant: reproduce with SMT")
+end)
+
+-- https://github.com/tarantool/luajit/commit/eac9ead5bfa699d2dfc663022fbeb2ab633285ef
+-- XXX: reproduced in the DUALNUM mode only.
+test:test("Omission of the guarded CONV int.num in DUALNUM mode",
+function(test)
+    test:plan(2)
+    if not dualnum_build then
+        test:skip("reproduce in runtime")
+        test:skip("reproduce with SMT")
+        return
+    end
+    test:ok(reproduce_bug_in_popen("lj_conv_non_weak.lua",
+        "assertion is violated"),
+        "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 
