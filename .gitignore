@@ -2,3 +2,39 @@ luacov.report.out
 luacov.stats.out
 build
 .z3-trace
+
+# Vendored LuaJIT working checkout
+/luajit/
+
+# Personal notes -- never commit (origin is a shared upstream)
+/PHD.md
+/HANDOFF.md
+
+# Scratch run artifacts
+/err.log
+/err2.log
+/err.txt
+/err.sat
+/one.err
+/out
+/out.log
+/out.ll
+/out_lj791.log
+/results.log
+/diff.txt
+/output_files
+/output_files2
+/result
+/main.lua
+/example.lua
+/example.smt2
+/fail.lua
+/fails.lua
+/tt.lua
+/load_only.smt2
+/t,smt
+/o
+/0
+/1
+/'
+/qgit diff

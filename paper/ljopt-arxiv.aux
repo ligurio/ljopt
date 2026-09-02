@@ -1,0 +1,95 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{gal2009tracemonkey,bolz2009pypy}
+\citation{pall2005luajit}
+\citation{leroy2009compcert}
+\citation{pnueli1998tv,necula2000tv}
+\citation{lopes2021alive2}
+\@writefile{toc}{\contentsline {title}{\textsf  {ljopt}: Translation Validation and IR-Level Fuzzing for the LuaJIT Trace Optimizer}{1}{chapter.1}\protected@file@percent }
+\@writefile{toc}{\authcount {3}}
+\@writefile{toc}{\contentsline {author}{Aleksey Churkin \and Sergey Bronnikov \and Sergey Kaplun}{1}{chapter.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1.1}\protected@file@percent }
+\citation{barbosa2022cvc5}
+\citation{demoura2008z3}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background: LuaJIT Traces}{2}{section.1.2}\protected@file@percent }
+\newlabel{sec:background}{{2}{2}{Background: LuaJIT Traces}{section.1.2}{}}
+\citation{smtlib26}
+\citation{sheridan2007ieee754}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Translation Validation for Traces}{3}{section.1.3}\protected@file@percent }
+\newlabel{sec:tv}{{3}{3}{Translation Validation for Traces}{section.1.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Recording twice}{3}{subsection.1.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Value and memory model}{3}{subsection.1.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Table identity by congruence.}{4}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Guards and snapshots}{4}{subsection.1.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Three disciplines for typed loads.}{4}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Floating-point fidelity}{4}{subsection.1.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Loops, and what ``bounded'' means}{5}{subsection.1.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Guarding against vacuous proofs}{5}{subsection.1.3.6}\protected@file@percent }
+\newlabel{sec:vacuity}{{3.6}{5}{Guarding against vacuous proofs}{subsection.1.3.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}\textsf  {irfuzz}: Fuzzing the Optimizer at the IR Level}{5}{section.1.4}\protected@file@percent }
+\newlabel{sec:irfuzz}{{4}{5}{\irfuzz : Fuzzing the Optimizer at the IR Level}{section.1.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Replaying synthetic IR through the real optimizer}{5}{subsection.1.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Generation}{6}{subsection.1.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Random mode}{6}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Exhaustive mode}{6}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Loop mode}{6}{section*.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Line coverage of LuaJIT's optimizer under the \textsf  {irfuzz}{} sweep.}}{7}{table.1.1}\protected@file@percent }
+\newlabel{tab:coverage}{{1}{7}{Line coverage of LuaJIT's optimizer under the \irfuzz {} sweep}{table.1.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Solvers}{7}{subsection.1.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Coverage, and validating the fuzzer itself}{7}{subsection.1.4.4}\protected@file@percent }
+\newlabel{sec:coverage}{{4.4}{7}{Coverage, and validating the fuzzer itself}{subsection.1.4.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{A third, syntactic oracle.}{8}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}\textsf  {diffuzz}: Differential Testing Below the IR}{8}{section.1.5}\protected@file@percent }
+\newlabel{sec:diffuzz}{{5}{8}{\diffuzz : Differential Testing Below the IR}{section.1.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Findings}{8}{section.1.6}\protected@file@percent }
+\newlabel{sec:findings}{{6}{8}{Findings}{section.1.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{A new narrowing miscompile (fix authored).}{8}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Other new findings.}{9}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Bugs found in the oracle itself.}{9}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Evaluation}{9}{section.1.7}\protected@file@percent }
+\newlabel{sec:eval}{{7}{9}{Evaluation}{section.1.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Historical bug corpus.}{9}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Verification throughput.}{9}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{9}{section*.13}\protected@file@percent }
+\citation{pnueli1998tv}
+\citation{necula2000tv}
+\citation{lopes2015alive,lopes2021alive2}
+\citation{yang2011csmith}
+\citation{le2014emi}
+\citation{gross2023fuzzilli,wang2023fuzzjit}
+\citation{brummayer2009fuzzsmt}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Related Work}{10}{section.1.8}\protected@file@percent }
+\newlabel{sec:related}{{8}{10}{Related Work}{section.1.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9}Conclusion}{10}{section.1.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Encoding Reference}{10}{section.A.1}\protected@file@percent }
+\newlabel{app:encoding}{{A}{10}{Encoding Reference}{section.A.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Sorts and theories.}{10}{section*.14}\protected@file@percent }
+\bibstyle{splncs04}
+\bibdata{refs}
+\bibcite{barbosa2022cvc5}{1}
+\bibcite{smtlib26}{2}
+\bibcite{bolz2009pypy}{3}
+\@writefile{toc}{\contentsline {paragraph}{Per-trace-pair state.}{11}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Final query.}{11}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Uninterpreted boundary.}{11}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}Fuzzer Sweep Inventory}{11}{section.A.2}\protected@file@percent }
+\newlabel{app:sweeps}{{B}{11}{Fuzzer Sweep Inventory}{section.A.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C}Historical Bug Corpus}{11}{section.A.3}\protected@file@percent }
+\newlabel{app:bugs}{{C}{11}{Historical Bug Corpus}{section.A.3}{}}
+\bibcite{sheridan2007ieee754}{4}
+\bibcite{brummayer2009fuzzsmt}{5}
+\bibcite{gal2009tracemonkey}{6}
+\bibcite{gross2023fuzzilli}{7}
+\bibcite{le2014emi}{8}
+\bibcite{leroy2009compcert}{9}
+\bibcite{lopes2021alive2}{10}
+\bibcite{lopes2015alive}{11}
+\bibcite{demoura2008z3}{12}
+\bibcite{necula2000tv}{13}
+\bibcite{pall2005luajit}{14}
+\bibcite{pnueli1998tv}{15}
+\bibcite{wang2023fuzzjit}{16}
+\bibcite{yang2011csmith}{17}
+\gdef \@abspage@last{12}

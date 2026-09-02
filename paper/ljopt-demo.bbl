@@ -1,0 +1,85 @@
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{barbosa2022cvc5}
+Barbosa, H., Barrett, C., Brain, M., Kremer, G., Lachnitt, H., Mann, M.,
+  Mohamed, A., Mohamed, M., Niemetz, A., N{\"o}tzli, A., Ozdemir, A., Preiner,
+  M., Reynolds, A., Sheng, Y., Tinelli, C., Zohar, Y.: cvc5: A versatile and
+  industrial-strength {SMT} solver. In: Tools and Algorithms for the
+  Construction and Analysis of Systems ({TACAS}). LNCS, vol. 13243, pp.
+  415--442. Springer (2022)
+
+\bibitem{smtlib26}
+Barrett, C., Fontaine, P., Tinelli, C.: The {SMT-LIB} standard: Version 2.6.
+  Tech. rep., Department of Computer Science, The University of Iowa (2017),
+  available at \url{https://smt-lib.org}
+
+\bibitem{bolz2009pypy}
+Bolz, C.F., Cuni, A., Fija{\l}kowski, M., Rigo, A.: Tracing the meta-level:
+  {PyPy}'s tracing {JIT} compiler. In: Workshop on the Implementation,
+  Compilation, Optimization of Object-Oriented Languages and Programming
+  Systems ({ICOOOLPS}). pp. 18--25. ACM (2009)
+
+\bibitem{sheridan2007ieee754}
+Brain, M., Tinelli, C., R{\"u}mmer, P., Wahl, T.: An automatable formal
+  semantics for {IEEE}-754 floating-point arithmetic. In: {IEEE} Symposium on
+  Computer Arithmetic ({ARITH}). pp. 160--167 (2015)
+
+\bibitem{gal2009tracemonkey}
+Gal, A., Eich, B., Shaver, M., Anderson, D., Mandelin, D., Haghighat, M.R.,
+  Kaplan, B., Hoare, G., Zbarsky, B., Orendorff, J., Ruderman, J., Smith, E.W.,
+  Reitmaier, R., Bebenita, M., Chang, M., Franz, M.: Trace-based just-in-time
+  type specialization for dynamic languages. In: Programming Language Design
+  and Implementation ({PLDI}). pp. 465--478. ACM (2009)
+
+\bibitem{gross2023fuzzilli}
+Gro{\ss}, S., Koch, S., Bernhard, L., Holz, T., Johns, M.: {FUZZILLI}: Fuzzing
+  for {JavaScript} {JIT} compiler vulnerabilities. In: Network and Distributed
+  System Security Symposium ({NDSS}) (2023)
+
+\bibitem{le2014emi}
+Le, V., Afshari, M., Su, Z.: Compiler validation via equivalence modulo inputs.
+  In: Programming Language Design and Implementation ({PLDI}). pp. 216--226.
+  ACM (2014)
+
+\bibitem{lopes2021alive2}
+Lopes, N.P., Lee, J., Hur, C.K., Liu, Z., Regehr, J.: Alive2: Bounded
+  translation validation for {LLVM}. In: Programming Language Design and
+  Implementation ({PLDI}). pp. 65--79. ACM (2021)
+
+\bibitem{lopes2015alive}
+Lopes, N.P., Menendez, D., Nagarakatte, S., Regehr, J.: Provably correct
+  peephole optimizations with {Alive}. In: Programming Language Design and
+  Implementation ({PLDI}). pp. 22--32. ACM (2015)
+
+\bibitem{demoura2008z3}
+de~Moura, L., Bj{\o}rner, N.: Z3: An efficient {SMT} solver. In: Tools and
+  Algorithms for the Construction and Analysis of Systems ({TACAS}). LNCS,
+  vol.~4963, pp. 337--340. Springer (2008)
+
+\bibitem{necula2000tv}
+Necula, G.C.: Translation validation for an optimizing compiler. In:
+  Programming Language Design and Implementation ({PLDI}). pp. 83--94. ACM
+  (2000)
+
+\bibitem{pall2005luajit}
+Pall, M.: The {LuaJIT} project. \url{https://luajit.org}, accessed August 2026
+
+\bibitem{pnueli1998tv}
+Pnueli, A., Siegel, M., Singerman, E.: Translation validation. In: Tools and
+  Algorithms for the Construction and Analysis of Systems ({TACAS}). LNCS,
+  vol.~1384, pp. 151--166. Springer (1998)
+
+\bibitem{wang2023fuzzjit}
+Wang, J., Zhang, Z., Liu, S., Du, X., Chen, J.: {FuzzJIT}: Oracle-enhanced
+  fuzzing for {JavaScript} engine {JIT} compiler. In: {USENIX} Security
+  Symposium. pp. 1865--1882 (2023)
+
+\bibitem{yang2011csmith}
+Yang, X., Chen, Y., Eide, E., Regehr, J.: Finding and understanding bugs in {C}
+  compilers. In: Programming Language Design and Implementation ({PLDI}). pp.
+  283--294. ACM (2011)
+
+\end{thebibliography}

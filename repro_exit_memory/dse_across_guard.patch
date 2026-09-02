@@ -1,0 +1,8 @@
+--- a/src/lj_opt_mem.c
++++ b/src/lj_opt_mem.c
+@@ lj_opt_dse_ahstore
+ 	/* Check for any intervening guards (includes conflicting loads). */
+ 	for (ir = IR(J->cur.nins-1); ir > store; ir--)
+-	  if (irt_isguard(ir->t) || ir->o == IR_CALLL)
++	  if (ir->o == IR_CALLL)  /* INJECTED FAULT: guards ignored */
+ 	    goto doemit;  /* No elimination possible. */

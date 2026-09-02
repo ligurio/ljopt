@@ -1,0 +1,757 @@
+% ljopt paper — single source, multiple build modes.
+%
+% Build modes (see Makefile):
+%   make tacas  -> ljopt-tacas.pdf   LNCS, full tool paper (<= 16 pp + refs)
+%   make vmcai  -> ljopt-vmcai.pdf   LNCS, same body, verification-slanted abstract
+%   make demo   -> ljopt-demo.pdf    LNCS, short tool-demo cut (<= 6 pp)
+%   make arxiv  -> ljopt-arxiv.pdf   full content + appendix, no page limit
+%
+% The mode is injected by latexmk:  -usepretex='\def\MODE{tacas}'
+\providecommand{\MODE}{tacas}
+
+\documentclass[runningheads]{llncs}
+
+% ---- mode plumbing --------------------------------------------------
+% Modes differ by *omission*, not by restatement: each fact is written
+% once, at full length, and the demo cut drops what is marked. Reach for
+% \cut only where the two versions genuinely need different words.
+%
+%   \iffull ... \fi     block-level content dropped in the demo cut
+%   \full{...}          inline phrase dropped in the demo cut
+%   \brief{...}         inline phrase kept only in the demo cut
+%   \cut{short}{long}   pick a wording: demo / everything else
+%
+% Keep verbatim-like content (lstlisting) out of macro arguments -- use
+% the \iffull block form there. Plain \ifx below so that works.
+\newif\iffull \fulltrue
+\newif\ifarxiv
+\newif\ifvmcai
+\begingroup
+  \def\tmp{demo}\expandafter\ifx\csname MODE\endcsname\tmp
+    \global\fullfalse\fi
+  \def\tmp{arxiv}\expandafter\ifx\csname MODE\endcsname\tmp
+    \global\arxivtrue\fi
+  \def\tmp{vmcai}\expandafter\ifx\csname MODE\endcsname\tmp
+    \global\vmcaitrue\fi
+\endgroup
+
+\iffull
+  \newcommand{\full}[1]{#1}
+  \newcommand{\brief}[1]{}
+  \newcommand{\cut}[2]{#2}
+\else
+  \newcommand{\full}[1]{}
+  \newcommand{\brief}[1]{#1}
+  \newcommand{\cut}[2]{#1}
+\fi
+
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\lstdefinelanguage{smtlib}{
+  morekeywords={assert,declare-const,declare-fun,define-sort,declare-datatypes,
+                select,store,ite,and,or,not,check-sat,get-value},
+  morecomment=[l]{;},
+  alsoletter={-},
+  sensitive=true
+}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  commentstyle=\itshape\color{black!60},
+  keywordstyle=\bfseries,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=none,
+  aboveskip=4pt,
+  belowskip=4pt
+}
+
+\newcommand{\ljopt}{\textsf{ljopt}}
+\newcommand{\irfuzz}{\textsf{irfuzz}}
+\newcommand{\diffuzz}{\textsf{diffuzz}}
+\newcommand{\ir}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{\ljopt: Translation Validation and IR-Level Fuzzing
+       for the LuaJIT Trace Optimizer%
+\iffull\else\thanks{Tool demonstration paper.}\fi}
+
+\author{Aleksey Churkin\inst{1} \and Sergey Bronnikov\inst{2} \and
+        Sergey Kaplun\inst{2}}
+\institute{Moscow Institute of Physics and Technology (MIPT),
+Dolgoprudny, Russia\\
+\email{churkin.as@phystech.edu}
+\and
+VK, Moscow, Russia}
+\authorrunning{A.~Churkin et al.}
+\titlerunning{\ljopt: Translation Validation and IR Fuzzing for LuaJIT}
+
+\maketitle
+
+\begin{abstract}
+\full{Trace-based JIT compilers optimize aggressively and are validated
+almost exclusively by testing. }%
+\cut{We demonstrate}{We present} \ljopt{}, a \ifvmcai bounded \fi%
+translation-validation tool for the LuaJIT tracing JIT compiler: it records
+the trace a program produces twice, unoptimized and optimized, translates
+\cut{them}{both intermediate-representation (IR) traces} into
+\cut{one}{a single} SMT-LIB formula asserting their inequivalence, and
+\ifvmcai
+discharges it with an SMT solver---\textsf{unsat} proves the optimizer
+preserved the observable semantics of that trace, \textsf{sat} yields a
+counterexample.
+\else
+\cut{lets cvc5 or Z3 prove \textsf{unsat} (equivalent) or return a
+counterexample.}{lets an SMT solver prove \textsf{unsat} (the optimization
+was semantics-preserving for this trace) or return a \textsf{sat}
+counterexample.}
+\fi
+The encoding covers IEEE-754 arithmetic, \full{LuaJIT's }tagged values,
+versioned table memory, guards and side-exit snapshots, FFI\full{ 64-bit}
+integers, and strings\full{, and runs unmodified on both cvc5 and Z3}.
+On top of the validator we built \irfuzz{}, a fuzzer that synthesizes typed
+IR instruction streams and replays them through LuaJIT's real fold engine,
+using the validator itself as the bug oracle. Random and exhaustive
+enumeration modes reach 97.5\,\% line coverage of LuaJIT's optimizer%
+\full{ (2449 of 2513 lines), with 16 of the missed lines argued unreachable
+individually}, and the oracle's sensitivity is confirmed by fault injection.
+The tools re-detect six historical LuaJIT miscompilation bugs and found new
+ones\full{, including a narrowing bug that makes
+\texttt{("abcdef"):sub(-0.5+3)} disagree with the interpreter; we authored
+the fix}.
+\full{A complementary end-to-end differential fuzzer, \diffuzz{}, covers
+the compiler stages below the IR.}
+\keywords{translation validation \and JIT compilation \and SMT \and
+compiler fuzzing \and LuaJIT}
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+
+Tracing JIT compilers~\cite{gal2009tracemonkey,bolz2009pypy} compile only the
+hot paths a program actually takes, which makes their optimizers both
+unusually aggressive and unusually hard to test: the unit of compilation is
+not a function but a dynamically recorded instruction trace, specialized by
+guards that fall back to the interpreter. LuaJIT~\cite{pall2005luajit} is a
+mature, widely deployed example---it powers OpenResty, game scripting, and
+the Tarantool database---yet its optimizer has a steady history of
+miscompilation bugs, several of which survived in releases for years.
+
+\full{Verifying such a compiler wholesale,
+CompCert-style~\cite{leroy2009compcert}, is unrealistic: the implementation
+is hand-written C, evolves quickly, and its semantics is fixed by the
+interpreter rather than by a specification.
+}%
+Translation validation~\cite{pnueli1998tv,necula2000tv} checks each
+individual compilation instead of the compiler: rather than proving the
+compiler correct, prove that \emph{this} optimized program is equivalent to
+\emph{this} unoptimized one.
+\full{Alive2~\cite{lopes2021alive2} demonstrated that bounded translation
+validation with an SMT solver scales to LLVM. }%
+\brief{Alive2~\cite{lopes2021alive2} made this practical for LLVM. }%
+Tracing JITs are\full{, in one respect, an even better fit}\brief{ a natural
+fit}: a trace is a straight-line program with explicit guards, so the
+control flow that makes whole-function validation hard largely disappears.
+
+This paper presents \ljopt{}, a translation validator for LuaJIT traces, and
+\irfuzz{}, an IR-level fuzzer that turns the validator into a bug-finding
+oracle. Our contributions:
+
+\begin{enumerate}
+\item An SMT encoding of LuaJIT IR traces covering IEEE-754 doubles, tagged
+      values as an algebraic datatype, versioned table memory\full{ with
+      table-identity functions}, guards and side-exit snapshots, bounded
+      loop unrolling, FFI 64-bit integers, and strings
+      (Sect.~\ref{sec:tv}). The encoding is solver-portable and runs on
+      both cvc5~\cite{barbosa2022cvc5} and Z3~\cite{demoura2008z3}.
+\item \irfuzz{}: a fuzzer that synthesizes typed IR instruction streams and
+      replays them through LuaJIT's \emph{actual} fold engine twice
+      (optimizations off and on), then asks the validator whether the two
+      results are equivalent (Sect.~\ref{sec:irfuzz}). Random and
+      exhaustive modes reach 97.5\,\% line coverage of the optimizer, and
+      fault injection confirms the oracle actually fires.
+\item New bugs and a fix: a narrowing miscompile in
+      \texttt{lj\_opt\_narrow.c} found by exhaustive enumeration (we wrote
+      the patch)\full{, a loop-direction bug reported upstream as LuaJIT
+      issue~\#1432, a segfault in \texttt{jit.util.tracek()}, and two
+      pipeline bugs found by the companion differential fuzzer}
+      (Sect.~\ref{sec:findings}).\brief{ A 35-case corpus of historical
+      LuaJIT bugs, validated \textsf{sat}-on-buggy /
+      \textsf{unsat}-on-fixed (Sect.~\ref{sec:eval}).}
+\iffull
+\item An evaluation methodology for the validator itself: 35 regression
+      cases built from historical LuaJIT bugs, checked to be \textsf{sat}
+      on the buggy release and \textsf{unsat} after the upstream fix, plus
+      a self-check mode that guards against vacuous proofs
+      (Sect.~\ref{sec:eval}).
+\fi
+\end{enumerate}
+
+\iffull
+\ljopt{} is about 9,700 lines of Lua for the validator, 6,300 for the
+fuzzer, and small patches to LuaJIT itself; everything is open source.
+\fi
+
+% =====================================================================
+\section{Background: LuaJIT Traces}\label{sec:background}
+% =====================================================================
+
+When a loop or function becomes hot, LuaJIT records the bytecode it
+executes into a linear SSA IR.\full{ Each IR instruction has an opcode, a
+result type (out of 23: doubles, 32- and 64-bit integers, strings, tables,
+\dots), and two operands.} Type checks and control decisions become
+\emph{guards}: \full{an instruction flagged as guarded aborts the trace at
+runtime if its condition fails, restoring}\brief{each restores} the
+interpreter state described by the dominating \emph{snapshot}\full{---a map
+from Lua stack slots to IR references}. The optimizer pipeline runs over
+this IR: the fold engine\full{ (algebraic rewrites, constant folding, CSE)},
+alias analysis with load forwarding and dead-store elimination,
+loop-invariant code motion by peeling, allocation sinking, dead-code
+elimination, and \emph{narrowing}\full{, which rewrites double arithmetic
+into integer arithmetic where profitable}. After optimization the trace is
+assembled to machine code.
+
+A miscompilation at this level is observable as a wrong value in a slot, a
+wrong store to a table, or a guard that exits differently---exactly the
+three things our encoding compares.
+
+% =====================================================================
+\section{Translation Validation for Traces}\label{sec:tv}
+% =====================================================================
+
+\subsection{Recording twice}
+
+\ljopt{} runs the input chunk twice in a sandboxed environment%
+\cut{---optimizations off and at \texttt{-O3}, with \texttt{hotloop=1} so
+small chunks compile---and captures}{: once with
+\texttt{jit.opt.start(0)} and once with \texttt{jit.opt.start(3)} (all
+optimizations), both with \texttt{hotloop=1} so that even small chunks
+compile. A fork of LuaJIT's \texttt{jit/dump.lua} taps the compiler's
+introspection API (\texttt{jit.util.traceir}/\texttt{tracek}/%
+\texttt{tracesnap}) to capture}, for every recorded trace, the full IR
+with structured operands and all snapshots.\full{\footnote{One small
+upstream patch is required to expose snapshot positions; it was accepted
+into LuaJIT as part of pull request \#1472.}} Traces from the two runs are
+matched by their starting location; the pair is then translated into one
+SMT-LIB formula~\cite{smtlib26}.
+
+\subsection{Value and memory model}
+
+Lua values are dynamically typed, so cells are modeled as an algebraic
+datatype with six constructors:
+
+\begin{lstlisting}[language=smtlib]
+(declare-datatypes ((MemCell 0))
+  (((int-val (get-bv (_ BitVec 64)))
+    (fp-val  (get-fp (_ FloatingPoint 11 53)))
+    (str-val (get-str String))
+    (tab-val (get-tab Int))
+    (p32-val (get-p32-tab Int) (get-p32-idx MemCell))
+    (nil-val))))
+(define-sort MemPtr ()
+  (Array Int (Array Int (Array MemCell MemCell))))
+\end{lstlisting}
+
+\noindent
+Numbers are IEEE-754 doubles in the SMT floating-point
+theory~\cite{sheridan2007ieee754}; FFI integers are 64-bit bitvectors;
+strings use the SMT string theory; a table is an integer identity. A
+\emph{reference into} a table (\ir{p32-val}) carries both the table identity
+and the key cell, so string and numeric keys can never collide by accident.
+The formula is quantifier-free throughout.
+
+Memory is a three-level array indexed
+$[\mathit{version}][\mathit{table}][\mathit{key}]$; every store bumps the
+version with a functional update, and loads read the current version. Three
+such arrays exist per trace pair: \texttt{shared\_mem} is the unknown
+pre-trace heap, and \texttt{mem\_unopt}, \texttt{mem\_opt} are each
+constrained to equal it at version~0. Both traces therefore start from the
+\emph{same} arbitrary heap, and the solver searches for any initial state
+that makes them diverge. Raw FFI memory is a separate byte-addressed array.
+
+\iffull
+\paragraph{Table identity by congruence.}
+A subtle class of spurious results comes from naming tables. If each trace
+numbered the tables it loads independently, the same table reached through
+two paths would get two names, aliasing information would be lost, and
+either false alarms or---worse---vacuously true formulas follow. \ljopt{}
+instead uses two uninterpreted functions: \texttt{tab\_slot(Int)} maps a VM
+stack slot to the identity of the table found there (so \texttt{f(t,t)}
+correctly allows both arguments to alias), and \texttt{tab\_uid(MemCell)}
+maps a cell to the table it would denote. Because both traces apply the same
+function to equal arguments, congruence makes them agree without \ljopt{}
+having to know the actual pointer values. Tables allocated \emph{inside}
+the trace get fresh symbolic identities constrained pairwise distinct and
+distinct from all pre-existing ones; escaped trace-local tables are paired
+across the two traces in allocation order and included in the final memory
+comparison.
+\fi % end long-only table identity
+
+\subsection{Guards and snapshots}
+
+Every guarded instruction contributes a boolean ``this guard held.'' Each
+snapshot accumulates its guards into a wide bitvector whose least-significant
+set bit identifies the first failing guard; the formula compares, across the
+two traces, (i)~whether any guard fired at all, and (ii)~the restored value
+of every slot of every snapshot, under a mapping that pairs snapshots across
+traces by position rather than by index (the optimizer renumbers them).
+Modeling guard failure as \emph{data}---rather than as an assertion---is
+essential: guard elimination and guard strengthening are exactly the
+optimizations one wants to check.
+
+\iffull
+\paragraph{Three disciplines for typed loads.}
+When a trace loads a cell and asserts its type (e.g.\ \ir{HLOAD} of a
+number), the encoding must pin the ADT constructor, otherwise the accessor
+returns an unconstrained value and the two traces diverge spuriously. But
+\emph{how} it is pinned matters, and \ljopt{} uses three different
+disciplines, chosen per case:
+a hard assertion where the recorder guarantees the type;
+a \emph{guard condition} where the check is itself a trace exit, so a wrong
+type means ``exit taken,'' not ``formula inconsistent'';
+and, for table loads, a total decode
+$\mathit{ite}(\mathit{is\mbox{-}tab}(c),\allowbreak \mathit{get\mbox{-}tab}(c),\allowbreak \mathit{tab\_uid}(c))$
+whose fallback is congruent across traces.
+The danger being engineered around is vacuity: a single unsatisfiable
+assertion makes every trace pair ``equivalent.'' An earlier version used a
+fresh counter as the fallback; the counters drifted apart between the two
+traces (their IR has different lengths) and produced false alarms---the
+congruent fallback fixed both problems at once.
+\fi % end long-only disciplines
+
+\subsection{Floating-point fidelity}
+
+The encoding is bit-precise for doubles, with deliberate deviations only
+where LuaJIT itself deviates from na\"ive IEEE semantics:
+\ir{MIN}/\ir{MAX} are encoded as ordered conditionals\full{ matching
+LuaJIT's \texttt{lj\_vm\_foldarith}}, not as
+\texttt{fp.min}/\texttt{fp.max}, which SMT leaves underspecified on
+$(+0,-0)$;
+integer \ir{MOD} is floor-mod; shift counts are masked as on x86;
+numeric equality uses \texttt{fp.eq}, while the final state comparison
+uses structural equality \emph{relaxed on NaN sign}, because LuaJIT folds
+$-1.0 \cdot x$ into a sign-bit XOR\full{, which flips the sign of a NaN
+where \texttt{mulsd} would preserve it}. $+0.0$ and $-0.0$ remain
+distinguished\full{: Lua code can observe the difference through $1/x$}.
+Transcendentals, \ir{POW}, string--number coercions\full{, table rehash
+sizes}, and external calls are uninterpreted functions---equivalence is
+then checked up to congruence\full{, which is the right contract for
+optimizations that may reorder but not re-evaluate such calls}.
+
+\subsection{Loops, and what ``bounded'' means}
+
+LuaJIT's loop optimization peels one iteration and inserts PHIs. Rather than
+encode PHIs, \ljopt{} unrolls: the unoptimized trace body $n$ times against
+the optimized body's peel plus $n{-}1$ iterations (default $n{=}4$),
+duplicating snapshots per iteration. Like Alive2, the result is
+\emph{bounded} translation validation: a divergence that only manifests
+after more iterations is missed.
+
+Instructions the encoding does not model are handled by \emph{transitive
+weakening}: the unknown node and everything data-dependent on it are
+replaced by unconstrained values, and their guards default to ``held.''
+This can only weaken the check---it can never invent a divergence---and a
+strict mode turns any weakening into a hard error.\full{ Out of LuaJIT's 99
+IR opcodes, 17 cannot appear as instructions by construction (constants,
+markers), and} \brief{\ljopt{} models roughly 76 of LuaJIT's 82 instruction
+opcodes via 202 typed handlers.}\full{\ljopt{} models roughly 76 of the
+remaining 82 via 202 typed handlers.}
+
+\iffull
+\subsection{Guarding against vacuous proofs}\label{sec:vacuity}
+
+An equivalence checker that emits an inconsistent formula reports
+\textsf{unsat}---``everything verified''---and no test based on correct
+compilations will ever notice. Three fixed bugs of exactly this shape
+motivated a standing defense: a self-check mode drops the inequivalence
+disjunct and requires the remaining constraints to be \emph{satisfiable}
+(the recorded execution must be a model of its own trace). The historical
+bug corpus (Sect.~\ref{sec:eval}) provides the complementary direction:
+formulas that must be \textsf{sat}.
+\fi % end long-only vacuity
+
+% =====================================================================
+\section{\irfuzz: Fuzzing the Optimizer at the IR Level}\label{sec:irfuzz}
+% =====================================================================
+
+Translation validation checks the traces your test programs happen to
+produce. To search the optimizer's input space directly, \irfuzz{} inverts
+the setup: it \emph{synthesizes} IR and uses the validator as the oracle.
+
+\subsection{Replaying synthetic IR through the real optimizer}
+
+A 335-line patch adds \texttt{jit.util.irfuzz} to LuaJIT: it takes a typed
+instruction stream (opcodes, result types, operand kinds and payloads) and
+replays it twice through the \emph{production} fold engine---once with all
+optimizations disabled and once at \texttt{-O3}, optionally followed by the
+loop, DCE, and sinking passes---returning both resulting IR buffers. No
+bytecode, recorder, or assembler is involved: the unit under test is
+precisely the optimizer. A decoder rebuilds each buffer into the exact
+structure the trace recorder would have produced, so the validator cannot
+tell synthetic IR from recorded IR, and the comparison entry point is
+\emph{the same function} used for recorded traces. \textsf{unsat} means the
+optimizer preserved observable state on this input; \textsf{sat} is a
+candidate miscompile or a modeling gap, triaged by replaying the seed.
+
+\subsection{Generation}
+
+\paragraph{Random mode} builds streams of \ir{SLOAD} inputs, constants, and
+a body of arithmetic, bitwise, comparison, and table operations, using a
+local deterministic PRNG so seeds reproduce across builds. Operand selection
+is \emph{blacklist}-based: only combinations the recorder provably never
+emits, or that hit a known modeling gap, are excluded---a whitelist would
+only ever exercise what the model already covers and could never surface a
+new gap. Constants are exactly the literals LuaJIT's fold rules
+special-case\full{ ($0.0$, $-0.0$, $1.0$, $2.0$, $0.5$, powers of two, int
+patterns like $2^{31}{-}1$)}, plus\full{ deliberately} non-special
+controls\full{, so ``no fold applies'' paths are exercised too}.
+
+\paragraph{Exhaustive mode} enumerates\full{, seedlessly and resumably,}
+every operator chain of a given depth over a fixed leaf set\full{---$|ops|^{d}
+\cdot |\mathit{leaves}|^{d+1}$ trace shapes, both operand orders for
+non-commutative operators. Depth 2 is exhaustively tractable; depth 3
+(${\approx}12.5$M shapes for doubles) is sampled with a limit}. Seventeen
+targeted enumerators cover specific pass surfaces:
+\full{mixed-type conversion chains (the 47 \ir{CONV} fold rules),
+comparison guards (observable only through the exit bitvector), aliasing
+shapes for load forwarding and dead-store elimination, the narrowing pass,
+allocation sinking, string buffers, bounds-check elimination, upvalues, and
+FFI pointer arithmetic.}%
+\brief{conversion chains, guards, aliasing, narrowing, sinking, buffers,
+bounds checks, upvalues, FFI pointers.}
+
+\iffull
+Two pre-solver filters are provably sound: optimized output byte-identical
+to the input is skipped, as are pairs differing only by operand swaps of
+provably commutative operators (the fold engine canonicalizes $k+x$ to
+$x+k$; a solver otherwise re-proves FP commutativity from scratch on every
+such seed). \ir{MIN}/\ir{MAX} are deliberately excluded from the swap
+filter---they are \emph{not} commutative on $(+0,-0)$.
+\fi
+
+\paragraph{Loop mode} feeds generator output $i$ back into the slot that
+\ir{SLOAD}~$i$ reads, making every value loop-carried, and runs LuaJIT's
+loop pass on the optimized side\full{ while the validator unrolls both. A
+type-respecting permutation assigns each slot a value of its own type;
+without it, the two traces model the resulting type change differently and
+report divergences the optimizer never caused (the debugging trail ends at
+the memorable expression $-2^{31} \cdot -0.0$)}.
+
+\subsection{Solvers}
+
+Queries run against standalone solver binaries\full{---one crash or timeout
+cannot take down a campaign}---with verdicts matched line-exactly. cvc5 is
+the default\full{ (\texttt{--arrays-exp}, per-query time limits)}.
+On 180 byte-identical queries drawn evenly from six generation modes, at a
+30\,s limit, cvc5 closed 166 and Z3 134; the union is 171, with 37 closed
+only by cvc5 and 5 only by Z3.
+\full{The two fail differently rather than one dominating: Z3's median is
+three times faster (0.33\,s against 0.94\,s) yet it abandons more than a
+quarter of the queries, so its mean is nearly twice cvc5's---a median
+alone would rank the solvers backwards.
+Extending the comparison to 1470 queries over seven modes, the two
+\emph{never} returned contradictory verdicts, and neither produced a model
+its own checker rejected; they differ only in strength, and 225 of the 276
+queries cvc5 closes alone come from the narrowing mode, whose
+\texttt{fp.to\_sbv} sinks are the hardest construct in the encoding for
+both solvers.}
+Making the encoding portable\full{ required removing
+Z3-specific constructs (\texttt{fp.to\_ieee\_bv}, rotation builtins,
+constant arrays)---portability} doubled as a soundness review.
+
+\subsection{Coverage, and validating the fuzzer itself}\label{sec:coverage}
+
+A full sweep of all generation modes (8000 traces per mode, with and without
+loop replay) against a gcov-instrumented LuaJIT covers \textbf{2449 of 2513
+lines, 97.5\,\%}, of the optimizer
+\cut{(\texttt{lj\_opt\_fold.c} 97.4\,\%, \texttt{mem} 96.9\,\%,
+\texttt{loop} 97.6\,\%, \texttt{dce} 100\,\%, \texttt{sink} 98.0\,\%,
+\texttt{narrow} 98.2\,\%)}{(Table~\ref{tab:coverage})}.
+
+\iffull
+\begin{table}[t]
+\centering
+\caption{Line coverage of LuaJIT's optimizer under the \irfuzz{} sweep.}
+\label{tab:coverage}
+\begin{tabular}{lrrr}
+\toprule
+file & lines & hit & \% \\
+\midrule
+\texttt{lj\_opt\_fold.c}   & 1241 & 1209 & 97.4 \\
+\texttt{lj\_opt\_mem.c}    &  572 &  554 & 96.9 \\
+\texttt{lj\_opt\_loop.c}   &  245 &  239 & 97.6 \\
+\texttt{lj\_opt\_dce.c}    &   35 &   35 & 100.0 \\
+\texttt{lj\_opt\_sink.c}   &  148 &  145 & 98.0 \\
+\texttt{lj\_opt\_narrow.c} &  272 &  267 & 98.2 \\
+\midrule
+total & 2513 & 2449 & 97.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\fi % end long-only coverage table
+
+Of the 64 missed lines, 16 are argued unreachable individually
+(assertion-guarded \texttt{default} arms, fold-table entries no rule can
+reach, arms dead when folding is disabled); each remaining line has a
+documented reason.
+
+Coverage alone does not show the oracle can \emph{fire}, so \irfuzz{} is
+validated by mutation: injecting a fault into a fold rule must flip a clean
+sweep to \textsf{sat}. Injecting an off-by-one into the string-length fold
+turns a clean sweep (0 \textsf{sat}) into all-\textsf{sat}; forcing the
+alias analysis to treat may-alias as must-alias flips 18 of 120 aliasing
+shapes. \iffull The negative results are reported with equal weight:
+stubbing out the sinking heuristic changes nothing the decoder can
+see---sinking is \emph{covered but not verified}, since its effect lives in
+a field the introspection API does not expose---and one generic sweep
+failed to transport four injected faults at all, so it is classified as
+coverage-only, not as an oracle.\fi
+
+\iffull
+\paragraph{A third, syntactic oracle.} One historical bug class
+(LuaJIT~\#524) corrupts the \emph{type annotation} of an emitted \ir{CONV}
+while its semantics---keyed on the conversion mode---stays right; the
+damage happens in the backend, below the SMT abstraction, and no semantic
+oracle at the IR level can see it. A one-page lint (``a \ir{CONV}'s result
+type must equal its mode's destination type'') runs on every fuzzed trace
+and is reported independently. Layering oracles with different blind spots
+is cheap and, in our experience, necessary.
+\fi % end long-only third oracle
+
+% =====================================================================
+\section{\diffuzz: Differential Testing Below the IR}\label{sec:diffuzz}
+% =====================================================================
+
+\irfuzz{} reasons about IR semantics, so it is blind to everything the
+compiler does after the IR: register allocation, snapshot restoration,
+trace linking. \diffuzz{} closes that gap from the other side: it generates
+random Lua programs, runs them under the interpreter and under 16 JIT
+configurations (optimization levels, hot-counter settings, and each pass
+individually disabled), and compares outputs.\iffull{} A configuration
+with one pass
+disabled must never change results, so a divergence under
+\texttt{-O3,-dce} is as much a defect as one at \texttt{-O3}---and the
+per-pass rows localize the failure without a separate bisection.\fi
+
+\full{The design constraint is the oracle: every}\brief{Every} generated
+value is an exact integer reduced modulo $1000003$. Floating point ruins
+end-to-end differential testing---a one-ULP interpreter/JIT difference is
+usually a legitimate \texttt{libm} difference\full{---and an earlier
+float-based generator produced 679 ``mismatches'' over 15k seeds, every one
+undefined behavior rather than a bug}. The exact-integer generator is also
+the more sensitive one: against a deliberately injected alias-analysis
+fault it flags 15 of the first 60 seeds where the float version caught 2.
+
+% =====================================================================
+\section{Findings}\label{sec:findings}
+% =====================================================================
+
+\paragraph{A new narrowing miscompile (fix authored).}
+The exhaustive narrowing enumeration found that
+\texttt{narrow\_conv\_backprop} sinks an \emph{unguarded}
+number-to-integer conversion inside an addition:
+$\mathit{int}(x + \mathit{double}(i))$ becomes $\mathit{int}(x) + i$, so
+rounding happens before the addition instead of after. The bug is reachable
+from plain Lua through every \ir{IRCONV\_ANY} consumer:
+
+\begin{lstlisting}
+("abcdef"):sub(-0.5 + 3)  --> "cdef"  (interpreter: "bcdef")
+bit.tobit(0.5 + 1)        --> 1       (interpreter: 2)
+\end{lstlisting}
+
+\noindent
+We wrote the fix---allow the sunk conversion only for guarded conversion
+modes---and validate it in CI: the reproducers fail on eight unpatched
+LuaJIT builds and pass on the patched one.
+
+\paragraph{Other new findings.}
+(i) A wrong loop direction for a \texttt{-0} step, reported upstream as
+LuaJIT issue~\#1432.
+(ii) A segmentation fault in \texttt{jit.util.tracek()}: the payload half
+of a 64-bit constant is misread as an instruction, and one byte value turns
+it into an out-of-bounds dereference; reachable from plain Lua, confirmed
+on upstream HEAD.
+(iii) By \diffuzz{}: a store lost at default \texttt{-O3}---an
+\ir{HSTORE} inside a nested loop is dropped by the interaction of five
+passes (forwarding, DSE, CSE, fold, loop), so a later read observes a stale
+value.
+(iv) By \diffuzz{}: with DCE disabled, a loop-invariant value referenced
+only by side-exit snapshots is assigned a register the loop body reuses, so
+the exit restores an unrelated variable---a register-allocator bug on which
+\ljopt{} correctly answers \textsf{unsat}, since the IR is equivalent; the
+defect is introduced below the IR. This pair of findings is the concrete
+argument for layering \irfuzz{} and \diffuzz{}.
+
+\iffull
+\paragraph{Bugs found in the oracle itself.}
+Fuzzing also debugged \ljopt{}: encoding \ir{MIN}/\ir{MAX} as
+\texttt{fp.min}/\texttt{fp.max} flagged a correct fold of
+$\min(-0.0,+0.0)$; unmasked shift counts and structural FP equality caused
+similar false alarms. We report these because they are the expected failure
+mode of any verification tool used as a fuzzing oracle, and the
+fault-injection discipline of Sect.~\ref{sec:coverage} is what kept them
+from silently becoming false \emph{negatives}.
+\fi % end long-only oracle bugs
+
+% =====================================================================
+\section{Evaluation}\label{sec:eval}
+% =====================================================================
+
+\paragraph{Historical bug corpus.}
+The strongest evidence that the validator's \textsf{sat} verdicts mean
+something is behavioral: 35 regression cases reconstruct known LuaJIT
+miscompilation bugs\iffull{} (among them issues \#505, \#524, \#783,
+\#784, \#791,
+\#794, \#797, \#980, \#994, \#1069, \#1079, \#1133, \#1194, \#1236,
+\#1262)\fi. Each case is run against two pinned LuaJIT builds---one just
+before the upstream fix, one just after---and the harness requires
+\textsf{sat} on the buggy build and \textsf{unsat} on the fixed one.
+Six of these (\#794, \#797, \#817, \#1069, \#1194, \#1236) are detected by
+the SMT oracle itself, i.e.\ the encoding sees the semantic divergence; the
+others reproduce behaviorally and pin the encoding's handling of the
+affected constructs.
+
+\iffull
+\paragraph{Verification throughput.}
+The end-to-end suite translates 90 Lua chunks (arithmetic, tables, globals,
+strings, upvalues, FFI, bounds checks) and requires each resulting formula
+to parse and prove \textsf{unsat}; 93 per-instruction cases check single
+opcodes against concretely known results. On a curated 149-file corpus of
+generated Lua programs, a sweep produced 625 \textsf{unsat} verdicts,
+9 \textsf{sat} (all triaged to one known modeling gap, below) and
+25 timeouts. Fuzzing sweeps at the IR level ran 5,000 random arithmetic
+seeds and 1,600 table seeds with zero unexplained \textsf{sat} verdicts on
+clean LuaJIT builds.
+\fi
+
+\paragraph{Limitations.}
+\ljopt{} is bounded (loop unrolling, default depth 4) and IR-level: the
+assembler and register allocator are out of scope by construction, which
+finding~(iv) above makes concrete. Memory is currently compared at its
+final version only, so a dead store observable at an intervening side exit
+can be missed---we constructed this false negative deliberately (by
+weakening DSE's guard check and watching the validator stay
+\textsf{unsat}) and the fix direction is to compare memory per snapshot at
+its version. \iffull Known false-positive sources are equally
+documented:
+repeated or dead stores to an escaping table can produce a spurious
+\textsf{sat} from the memory-diff encoding, and uninterpreted abstractions
+check equivalence only up to congruence (two \texttt{math.random} calls
+compare equal). Solver-side, the formulas need cvc5${}\geq{}$1.2
+(older versions answer some of them \emph{incorrectly}), and Z3's Horn
+backend is unusable here for lack of FP and string sorts.\fi
+
+% =====================================================================
+\iffull
+\section{Related Work}\label{sec:related}
+\else
+\section{Related Work and Conclusion}
+\fi
+% =====================================================================
+
+Translation validation originates with Pnueli et
+al.~\cite{pnueli1998tv} and Necula~\cite{necula2000tv}; Alive and
+Alive2~\cite{lopes2015alive,lopes2021alive2} made bounded SMT-based
+validation practical for LLVM and are the closest relatives of this work.
+\iffull
+\ljopt{} differs in its target's shape: traces are straight-line and
+guard-structured, memory is a dynamically typed heap of tables rather than
+typed LLVM memory, and the semantics baseline is an interpreter, not a
+language reference.
+\fi
+Compiler fuzzing by differential execution goes back to
+Csmith~\cite{yang2011csmith} and EMI~\cite{le2014emi}; JIT-directed fuzzers
+such as Fuzzilli and FuzzJIT~\cite{gross2023fuzzilli,wang2023fuzzjit}
+generate source programs and rely on crashes or differential behavior.
+\irfuzz{}'s distinguishing choice is to generate \emph{IR} and use a
+translation validator as the oracle, which detects silent wrong-value
+optimizations that neither crash nor happen to be exercised
+observably by a source-level test\brief{.}\full{---while measuring, by line
+coverage and fault injection, how much of the optimizer the campaign
+actually judges.
+Mutation-based validation of the toolchain itself follows the spirit of
+solver fuzzing~\cite{brummayer2009fuzzsmt}.}
+
+\iffull
+\section{Conclusion}
+\else
+\paragraph{Conclusion.}
+\fi
+\ljopt{} shows that bounded translation validation is a practical fit for a
+production tracing JIT: the trace shape removes most control-flow
+complexity, and a careful ADT-plus-versioned-arrays heap encoding handles a
+dynamically typed language. Used as a fuzzing oracle over synthesized IR,
+it judges 97.5\,\% of LuaJIT's optimizer lines and has found and fixed real
+miscompiles. The tool, the fuzzers, the bug corpus, and all coverage and
+fault-injection protocols are open source.
+
+% TODO: add data-availability paragraph with the repository URL
+% (and an archived artifact DOI for TACAS artifact evaluation).
+
+\ifarxiv
+% =====================================================================
+\appendix
+\section{Encoding Reference}\label{app:encoding}
+% =====================================================================
+
+\paragraph{Sorts and theories.} Quantifier-free formulas over:
+\texttt{(\_ FloatingPoint 11 53)} (Lua numbers), \texttt{(\_ FloatingPoint
+8 24)} (FFI floats), \texttt{(\_ BitVec 64)} (integers; narrower FFI types
+widened), \texttt{String}, \texttt{Int} (table identities), extensional
+arrays, the \texttt{MemCell} ADT, and a 500-bit vector per snapshot for
+guard exits.
+
+\paragraph{Per-trace-pair state.}
+\texttt{shared\_mem} (unknown initial heap), \texttt{mem\_unopt},
+\texttt{mem\_opt} (each tied to \texttt{shared\_mem} at version 0), a
+byte-addressed FFI memory array, a VM-slot array, and per-snapshot slot
+arrays plus exit bitvectors.
+
+\paragraph{Final query.} A single disjunction: some snapshot slot differs,
+or the traces disagree on whether any guard fired, or memory differs at a
+symbolic witness $(\mathit{ptr}, \mathit{key})$ whose domain is
+non-negative identities (pre-existing tables) plus the paired escaping
+trace-local tables. \textsf{unsat} proves equivalence of the trace pair.
+
+\paragraph{Uninterpreted boundary.} \texttt{pow\_fp}, twelve
+\texttt{math\_*} unary transcendentals, \texttt{math\_atan2},
+number--string coercions, \texttt{str\_reverse}, table rehash size
+functions, indexed external-call families for Lua and FFI calls, and
+float-to-bitvector witnesses (not a function on NaN payloads).
+
+\section{Fuzzer Sweep Inventory}\label{app:sweeps}
+
+Seventeen enumerators with per-sweep classification (value oracle vs.\
+coverage-only), each with a documented fault-injection or triage result:
+single-type chains, mixed \ir{CONV} chains, comparison guards, aliasing /
+load-forwarding / DSE shapes, raw FFI memory, string operations, narrowing
+(the only shape reaching \texttt{lj\_opt\_narrow.c} from an IR replay),
+allocation sinking, string buffers, bounds-check elimination, upvalues,
+\ir{AHREF} shapes, buffer calls, per-fold-rule shapes, FFI pointer
+arithmetic, and the loop pass. A triaged clean-build sweep of the
+per-fold-rule mode (2166 traces) reports 25 \textsf{sat} + 21 lint hits,
+all benign classes: \texttt{i64} division by literal zero, conversion
+round-trips, \texttt{TOSTR} of out-of-range character codes, and loads from
+a fresh empty table.
+
+\section{Historical Bug Corpus}\label{app:bugs}
+
+The 35-case corpus covers LuaJIT issues
+\#9, \#299, \#311, \#505, \#524, \#540, \#584, \#606, \#651, \#684, \#783,
+\#784, \#791, \#792, \#794, \#797, \#799, \#817, \#980, \#994, \#1069,
+\#1079, \#1084, \#1086, \#1094, \#1133, \#1194, \#1236, \#1244, \#1262,
+\#1295, plus unnumbered fold-rule fixes (FP negation via \texttt{math.abs},
+strength reduction of widening, ABC elimination in the recorder and in the
+fold engine, sign-extension simplification of conversions).
+\fi
+
+\bibliographystyle{splncs04}
+\bibliography{refs}
+
+\end{document}

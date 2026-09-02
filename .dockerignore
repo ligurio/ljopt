@@ -1,0 +1,11 @@
+build/
+luajit/
+.git/
+output_files/
+output_files2/
+inputs/
+results.log
+*.log
+*.smt
+*.smt2
+*.ll
