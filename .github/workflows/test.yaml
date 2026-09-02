@@ -12,6 +12,14 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
 
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: single-number
+          - name: dualnum
+            luajit_cmake_flags: -DLUAJIT_NUMMODE=2
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,12 +30,13 @@ jobs:
           # This path should be same as the path in Makefile,
           # where tarantool's LuaJIT repo stored.
           path: build
-          key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}
+          key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}-${{ matrix.luajit_cmake_flags }}
 
       - name: Setup packages
         run: sudo apt install -y luarocks
 
       - name: Setup Z3 (library)
+        if: matrix.name == 'single-number'
         uses: cda-tum/setup-z3@v1
         with:
           # Equivalence of some traces could not be proved
@@ -51,9 +60,10 @@ jobs:
         run: make deps
 
       - name: Building
-        run: make build
+        run: make build LUAJIT_CMAKE_FLAGS="${{ matrix.luajit_cmake_flags }}"
 
       - name: Testing
+        if: matrix.name == 'single-number'
         env:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
@@ -62,7 +72,18 @@ jobs:
           eval $(luarocks path)
           make test
 
+      - name: Testing buggy tests on DUALNUM LuaJIT
+        if: matrix.name == 'dualnum'
+        env:
+          LJOPT_ENABLE_INTERNAL_CHECKS: 1
+          LJOPT_STRICT: 1
+          LJOPT_TESTS_TIMEOUT: 120
+        run: |
+          eval $(luarocks path)
+          make test-buggy LUAJIT_CMAKE_FLAGS="${{ matrix.luajit_cmake_flags }}"
+
       - name: Smoke-test the z3 backend
+        if: matrix.name == 'single-number'
         env:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
@@ -71,6 +92,7 @@ jobs:
           make test-z3-smoke
 
       - name: Testing with code coverage
+        if: matrix.name == 'single-number'
         env:
           LJOPT_ENABLE_INTERNAL_CHECKS: 1
           LJOPT_STRICT: 1
