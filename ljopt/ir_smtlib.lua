@@ -300,9 +300,32 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     end
     local merged_snaps = utils.merge_tables(snapshots1.slots, snapshots2.slots)
     -- Check whether both traces exited by a guard.
-    local smt_result = ('(assert (or (not (= (lsb %s) (lsb %s)))\n'):format(
-        snapshots1.te, snapshots2.te
+    --
+    -- Values are only compared when neither trace exited. A guard
+    -- that fails hands control back to the interpreter, so the
+    -- slots and memory the trace leaves behind are never read;
+    -- comparing them lets the solver pick an input that trips a
+    -- guard on both sides and report the leftovers as a
+    -- divergence. Disagreement about *whether* an exit was taken
+    -- stays in the first disjunct, so guard elimination is still
+    -- caught.
+    local zero_bv = ('(_ bv0 %d)'):format(smt_constants.MAXSNAP)
+    local no_exit = ('(and (= (lsb %s) %s) (= (lsb %s) %s))'):format(
+        snapshots1.te, zero_bv, snapshots2.te, zero_bv
     )
+    -- Only the optimized side *skipping* an exit is a finding.
+    -- A trace exit hands control back to the interpreter, which
+    -- recomputes the expression, so an optimized trace that exits
+    -- where the reference runs on is a deoptimization and not a
+    -- wrong answer -- lj_opt_narrow turning `int(x+1.0)` into
+    -- `int(x)+1` does exactly that whenever the addition rounds a
+    -- fraction away. Comparing the two exits symmetrically
+    -- reported every such input as a miscompile.
+    local exit_removed = ('(and (not (= (lsb %s) %s)) (= (lsb %s) %s))'):format(
+        snapshots1.te, zero_bv, snapshots2.te, zero_bv
+    )
+    local smt_result = ('(assert (or %s\n'
+        .. '    (and %s (or false\n'):format(exit_removed, no_exit)
     smt_result = locals_smt .. '(declare-const witness_ptr Int)\n' .. smt_result
     for _snap_id, values in pairs(merged_snaps) do
         local value1, value2 = unpack(values)
@@ -344,7 +367,7 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
         stack1._name, stack1:get_version(),
         stack2._name, stack2:get_version()
     )
-    smt_result = smt_result .. '))\n'
+    smt_result = smt_result .. '))))\n'
     return smt_result
 end
 

@@ -686,6 +686,23 @@ foo({})
             {type = "num", name = "HLOAD"},
         },
     }, {
+        name = "hash store to a field the trace already loaded",
+        code = [[
+local t = {a = 1}
+local s = 0
+for i = 1, 100 do
+    s = s + t.a
+    t.a = i
+end
+]],
+        unroll_n = 1,
+        ins = {
+            {type = "p32", name = "HREFK"},
+            {type = "num", name = "HLOAD"},
+            {type = "tab", name = "EQ"},
+            {type = "num", name = "HSTORE"},
+        },
+    }, {
         code = [[
 -- Array part store (AREF, ASTORE)
 local function foo(x)

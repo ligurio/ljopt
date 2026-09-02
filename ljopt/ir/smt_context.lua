@@ -278,14 +278,15 @@ end
 function TEStackBV.store(self, op_num, data)
     dev_checks('table', 'number', 'string')
     self.stored[op_num] = true
-    -- Narrowed guards (those whose operands trace back only to
-    -- C-flagged SLOAD inputs and constants) are domain
-    -- preconditions LJ's narrower introduces. Lift them to
-    -- top-level asserts and store `true` for the TE slot so they
-    -- don't show up in the snap exit bitvector (where they'd
-    -- produce a spurious te-diff against unopt, which has no
-    -- analogous IR).
-    if self.narrowed_refs and self.narrowed_refs[op_num] and data ~= 'true' then
+    -- A precondition guard states a fact about the trace's
+    -- inputs rather than a branch the trace may take, and the
+    -- two -O levels do not have to agree on emitting one. Lift
+    -- it to a top-level assert and store `true` for the TE slot,
+    -- so the fact still constrains the model but the guard stays
+    -- out of the snap exit bitvector, where an asymmetry between
+    -- the two traces reads as a removed guard.
+    if self.precondition_refs and self.precondition_refs[op_num]
+       and data ~= 'true' then
         return ('(assert %s)\n%s'):format(
             data,
             string.format(
@@ -693,11 +694,10 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- through the first SLOAD's chain is invisible to a later
     -- HLOAD through the second SLOAD's chain.
     self.const_tabs_by_slot = {}
-    -- ssa_ref -> true when value is derived purely from narrowed
-    -- (C-flagged) SLOAD inputs and constants. Guards on such refs
-    -- are narrowing preconditions and lift to top-level asserts
-    -- (see TEStackBV.store).
-    self.te_stack.narrowed_refs = {}
+    -- ssa_ref -> true for a guard that constrains the trace's
+    -- inputs instead of selecting a path through it. Such guards
+    -- lift to top-level asserts (see TEStackBV.store).
+    self.te_stack.precondition_refs = {}
 
     return self
 end
@@ -718,7 +718,7 @@ function SMTContext:restart()
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
-    self.te_stack.narrowed_refs = {}
+    self.te_stack.precondition_refs = {}
 end
 
 return {

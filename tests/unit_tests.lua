@@ -183,7 +183,7 @@ test:test("mark_narrowed_refs", function(test)
     end
     local function fresh_ctx()
         return {
-            te_stack = { narrowed_refs = {} }
+            te_stack = { precondition_refs = {} }
         }
     end
 
@@ -196,9 +196,9 @@ test:test("mark_narrowed_refs", function(test)
         node('LE', 'int', 2, ssa(1), lit('#x7ffffffe')),
         node('LE', 'int', 3, ssa(2), lit('#x7ffffffe')),
     }, ctx)
-    test:is(ctx.te_stack.narrowed_refs[2], true,
+    test:is(ctx.te_stack.precondition_refs[2], true,
         "LE on SLOAD-C + const marked")
-    test:is(ctx.te_stack.narrowed_refs[3], nil,
+    test:is(ctx.te_stack.precondition_refs[3], nil,
         "chained LE on non-SLOAD-C operand not marked")
 
     -- LE whose operand is a stray SSA ref (no SLOAD-C anywhere):
@@ -207,7 +207,7 @@ test:test("mark_narrowed_refs", function(test)
     ir_passes.mark_narrowed_refs({
         node('LE', 'int', 1, ssa(99), lit('#x7ffffffe')),
     }, ctx)
-    test:is(ctx.te_stack.narrowed_refs[1], nil,
+    test:is(ctx.te_stack.precondition_refs[1], nil,
         "LE on stray ref not marked")
 end)
 

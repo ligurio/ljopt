@@ -71,10 +71,9 @@ local NULL_TAB = '(tab_uid nil-val)'
 
 function impls.IRNodeEQTab:to_smt_lib(ctx)
     local left = ctx.op_stack:load(self:get_left_op():get_ssa(), 'tab')
-    return ctx.te_stack:store(
-        self:get_ssa_reference(),
-        ('(= %s %s)'):format(left, NULL_TAB)
-    )
+    local ref = self:get_ssa_reference()
+    ctx.te_stack.precondition_refs[ref] = true
+    return ctx.te_stack:store(ref, ('(= %s %s)'):format(left, NULL_TAB))
 end
 
 function impls.IRNodeEQTab.is_implemented(_flags, _type, _opcode,

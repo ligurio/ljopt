@@ -1004,15 +1004,50 @@ local function iter_narrow(opts)
                     { k = K.KNUM, v = 32768.0 } }
   local TREEOPS = { "ADD", "SUB" }
 
+  -- Constant value of a tree, or nil when a leaf is symbolic.
+  -- Only ADD/SUB over KNUM leaves fold, which is all the shapes
+  -- below build.
+  local function const_value(insns, ref)
+    local ins = insns[ref]
+    if ins == nil then return nil end
+    local function leaf(k, v)
+      if k == K.KNUM then return v end
+      if k == K.REF then return const_value(insns, v) end
+      return nil
+    end
+    local add, sub = gen.op_num("ADD"), gen.op_num("SUB")
+    if ins.op ~= add and ins.op ~= sub then return nil end
+    local a, b = leaf(ins.ak, ins.av), leaf(ins.bk, ins.bv)
+    if a == nil or b == nil then return nil end
+    if ins.op == add then return a + b end
+    return a - b
+  end
+
   return coroutine.wrap(function()
     local function yield_shape(insns, root)
       for _, sink in ipairs(NARROW_SINKS) do
-        local out = {}
-        for _, x in ipairs(insns) do out[#out + 1] = x end
-        out[#out + 1] = { op = gen.op_num(sink.op), t = sink.t,
-          ak = K.REF, av = root,
-          bk = sink.bk or K.LIT, bv = sink.bv }
-        coroutine.yield({ insns = out, outputs = { #out } })
+        -- An unguarded num -> int32 CONV of an out-of-range
+        -- constant is undefined: LuaJIT folds it with
+        -- lj_num2int, a bare `(int32_t)` cast, and both emit
+        -- sites say so ("overflow undefined",
+        -- lj_opt_narrow_toint / lj_opt_narrow_cindex). The two
+        -- sides are then free to disagree and the shape reports
+        -- a miscompile LuaJIT never promised not to make.
+        if sink.name == "int_any" then
+          local k = const_value(insns, root)
+          if k ~= nil and (k >= 2147483648 or k < -2147483648) then
+            goto continue
+          end
+        end
+        do
+          local out = {}
+          for _, x in ipairs(insns) do out[#out + 1] = x end
+          out[#out + 1] = { op = gen.op_num(sink.op), t = sink.t,
+            ak = K.REF, av = root,
+            bk = sink.bk or K.LIT, bv = sink.bv }
+          coroutine.yield({ insns = out, outputs = { #out } })
+        end
+        ::continue::
       end
     end
 

@@ -8,7 +8,7 @@
 -- show up in the snap exit bitvector (where they'd produce a
 -- spurious te-diff against unopt, which has no analogous IR).
 local function mark_narrowed_refs(nodes, ctx)
-    local marked = ctx.te_stack.narrowed_refs
+    local marked = ctx.te_stack.precondition_refs
     local sload_c = {}
     local function op_is_sload_c_or_const(op)
         if op == nil then return true end

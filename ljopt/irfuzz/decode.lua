@@ -217,7 +217,15 @@ local function decode(pass, linktype)
       num = i,
       flags = {
         irt_guard = guard,
-        irt_isphi = phi,
+        -- Deliberately dropped. BinOp exempts a PHI-marked int
+        -- from wrap_i32, a calibration for recorded FORL pairs
+        -- whose -O0 side is FP and so never wraps. Here both
+        -- sides are the same int stream and only the optimized
+        -- one runs lj_opt_loop, so keeping the mark encodes
+        -- one side wrapped and the other not, and a value
+        -- leaving int32 range reads as a divergence. Wrapping
+        -- both is also faithful: LuaJIT's `int` is int32.
+        irt_isphi = false,
         irt_mark = false,
         raw = raw,
       },
