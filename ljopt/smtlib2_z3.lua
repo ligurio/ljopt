@@ -1,6 +1,6 @@
 -- Requires installed z3 package.
 -- Usage:
--- local smt = require("smtlib2").new()
+-- local smt = require("ljopt.smtlib2").new()
 -- assert(smt:parse("(declare-const p0 Bool)") == true)
 -- assert(smt:check("(declare-const p0 Bool)") == 1)
 -- smt = nil
