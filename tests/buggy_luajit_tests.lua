@@ -569,8 +569,10 @@ end)
 -- XXX: The bug is reproduced in the DUALNUM mode only. Runtime
 -- reproduction requires a JIT trace to be recorded, hence the
 -- `hotloop=1` command-line option.
--- XXX: `narrow` optimization is unsupported, see
--- https://github.com/ligurio/ljopt/issues/34.
+-- XXX: The `narrow` optimization is supported now (see
+-- https://github.com/ligurio/ljopt/issues/34), but SMT reproduction
+-- is still not enabled: checking the generated DUALNUM formula hangs
+-- cvc5 (verified), so the test stays runtime-only.
 test:test(
   "Narrowing of unary minus operation for number 0 in DUALNUM mode \
      (LuaJIT #1418)",
