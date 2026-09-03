@@ -6,6 +6,7 @@
 -- but due to requirement of old LuaJIT compiler we extracted
 -- them to separate file.
 
+local ffi = require("ffi")
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
 local smt = require("tests.smtlib2").new()
@@ -17,10 +18,30 @@ local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
 local buggy_build = os.getenv("BUGGY_BUILD") == "1"
 local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 
+-- Some bugs are reproduced in the DUALNUM mode only (e.g.
+-- LuaJIT#1418, LuaJIT#1422), while others rely on the
+-- single-number mode (e.g. LuaJIT#783). LuaJIT builds checked by
+-- this test can be either in single-number or in DUALNUM mode.
+local function is_dualnum_build()
+    -- Some LuaJIT versions do not know the `dualnum` ABI flag, so
+    -- `ffi.abi("dualnum")` returns false even for a DUALNUM build.
+    -- Fall back to a behavioral probe in that case: in a
+    -- dual-number build `1 % 1` yields an integer 0 and
+    -- `-(1 % 1)` stringifies to "0"; in a single-number build the
+    -- result is the double -0.0, which stringifies to "-0".
+    local ok, res = pcall(ffi.abi, "dualnum")
+    if ok and res then
+        return true
+    end
+    local a = 1 % 1
+    return tostring(-a) == "0"
+end
+local dualnum_build = is_dualnum_build()
+
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(34)
+test:plan(30)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -111,9 +132,19 @@ end
 
 -- Some bugs cannot be reproduced using `pcall()`. In such cases
 -- test executes Lua chunk in a separated LuaJIT process.
-local function reproduce_bug_in_popen(filename, err_msg)
-    local cmd = ("%s %s/tests/reproducers/%s"):format(
-        progname(arg), coverage.cwd(), filename)
+-- `jit_options` is an optional table of LuaJIT command-line
+-- options (e.g. {"-Otryside=1"}) to force the required JIT
+-- behavior. The default options are applied first, so options
+-- provided by the caller override them.
+local function reproduce_bug_in_popen(filename, err_msg, jit_options)
+    local options = { "-Ohotloop=1", "-Ohotexit=1" }
+    if jit_options ~= nil then
+        for _, opt in ipairs(jit_options) do
+            options[#options + 1] = opt
+        end
+    end
+    local cmd = ("%s %s %s/tests/reproducers/%s"):format(
+        progname(arg), table.concat(options, " "), coverage.cwd(), filename)
     local output = run_shell_command(cmd)
     if buggy_build then
        return string.match(output, err_msg) ~= nil
@@ -124,8 +155,15 @@ end
 -- https://github.com/LuaJIT/LuaJIT/pull/783
 -- https://github.com/tarantool/luajit/commit/ab0c0793a43fc0fb0c7b71b6250339117d99254a
 -- https://github.com/LuaJIT/LuaJIT/commit/7b994e0ee0399caf6319865bbac88ddf62129a36
+-- The bug is about the `x - (-0) ==> x` FOLD rule for double
+-- operands; it is not reproduced in the DUALNUM mode.
 test:test("Fix FOLD rule for x-0 (LuaJIT#783)", function(test)
     test:plan(2)
+    if dualnum_build then
+        test:skip("reproduce in runtime")
+        test:skip("reproduce using SMT")
+        return
+    end
     local chunk = read_reproducer_file("lj_783.lua")
     test:ok(reproduce_bug_in_runtime(chunk,
         "-0 folding in simplify_numsub_k"), "reproduce in runtime")
@@ -187,7 +225,10 @@ end)
 test:test("Problem of HREFK with table.clear (LuaJIT#792)", function(test)
     test:plan(2)
     local filename = "lj_792.lua"
-    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP"),
+    -- The reproducer relies on the default hotloop/hotexit
+    -- thresholds to hit the exact trace shape.
+    test:ok(reproduce_bug_in_popen(filename, "AREF forward from TDUP",
+        {"-Ohotloop=56", "-Ohotexit=10"}),
         "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
@@ -244,10 +285,18 @@ end)
 
 -- Fix FOLD rules for math.abs() and FP negation.
 -- https://github.com/LuaJIT/LuaJIT/commit/4416e885d28c0f49d2c7bb3f9630ab23c22fbc9a
+-- XXX: This bug cannot be reproduced at runtime (or via SMT) on the
+-- pinned LuaJIT builds (buggy 203a~, current af5d38f): the fix
+-- (4416e885) is already an ancestor of both. Moreover, the original
+-- miscompile depends on the pre-2017 IR representation in which the
+-- FP constant operand of NEG/ABS was a true KNUM. In the current IR
+-- that constant is loaded via IR_FLOAD REF_NIL, so reverting the fold
+-- rules would only disable an optimization instead of producing a
+-- wrong result. Hence no reproducer is possible.
 test:test("Fix FOLD rules for math.abs() and FP negation", function(test)
     test:plan(2)
-    test:ok("reproduce in runtime")
-    test:ok("reproduce using SMT")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce using SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/994
@@ -295,18 +344,11 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/commit/03208c8162af9cc01ca76ee1676ca79e5abe9b60
 test:test("(LuaJIT#6163)", function(test)
     test:plan(2)
-    local _ = read_reproducer_file("lj_6163.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1094
--- https://github.com/tarantool/luajit/commit/dbf132960a3c5b9992c71eeb24f9a3f1d010e86e
--- https://github.com/LuaJIT/LuaJIT/commit/f72c19e482b6f918b7cf42b0436e2b117d160a29
-test:test("Maintain chain invariant in DCE (LuaJIT#1094)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1094.lua")
-    test:skip("reproduce in runtime")
+    local filename = "lj_6163.lua"
+    -- The reproducer needs the default hotexit threshold (10),
+    -- not the forced hotexit=1, to keep the exact trace shape.
+    test:ok(reproduce_bug_in_popen(filename, "math.min: comm_dup_minmax",
+        {"-Ohotexit=10"}), "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 
@@ -381,29 +423,13 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/980
--- https://github.com/tarantool/luajit/commit/46418db5fdbfc5dcf5515edea7df1c652b3a5974
--- https://github.com/LuaJIT/LuaJIT/commit/c7db8255e1eb59f933fac7bc9322f0e4f8ddc6e6
-test:test("Fix TDUP load forwarding after table rehash. (LuaJIT#980)",
-function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_980.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/6976
--- https://github.com/tarantool/luajit/commit/f067cf638cf8987ab3b6db372d609a5982e458b5
--- https://github.com/LuaJIT/LuaJIT/commit/1e6e8aaa20626ac94cf907c69b0452f76e9f5fa5
-test:test("(LuaJIT#6976)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_6976.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
 -- https://github.com/LuaJIT/LuaJIT/issues/524
 -- https://github.com/tarantool/luajit/commit/c9588f51301844d11a2a9dfa9070e437961c9787
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (c9588f51) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("fold: keep type of emitted CONV in sync with its mode (LuaJIT#524)",
 function(test)
     test:plan(2)
@@ -414,39 +440,14 @@ end)
 
 -- https://github.com/tarantool/luajit/commit/51f722c2dc9b1db3b214a683678e570491fb82d7
 -- https://github.com/LuaJIT/LuaJIT/commit/9f0caad0e43f97a4613850b3874b851cb1bc301d
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (51f722c2) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix FOLD rule for strength reduction of widening", function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_fix-fold-simplify-conv-sext.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/584
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
-test:test("RENAME IR invariant violation (LuaJIT#584)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_584.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- (again) https://github.com/LuaJIT/LuaJIT/issues/1295
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
--- https://github.com/tarantool/luajit/commit/e0c8208ee2a41f06b6ce9134a7aa3db8fd36d12d
-test:test("RENAME IR invariant violation (again) (LuaJIT#1295)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1295.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1262
--- https://github.com/tarantool/luajit/commit/600dbbdab19003bbf06cfb66b04066371add3fc2
--- https://github.com/LuaJIT/LuaJIT/commit/e45fd4cb713b610506213692f3b55a1869febb03
-test:test("Fix limit check in narrow_conv_backprop() (LuaJIT#1262)",
-function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1262.lua")
     test:skip("reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
@@ -455,6 +456,11 @@ end)
 -- https://www.freelists.org/post/luajit/bug-in-21-head,3
 -- Introduced by
 -- https://github.com/LuaJIT/LuaJIT/commit/ccae333844c7aad0934f13f7698894c883a6b561
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (c98660c8) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Must preserve J->fold.ins (fins) around call to lj_ir_ksimd()",
 function(test)
     test:plan(2)
@@ -463,30 +469,13 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/1194
--- https://github.com/tarantool/luajit/commit/cc96994ae7cae290b22e6f3233062804ea533c8d
--- https://github.com/LuaJIT/LuaJIT/commit/7369eff67d46d7f5fac9ee064e3fbf97a15458de
-test:test("Fix IR_ABC hoisting (LuaJIT#1194)", function(test)
-    test:plan(2)
-    local filename = "lj_1194.lua"
-    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/794
--- https://github.com/tarantool/luajit/commit/4018d3a8f75c5e59531d314a3bd7bd4bc911805e
--- https://github.com/LuaJIT/LuaJIT/commit/c8bcf1e5fb8eb72c7e35604fdfd27bba512761bb
-test:test("Fix ABC FOLD rule with constants (LuaJIT#794)", function(test)
-    test:plan(2)
-    local filename = "lj_794.lua"
-    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
-        "reproduce in runtime")
-    test:skip("reproduce using SMT")
-end)
-
 -- https://www.freelists.org/post/luajit/Segmentation-fault-with-JITed-code,1
 -- https://github.com/LuaJIT/LuaJIT/commit/a6c34b85f776d8c83b0c01cbdc50550e613d1fda
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (a6c34b85) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix ABC elimination in lj_record.c",
 function(test)
     test:plan(2)
@@ -496,10 +485,81 @@ end)
 
 -- https://www.freelists.org/post/luajit/Crash-on-lua-code-with-LuaJIT
 -- https://github.com/LuaJIT/LuaJIT/commit/6964a7752ae314dcae693abcb0c1175c95ad22e0
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (6964a7752) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix ABC elimination in lj_fold.c",
 function(test)
     test:plan(2)
     test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/737
+-- https://github.com/tarantool/luajit/commit/ca0de768be31f10ccd35569f786a960a76e9fdbb
+test:test("Use-def analysis misses slots used by upvalues (LuaJIT#737)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_737.lua", "assertion is violated"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1128
+-- https://github.com/tarantool/luajit/commit/005e8cea3173879bb838fe48e2eb734baca23f0a
+test:test("Restore of sunk tables with double IR_NEWREF (LuaJIT#1128)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_1128.lua", "assertion is violated",
+        {"-Otryside=1"}), "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1418
+-- https://github.com/LuaJIT/LuaJIT/commit/707c12bf00dafdfd3899b1a6c36435dbbf6c7022
+-- XXX: The bug is reproduced in the DUALNUM mode only. Runtime
+-- reproduction requires a JIT trace to be recorded, hence the
+-- `hotloop=1` command-line option.
+-- XXX: The `narrow` optimization is supported now (see
+-- https://github.com/ligurio/ljopt/issues/34), but SMT reproduction
+-- is still not enabled: checking the generated DUALNUM formula hangs
+-- cvc5 (verified), so the test stays runtime-only.
+test:test(
+  "Narrowing of unary minus operation for number 0 in DUALNUM mode \
+     (LuaJIT #1418)",
+function(test)
+    test:plan(4)
+    if not dualnum_build then
+        test:skip("slot variant: reproduce in runtime")
+        test:skip("slot variant: reproduce with SMT")
+        test:skip("const variant: reproduce in runtime")
+        test:skip("const variant: reproduce with SMT")
+        return
+    end
+    test:ok(reproduce_bug_in_popen("lj_1418_slot.lua", "assertion is violated"),
+        "slot variant: reproduce in runtime")
+    test:skip("slot variant: reproduce with SMT")
+    test:ok(reproduce_bug_in_popen("lj_1418_const.lua",
+        "assertion is violated"), "const variant: reproduce in runtime")
+    test:skip("const variant: reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1083
+-- https://github.com/tarantool/luajit/commit/088e2e161b8aab0ddabc89fb5d9af922536c69f1
+-- XXX: reproduced only in the single-number mode.
+test:test("Missing coercion when recording select() (LuaJIT#1083)",
+function(test)
+    test:plan(2)
+    if dualnum_build then
+        test:skip("reproduce in runtime")
+        test:skip("reproduce with SMT")
+        return
+    end
+    test:ok(reproduce_bug_in_popen("lj_1083_select.lua",
+        "assertion is violated"),
+        "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 

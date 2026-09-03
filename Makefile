@@ -13,6 +13,9 @@ LUA_PATH="${LUA_PATH_ROCKS};./?/init.lua;;"
 # Don't forget to update the commit hash in .envrc.
 LUAJIT_TAG ?= af5d38f109b6a7f714b41f92a57e2bd67d14955a
 LUAJIT_BUGGY_TAG ?= 203a98682e925d3740291db26184b8a847857943~
+# Extra flags passed to CMake when building LuaJIT, e.g.
+# `-DLUAJIT_NUMMODE=2` to build a DUALNUM variant.
+LUAJIT_CMAKE_FLAGS ?=
 BUILD_DIR := $(PROJECT_DIR)/build
 LUA_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_TAG)/src/luajit
 LUA_BUGGY_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_BUGGY_TAG)/src/luajit
@@ -25,6 +28,7 @@ all: check test
 
 
 # @1 - commit to build LuaJIT on
+# @2 - extra CMake flags (e.g. -DLUAJIT_NUMMODE=2 for DUALNUM)
 define build_luajit
 	@if [ ! -d "$(BUILD_DIR)/luajit_$(1)" ]; then \
 		git clone https://github.com/tarantool/luajit $(BUILD_DIR)/luajit_$(1); \
@@ -34,18 +38,18 @@ define build_luajit
 		git reset --hard $(1) && \
 		echo "Applying patches..." && \
 		git apply $(PROJECT_DIR)/lua_patches/*.patch && \
-		cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)/luajit_$(1) && \
+		cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(BUILD_DIR)/luajit_$(1) $(2) && \
 		echo "Building..." && \
 		$(MAKE) install
 endef
 
 $(LUA_BIN):
 	@echo "Building LuaJIT $(LUAJIT_TAG)"
-	$(call build_luajit,$(LUAJIT_TAG))
+	$(call build_luajit,$(LUAJIT_TAG),$(LUAJIT_CMAKE_FLAGS))
 
 $(LUA_BUGGY_BIN):
 	@echo "Building buggy LuaJIT $(LUAJIT_BUGGY_TAG)"
-	$(call build_luajit,$(LUAJIT_BUGGY_TAG))
+	$(call build_luajit,$(LUAJIT_BUGGY_TAG),$(LUAJIT_CMAKE_FLAGS))
 
 build: $(LUA_BIN)
 
@@ -73,6 +77,9 @@ test: $(LUA_BUGGY_BIN) $(LUA_BIN)
 	@echo "Run unit tests"
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/unit_tests.lua
 	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
+	$(MAKE) test-buggy
+
+test-buggy: $(LUA_BUGGY_BIN) $(LUA_BIN)
 	@echo "Run buggy LuaJIT tests on old version"
 	BUGGY_BUILD=1 LUA_PATH=$(LUA_PATH) $(LUA_BUGGY_BIN) $(PROJECT_DIR)/tests/buggy_luajit_tests.lua
 	@echo "Run buggy LuaJIT tests on current version"
@@ -94,5 +101,5 @@ coverage: $(LUACOV_STATS)
 clean:
 	@rm -rf ${CLEANUP_FILES}
 
-.PHONY: test install coverage
+.PHONY: test test-buggy install coverage
 .PHONY: luacheck check deps
