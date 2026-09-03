@@ -336,8 +336,11 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/commit/03208c8162af9cc01ca76ee1676ca79e5abe9b60
 test:test("(LuaJIT#6163)", function(test)
     test:plan(2)
-    local _ = read_reproducer_file("lj_6163.lua")
-    test:skip("reproduce in runtime")
+    local filename = "lj_6163.lua"
+    -- The reproducer needs the default hotexit threshold (10),
+    -- not the forced hotexit=1, to keep the exact trace shape.
+    test:ok(reproduce_bug_in_popen(filename, "math.min: comm_dup_minmax",
+        {"-Ohotexit=10"}), "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 
