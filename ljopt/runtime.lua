@@ -1,5 +1,11 @@
 local ir_dump = require('ljopt.ir_dump')
-local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
+-- tests.coverage is a test-only module; when it is not installed
+-- (e.g. a luarocks install without the test suite) toggling the
+-- debug hook must be a no-op.
+local has_coverage, coverage = pcall(require, 'tests.coverage')
+local toggle_debug_hook = has_coverage
+    and coverage.toggle_debug_hook()
+    or function() end
 
 -- Disable print to avoid stdout modifications.
 local function capture(f, ...)

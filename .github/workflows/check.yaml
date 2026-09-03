@@ -1,4 +1,4 @@
-name: Static analysis
+name: Checks
 
 on:
   push:
@@ -18,3 +18,81 @@ jobs:
 
       - name: Run luacheck
         uses: lunarmodules/luacheck@v1
+
+  luarocks:
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    # LuaJIT in the shared build/ cache is built by the Testing
+    # workflow on ubuntu-24.04 and needs a matching glibc.
+    runs-on: ubuntu-24.04
+
+    env:
+      # Build directory of the pinned tarantool LuaJIT
+      # (Makefile LUAJIT_TAG).
+      LUAJIT_DIR: ${{ github.workspace }}/build/luajit_af5d38f109b6a7f714b41f92a57e2bd67d14955a
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache LuaJIT
+        uses: actions/cache@v3
+        with:
+          # This path should be same as the path in Makefile,
+          # where tarantool's LuaJIT repo stored.
+          path: build
+          key: ${{ runner.os }}-luajit-${{ hashFiles('lua_patches/*.patch') }}
+
+      - name: Setup luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luarocks
+
+      - name: Build LuaJIT
+        run: make build
+
+      - name: Setup Z3 (library)
+        uses: cda-tum/setup-z3@v1
+        with:
+          # The z3 backend requires Z3 >= 4.15.
+          version: 4.16.0
+          add_to_library_path: true
+
+      - name: Install ljopt with luarocks
+        run: |
+          # Satisfy the rockspec's external dependency on
+          # luajit-2.1/luajit.h by pointing luarocks at the freshly
+          # built LuaJIT.
+          luarocks make --tree "$GITHUB_WORKSPACE/.rock" \
+            ljopt-scm-1.rockspec \
+            LUAJIT_DIR="$LUAJIT_DIR" \
+            LUAJIT_INCDIR="$LUAJIT_DIR/include"
+
+      - name: Check SMT translation after installation
+        run: |
+          LUAJIT="$LUAJIT_DIR/bin/luajit"
+          export LUA_PATH="$GITHUB_WORKSPACE/.rock/share/lua/5.1/?.lua;$GITHUB_WORKSPACE/.rock/share/lua/5.1/?/init.lua;;"
+
+          # The installed entry point runs to completion.
+          printf 'for i = 1, 100 do local a, b = 23, 11; y = a + b end\n' > /tmp/ljopt-tr.lua
+          "$LUAJIT" "$GITHUB_WORKSPACE/bin/ljopt" /tmp/ljopt-tr.lua > /tmp/ljopt-tr.out
+          test -s /tmp/ljopt-tr.out
+
+          # Translating a chunk to SMT-LIB yields a formula.
+          "$LUAJIT" -e '
+              local code = "for i = 1, 100 do local a, b = 23, 11; y = a + b end"
+              local smt = require("ljopt").ir.translate_to_smt(code)
+              assert(#smt > 0, "no SMT-LIB produced")
+              assert(smt:find("(assert", 1, true), "no (assert in SMT-LIB")
+              assert(smt:find("(check-sat)", 1, true), "no (check-sat in SMT-LIB")
+          '
+
+      - name: Check verification with an SMT solver
+        run: |
+          LUAJIT="$LUAJIT_DIR/bin/luajit"
+          export LUA_PATH="$GITHUB_WORKSPACE/.rock/share/lua/5.1/?.lua;$GITHUB_WORKSPACE/.rock/share/lua/5.1/?/init.lua;;"
+          printf 'for i = 1, 100 do local a, b = 23, 11; y = a + b end\n' > /tmp/ljopt-tr.lua
+          LJOPT_SMT=z3 "$LUAJIT" "$GITHUB_WORKSPACE/bin/ljopt" --check /tmp/ljopt-tr.lua > /tmp/ljopt-check.out
+          grep -q 'VERIFICATION HAS PASSED' /tmp/ljopt-check.out
