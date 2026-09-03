@@ -16,7 +16,7 @@
 -- But we already know it should be 3, so we add
 -- assertion and check whether formula is SAT.
 
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 local translate = require("ljopt.ir_smtlib")
