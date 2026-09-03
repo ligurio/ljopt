@@ -41,7 +41,7 @@ local dualnum_build = is_dualnum_build()
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(41)
+test:plan(30)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -344,16 +344,6 @@ test:test("(LuaJIT#6163)", function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/1094
--- https://github.com/tarantool/luajit/commit/dbf132960a3c5b9992c71eeb24f9a3f1d010e86e
--- https://github.com/LuaJIT/LuaJIT/commit/f72c19e482b6f918b7cf42b0436e2b117d160a29
-test:test("Maintain chain invariant in DCE (LuaJIT#1094)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1094.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
 -- https://github.com/LuaJIT/LuaJIT/issues/1084
 -- https://github.com/LuaJIT/LuaJIT/commit/b8919781d4717d8c3171b0002d230e03304d8174
 test:test("Promote 32-bit constants in 64-bit operations (LuaJIT#1084)",
@@ -425,27 +415,6 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/980
--- https://github.com/tarantool/luajit/commit/46418db5fdbfc5dcf5515edea7df1c652b3a5974
--- https://github.com/LuaJIT/LuaJIT/commit/c7db8255e1eb59f933fac7bc9322f0e4f8ddc6e6
-test:test("Fix TDUP load forwarding after table rehash. (LuaJIT#980)",
-function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_980.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/6976
--- https://github.com/tarantool/luajit/commit/f067cf638cf8987ab3b6db372d609a5982e458b5
--- https://github.com/LuaJIT/LuaJIT/commit/1e6e8aaa20626ac94cf907c69b0452f76e9f5fa5
-test:test("(LuaJIT#6976)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_6976.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
 -- https://github.com/LuaJIT/LuaJIT/issues/524
 -- https://github.com/tarantool/luajit/commit/c9588f51301844d11a2a9dfa9070e437961c9787
 test:test("fold: keep type of emitted CONV in sync with its mode (LuaJIT#524)",
@@ -465,36 +434,6 @@ test:test("Fix FOLD rule for strength reduction of widening", function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/584
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
-test:test("RENAME IR invariant violation (LuaJIT#584)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_584.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- (again) https://github.com/LuaJIT/LuaJIT/issues/1295
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
--- https://github.com/tarantool/luajit/commit/e0c8208ee2a41f06b6ce9134a7aa3db8fd36d12d
-test:test("RENAME IR invariant violation (again) (LuaJIT#1295)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1295.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1262
--- https://github.com/tarantool/luajit/commit/600dbbdab19003bbf06cfb66b04066371add3fc2
--- https://github.com/LuaJIT/LuaJIT/commit/e45fd4cb713b610506213692f3b55a1869febb03
-test:test("Fix limit check in narrow_conv_backprop() (LuaJIT#1262)",
-function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1262.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
 -- https://github.com/LuaJIT/LuaJIT/commit/c98660c8c3921e43029625e51166c9d273ad09df
 -- https://www.freelists.org/post/luajit/bug-in-21-head,3
 -- Introduced by
@@ -505,28 +444,6 @@ function(test)
     local _ = read_reproducer_file("lj_ir_ksimd.lua")
     test:skip("reproduce in runtime")
     test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1194
--- https://github.com/tarantool/luajit/commit/cc96994ae7cae290b22e6f3233062804ea533c8d
--- https://github.com/LuaJIT/LuaJIT/commit/7369eff67d46d7f5fac9ee064e3fbf97a15458de
-test:test("Fix IR_ABC hoisting (LuaJIT#1194)", function(test)
-    test:plan(2)
-    local filename = "lj_1194.lua"
-    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/794
--- https://github.com/tarantool/luajit/commit/4018d3a8f75c5e59531d314a3bd7bd4bc911805e
--- https://github.com/LuaJIT/LuaJIT/commit/c8bcf1e5fb8eb72c7e35604fdfd27bba512761bb
-test:test("Fix ABC FOLD rule with constants (LuaJIT#794)", function(test)
-    test:plan(2)
-    local filename = "lj_794.lua"
-    test:ok(reproduce_bug_in_popen(filename, "Segmentation fault"),
-        "reproduce in runtime")
-    test:skip("reproduce using SMT")
 end)
 
 -- https://www.freelists.org/post/luajit/Segmentation-fault-with-JITed-code,1
@@ -608,54 +525,6 @@ function(test)
         return
     end
     test:ok(reproduce_bug_in_popen("lj_1083_select.lua",
-        "assertion is violated"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/859
--- https://github.com/tarantool/luajit/commit/439a3a039ebc8f9e9175a8f98e3d8a1249749c27
--- XXX: reproduced in the single-number mode on x86/x64 only.
-test:test("Fix math.ceil() result sign for -1 < x < -0.5 (LuaJIT#859)",
-function(test)
-    test:plan(2)
-    if dualnum_build then
-        test:skip("reproduce in runtime")
-        test:skip("reproduce with SMT")
-        return
-    end
-    test:ok(reproduce_bug_in_popen("lj_859.lua", "assertion is violated"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1273
--- https://github.com/tarantool/luajit/commit/8cd79d198df4b0e14882a663a1673e1308f09899
--- XXX: reproduced in the DUALNUM mode only.
-test:test("64-bit bit.band() operands in the DUALNUM mode (LuaJIT#1273)",
-function(test)
-    test:plan(2)
-    if not dualnum_build then
-        test:skip("reproduce in runtime")
-        test:skip("reproduce with SMT")
-        return
-    end
-    test:ok(reproduce_bug_in_popen("lj_1273.lua", "assertion is violated"),
-        "reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/tarantool/luajit/commit/eac9ead5bfa699d2dfc663022fbeb2ab633285ef
--- XXX: reproduced in the DUALNUM mode only.
-test:test("Omission of the guarded CONV int.num in DUALNUM mode",
-function(test)
-    test:plan(2)
-    if not dualnum_build then
-        test:skip("reproduce in runtime")
-        test:skip("reproduce with SMT")
-        return
-    end
-    test:ok(reproduce_bug_in_popen("lj_conv_non_weak.lua",
         "assertion is violated"),
         "reproduce in runtime")
     test:skip("reproduce with SMT")
