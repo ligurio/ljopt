@@ -425,6 +425,11 @@ end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/524
 -- https://github.com/tarantool/luajit/commit/c9588f51301844d11a2a9dfa9070e437961c9787
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (c9588f51) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("fold: keep type of emitted CONV in sync with its mode (LuaJIT#524)",
 function(test)
     test:plan(2)
@@ -435,6 +440,11 @@ end)
 
 -- https://github.com/tarantool/luajit/commit/51f722c2dc9b1db3b214a683678e570491fb82d7
 -- https://github.com/LuaJIT/LuaJIT/commit/9f0caad0e43f97a4613850b3874b851cb1bc301d
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (51f722c2) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix FOLD rule for strength reduction of widening", function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_fix-fold-simplify-conv-sext.lua")
@@ -446,6 +456,11 @@ end)
 -- https://www.freelists.org/post/luajit/bug-in-21-head,3
 -- Introduced by
 -- https://github.com/LuaJIT/LuaJIT/commit/ccae333844c7aad0934f13f7698894c883a6b561
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (c98660c8) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Must preserve J->fold.ins (fins) around call to lj_ir_ksimd()",
 function(test)
     test:plan(2)
@@ -456,6 +471,11 @@ end)
 
 -- https://www.freelists.org/post/luajit/Segmentation-fault-with-JITed-code,1
 -- https://github.com/LuaJIT/LuaJIT/commit/a6c34b85f776d8c83b0c01cbdc50550e613d1fda
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (a6c34b85) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix ABC elimination in lj_record.c",
 function(test)
     test:plan(2)
@@ -465,6 +485,11 @@ end)
 
 -- https://www.freelists.org/post/luajit/Crash-on-lua-code-with-LuaJIT
 -- https://github.com/LuaJIT/LuaJIT/commit/6964a7752ae314dcae693abcb0c1175c95ad22e0
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (6964a7752) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 test:test("Fix ABC elimination in lj_fold.c",
 function(test)
     test:plan(2)
