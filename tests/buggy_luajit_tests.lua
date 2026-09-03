@@ -285,10 +285,18 @@ end)
 
 -- Fix FOLD rules for math.abs() and FP negation.
 -- https://github.com/LuaJIT/LuaJIT/commit/4416e885d28c0f49d2c7bb3f9630ab23c22fbc9a
+-- XXX: This bug cannot be reproduced at runtime (or via SMT) on the
+-- pinned LuaJIT builds (buggy 203a~, current af5d38f): the fix
+-- (4416e885) is already an ancestor of both. Moreover, the original
+-- miscompile depends on the pre-2017 IR representation in which the
+-- FP constant operand of NEG/ABS was a true KNUM. In the current IR
+-- that constant is loaded via IR_FLOAD REF_NIL, so reverting the fold
+-- rules would only disable an optimization instead of producing a
+-- wrong result. Hence no reproducer is possible.
 test:test("Fix FOLD rules for math.abs() and FP negation", function(test)
     test:plan(2)
-    test:ok("reproduce in runtime")
-    test:ok("reproduce using SMT")
+    test:skip("reproduce in runtime")
+    test:skip("reproduce using SMT")
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/994
