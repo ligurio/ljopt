@@ -4,7 +4,7 @@
 
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local ir_smtlib = require("ljopt.ir_smtlib")

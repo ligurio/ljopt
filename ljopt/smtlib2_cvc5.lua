@@ -1,4 +1,4 @@
--- cvc5 backend, drop-in for tests/smtlib2.lua (the z3 one).
+-- cvc5 backend, drop-in for ljopt/smtlib2.lua (the z3 one).
 -- Same API: new(), :parse(str), :check(str), .result.
 --
 -- Uses cvc5's C API (include/cvc5/c) through LuaJIT's FFI, the
