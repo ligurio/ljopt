@@ -34,7 +34,7 @@ local dualnum_build = is_dualnum_build()
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(38)
+test:plan(34)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -376,16 +376,6 @@ test:test("(LuaJIT#6163)", function(test)
     test:skip("reproduce with SMT")
 end)
 
--- https://github.com/LuaJIT/LuaJIT/issues/1094
--- https://github.com/tarantool/luajit/commit/dbf132960a3c5b9992c71eeb24f9a3f1d010e86e
--- https://github.com/LuaJIT/LuaJIT/commit/f72c19e482b6f918b7cf42b0436e2b117d160a29
-test:test("Maintain chain invariant in DCE (LuaJIT#1094)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1094.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
 -- https://github.com/LuaJIT/LuaJIT/issues/1084
 -- https://github.com/LuaJIT/LuaJIT/commit/b8919781d4717d8c3171b0002d230e03304d8174
 test:test("Promote 32-bit constants in 64-bit operations (LuaJIT#1084)",
@@ -493,36 +483,6 @@ end)
 test:test("Fix FOLD rule for strength reduction of widening", function(test)
     test:plan(2)
     local _ = read_reproducer_file("lj_fix-fold-simplify-conv-sext.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/584
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
-test:test("RENAME IR invariant violation (LuaJIT#584)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_584.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- (again) https://github.com/LuaJIT/LuaJIT/issues/1295
--- https://github.com/LuaJIT/LuaJIT/commit/811e448daa0f8f06e946fb607a98ace85c43b574
--- https://github.com/tarantool/luajit/commit/e0c8208ee2a41f06b6ce9134a7aa3db8fd36d12d
-test:test("RENAME IR invariant violation (again) (LuaJIT#1295)", function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1295.lua")
-    test:skip("reproduce in runtime")
-    test:skip("reproduce with SMT")
-end)
-
--- https://github.com/LuaJIT/LuaJIT/issues/1262
--- https://github.com/tarantool/luajit/commit/600dbbdab19003bbf06cfb66b04066371add3fc2
--- https://github.com/LuaJIT/LuaJIT/commit/e45fd4cb713b610506213692f3b55a1869febb03
-test:test("Fix limit check in narrow_conv_backprop() (LuaJIT#1262)",
-function(test)
-    test:plan(2)
-    local _ = read_reproducer_file("lj_1262.lua")
     test:skip("reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
