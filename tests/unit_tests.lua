@@ -8,7 +8,7 @@ local ljopt_config = require("ljopt.config")
 local loop_unrolling = require("ljopt.loop_unrolling")
 local utils = require("ljopt.utils")
 
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.

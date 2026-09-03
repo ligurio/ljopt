@@ -39,6 +39,9 @@ build = {
         ['ljopt.loop_unrolling'] = 'ljopt/loop_unrolling.lua',
         ['ljopt.main'] = 'ljopt/main.lua',
         ['ljopt.runtime'] = 'ljopt/runtime.lua',
+        ['ljopt.smtlib2'] = 'ljopt/smtlib2.lua',
+        ['ljopt.smtlib2_cvc5'] = 'ljopt/smtlib2_cvc5.lua',
+        ['ljopt.smtlib2_z3'] = 'ljopt/smtlib2_z3.lua',
         ['ljopt.smt_constants'] = 'ljopt/smt_constants.lua',
         ['ljopt.utils'] = 'ljopt/utils.lua',
 

@@ -8,7 +8,7 @@
 
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 local smt_constants = require('ljopt.smt_constants')
 local coverage = require("tests.coverage")
