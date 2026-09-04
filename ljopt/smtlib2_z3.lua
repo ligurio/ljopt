@@ -167,7 +167,7 @@ end
 
 local function new()
     local z3_version = get_z3_version()
-    print("Z3 version: ", z3_version.version_string)
+    print(("SMT backend: Z3 %s"):format(z3_version.version_string))
     local Z3_MIN_MAJOR = 4
     local Z3_MIN_MINOR = 15
     if version_lt(get_z3_version(), {
