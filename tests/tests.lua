@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(11)
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -2030,6 +2030,50 @@ end
     end
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
+end)
+
+test:test("func.env FLOAD of a constant function", function(test)
+    local code = [[
+-- A function called from a traced loop that reads a global (math)
+-- is inlined off its constant prototype, so resolving the global
+-- emits a func.env FLOAD whose operand is the constant function. Its
+-- env cannot be modelled, so the FLOAD is dropped as NYI instead of
+-- crashing on left_op:get_ssa().
+local x
+local function f()
+  x = math.huge
+end
+for i = 1, 10 do
+  f()
+end
+]]
+    -- The number of recorded traces depends on JIT state, so the
+    -- plan is computed after collecting formulas. The regression
+    -- (no crash on the dropped constant-function func.env FLOAD)
+    -- is checked via parse/UNSAT below.
+    -- The trace holds NYI nodes (the dropped FLOAD, a p32 EQ
+    -- guard), which strict mode rejects, so strict is disabled
+    -- around translation as the relaxed equivalence tests do.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = {}
+    local ok = pcall(function()
+        local tmp = {}
+        for _j, formula in pairs(ljopt.ir.traces_to_smt(code)) do
+            tmp[#tmp + 1] = smt_constants.LJOPT_SMTLIB .. formula
+        end
+        formulas = tmp
+    end)
+    ljopt_config.set_strict_mode(strict_mode)
+
+    test:plan(1 + 2 * #formulas)
+    test:ok(ok, "func.env FLOAD chunk translates")
+    for j = 1, #formulas do
+        test:is(smt:parse(formulas[j]), true,
+            ("func.env FLOAD trace %s parse."):format(j))
+        test:is(smt:check(formulas[j]), smt.result.UNSAT,
+            ("func.env FLOAD trace %s check."):format(j))
+    end
 end)
 
 require("tests.coverage").shutdown()
