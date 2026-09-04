@@ -39,7 +39,11 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
         -- Truncate to lower 32 bits, then sign-extend back to 64.
         data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(left_op)
-    elseif parsed_right_op[1] == 'i64.int' then
+    -- u64 destinations are stored as 64-bit BVs just like i64, so
+    -- int -> u64 uses the same encoding: sext sign-extends low 32
+    -- bits, otherwise zero-extend.
+    elseif parsed_right_op[1] == 'i64.int' or
+           parsed_right_op[1] == 'u64.int' then
         local lo = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
         if parsed_right_op[2] == 'sext' then
             data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(lo)
