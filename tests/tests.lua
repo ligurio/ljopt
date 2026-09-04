@@ -1917,6 +1917,23 @@ end
             {type = "u64", name = "CONV",
                 right_op = op_type.new("lit", "u64.int sext")},
         },
+    }, {
+        name = "CONV u64.num",
+        code = [[
+local ffi = require('ffi')
+local function foo(n)
+    ffi.new('uint64_t', n)
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.num none")},
+        },
     }}
     test:plan(2 * #srcs)
 
