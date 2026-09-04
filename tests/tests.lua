@@ -1915,6 +1915,18 @@ end
         ins = {
             {type = "p64", name = "ADD"},
         },
+    }, {
+        name = "uint64 cdata constant operand",
+        code = [[
+local x
+for i = 1, 10 do
+  x = 1 + 1ULL
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
     }}
     test:plan(3 * #srcs)
 
