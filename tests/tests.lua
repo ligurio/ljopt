@@ -1856,6 +1856,21 @@ end
             {type = "u64", name = "CONV",
                 right_op = op_type.new("lit", "u64.int sext")},
         },
+    }, {
+        name = "CONV u64.num",
+        code = [[
+-- ffi.new fed from the traced double loop counter records a num ->
+-- u64 CONV on the unoptimized trace; it folds away at opt level 3.
+-- Both traces must stay equivalent.
+local ffi = require("ffi")
+for i = 1, 10 do
+  local _ = ffi.new("uint64_t", i)
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.num none")},
+        },
     }}
     test:plan(3 * #srcs)
 
