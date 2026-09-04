@@ -1903,6 +1903,18 @@ end
             {type = "int", name = "CONV",
                 right_op = op_type.new("lit", "int.u8")},
         },
+    }, {
+        name = "ffi.copy from string literal",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 11)
+for i = 0, 10 do
+  ffi.copy(a + i, "a", 1)
+end
+]],
+        ins = {
+            {type = "p64", name = "ADD"},
+        },
     }}
     test:plan(3 * #srcs)
 
