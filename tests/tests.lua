@@ -1841,6 +1841,21 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "CONV u64.int sext",
+        code = [[
+-- ffi.new with an integer constant records an int -> u64 CONV
+-- (sign-extended) on the unoptimized trace; it folds away at opt
+-- level 3. Both traces must stay equivalent.
+local ffi = require("ffi")
+for i = 1, 10 do
+  local _ = ffi.new("uint64_t", 1)
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
     }}
     test:plan(3 * #srcs)
 
