@@ -1841,6 +1841,18 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "CONV u64.int sext",
+        code = [[
+local ffi = require("ffi")
+for i = 1, 10 do
+  local _ = ffi.new("uint64_t", 1)
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
     }}
     test:plan(3 * #srcs)
 
