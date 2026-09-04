@@ -91,6 +91,14 @@ local traces_num
 
 local trace_bc_hash
 
+-- LuaJIT trace number -> "file:line" string of the trace start,
+-- captured while the trace is being recorded and folded into
+-- execution_locs once the trace gets its final uid.
+local trace_loc = {}
+
+-- uid -> "file:line" string where the trace starts.
+local execution_locs = {}
+
 local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
 
@@ -109,10 +117,16 @@ local function ljopt_init_trace_state()
   exec_record = {}
   traces_num = {}
   trace_bc_hash = {}
+  trace_loc = {}
+  execution_locs = {}
 end
 
 local function ljopt_get_execution_state()
   return exec_record
+end
+
+local function ljopt_get_execution_locs()
+  return execution_locs
 end
 
 -- Helper function used only in tests to map trace_id to
@@ -207,11 +221,14 @@ end
 -- All of the above together gives unique ID
 -- (except for cases, when there's multiple snapshots
 --  with same ID, we'll ignore them for now).
-local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
+local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
   if what == "start" then
     trace_bc_hash[tr] = ""
     dev_checks("number", "function", "number", "string")
     traces_num[tr] = ""
+    if func ~= nil and pc ~= nil then
+      trace_loc[tr] = fmtfunc(func, pc)
+    end
     if otr then
       if traces_num[otr] ~= nil then
         -- Set parent <trace_id>_<snap_id>
@@ -239,10 +256,15 @@ local function ljopt_init_trace_uid(tr, _func, _pc, what, otr, oex)
     if traces_num[tr] ~= nil then
       local bc_hash = tostring(fnv1a_hash(trace_bc_hash[tr]))
       traces_num[tr] = traces_num[tr] .. sload_type_sig(tr) .. "_" .. bc_hash
+      if trace_loc[tr] ~= nil then
+        execution_locs[traces_num[tr]] = trace_loc[tr]
+      end
+      trace_loc[tr] = nil
       if ljopt_config.is_debug_mode() then
         io.stderr:write("Cur trace id: " .. traces_num[tr] .. "\n")
       end
     else
+      trace_loc[tr] = nil
       if ljopt_config.is_debug_mode() then
         io.stderr:write(
           "Skip trace, parent=nil, trace hash: " .. trace_bc_hash[tr] .. '\n'
@@ -441,6 +463,7 @@ end
 return {
   ljopt_init_trace_state = ljopt_init_trace_state,
   ljopt_get_execution_state = ljopt_get_execution_state,
+  ljopt_get_execution_locs = ljopt_get_execution_locs,
   ljopt_get_traceid_map = ljopt_get_traceid_map,
   ljopt_init_new_trace = ljopt_init_new_trace,
   ljopt_init_trace_uid = ljopt_init_trace_uid,
