@@ -89,6 +89,10 @@ function IRNodeCONV:to_smt_lib(ctx)
     elseif parsed_right_op[1] == 'num.flt' then
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'flt')
         data = ('((_ to_fp 11 53) RNE %s)'):format(left_op)
+    -- int -> flt: sign-extend int32 and round to float32 (RNE).
+    elseif parsed_right_op[1] == 'flt.int' then
+        left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
+        data = arith_utils.smt_int_to_flt(left_op)
     elseif parsed_right_op[1] == 'num.u32' then
         -- u32 -> num: unsigned integer to floating point.
         left_op = ir_node.retrieve_u32_op(self:get_left_op(), ctx, 'u32')
