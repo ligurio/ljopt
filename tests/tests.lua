@@ -2089,6 +2089,35 @@ end
             {type = "u32", name = "CONV",
                 right_op = op_type.new("lit", "u32.num none")},
         },
+    }, {
+        name = "CONV u64.i64",
+        unroll_n = 0,
+        code = [[
+local ffi = require("ffi")
+local u = ffi.new("union { uint64_t u64[1]; void *v[1]; }")
+u.u64[0] = 0
+local res
+-- Start at -1: the negative lower bound stops LuaJIT from proving
+-- `i >= 0`, so the cast to `ptrdiff_t` is sign-extended
+-- (`i64.int sext`) and the pointer stored via `u.v[0]` is an i64.
+-- Reading it back as u64 then needs exactly the `u64.i64` CONV this
+-- test checks. With a non-negative range LuaJIT stores the int
+-- directly and emits `u64 CONV ... u64.int` instead.
+for i = -1, 4 do
+  u.v[0] = ffi.cast("void *", ffi.cast("ptrdiff_t", i))
+  -- `res` is declared outside the loop body, so it is carried
+  -- across the backedge and the load (with the `u64.i64` CONV it
+  -- forces) is not dropped by DCE. A local declared inside the
+  -- loop body would be unused, and `check_ins_present()` would
+  -- fail with `Instruction CONV(u64,u64.i64) not found`.
+  res = 1 + u.u64[0]
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.i64")},
+        },
     }}
     test:plan(2 * #srcs)
 
