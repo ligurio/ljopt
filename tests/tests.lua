@@ -1968,6 +1968,28 @@ end
         ins = {
             {type = "cdt", name = "SLOAD"},
         },
+    }, {
+        name = "module-level cdata union",
+        code = [[
+-- A module-level cdata union shows up as a literal operand of the
+-- p64 ADD that addresses its fields; its address is a compile-time
+-- constant that differs between recording runs, so the pointer
+-- arithmetic must be dropped as NYI instead of crashing.
+local ffi = require("ffi")
+local u = ffi.new("union { struct { uint32_t lo, hi; }; uint64_t u64; }")
+local function conv(lo, hi)
+  u.lo = lo
+  u.hi = hi
+  return u.u64
+end
+for i = 1, 10 do
+  _ = conv(i, i)
+end
+]],
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+        },
     }}
     test:plan(3 * #srcs)
 
