@@ -1388,6 +1388,11 @@ foo()
     }, {
         name = "write to global variable",
         code = [[
+-- Init the global first so the pre-state of v is the same in both
+-- recording sessions: without it a trace is sometimes recorded on the
+-- first call (v == nil) and sometimes on a later one (v == 1),
+-- which flips the equivalence check to SAT intermittently.
+v = 0
 function m()
   v = 1
   return v
@@ -1407,6 +1412,9 @@ m()
     }, {
         name = "read string global variable",
         code = [[
+-- See "write to global variable": deterministic pre-state of the
+-- global across both recording sessions.
+v = ""
 function m()
   v = "hello"
   return v
