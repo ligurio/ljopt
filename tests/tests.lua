@@ -1920,6 +1920,22 @@ end
         ins = {
             {type = "p64", name = "ADD"},
         },
+    }, {
+        name = "uint64 cdata constant operand",
+        code = [[
+-- A uint64_t literal (1ULL) shows up as a cdata constant IR operand
+-- (FLOAD of the box's ctypeid/int64); parsing it must not abort with
+-- "type is not exists: uint64". The int summand widens via a u64
+-- CONV before the cdata ADD.
+local x
+for i = 1, 10 do
+  x = 1 + 1ULL
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
     }}
     test:plan(3 * #srcs)
 
