@@ -2036,6 +2036,29 @@ end
             {type = "u32", name = "CONV",
                 right_op = op_type.new("lit", "u32.num none")},
         },
+    }, {
+        name = "CONV u64.i64",
+        unroll_n = 0,
+        code = [[
+local ffi = require("ffi")
+local u = ffi.new("union { uint64_t u64[1]; void *v[2]; }")
+u.u64[0] = 0
+for i = -1, 4 do
+  u.v[0] = ffi.cast("void *", ffi.cast("ptrdiff_t", i))
+  -- The variable below must be global; if it were local, the
+  -- result would be unused, causing LuaJIT to apply dead code
+  -- elimination (DCE) to the load operation and remove the
+  -- `u64.i64 CONV` conversion along with it. Consequently, the
+  -- `check_ins_present()` check fails with the error:
+  -- `Instruction CONV(u64,u64.i64) not found`.
+  _ = 1 + u.u64[0]
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.i64")},
+        },
     }}
     test:plan(2 * #srcs)
 
