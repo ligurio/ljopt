@@ -1960,6 +1960,18 @@ end
         ins = {
             {type = "u32", name = "XSTORE"},
         },
+    }, {
+        name = "ffi.copy() string to FFI array",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100, 42)
+for i = 0, 10 do
+  ffi.copy(a + i, "abc")
+end
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+        },
     }}
     test:plan(2 * #srcs)
 

@@ -7,6 +7,14 @@ local impls = {}
 local IRNodeXSTOREBase = {}
 ir_node.extended(IRNodeXSTOREBase, ir_node.ir_node_base)
 
+-- A store is modelled only for a pointer from a traced cdata (an
+-- SSA). A constant address (e.g. a string literal) is outside the
+-- xmem; drop the store as NYI.
+function IRNodeXSTOREBase.is_implemented(_flags, _type, _opcode,
+                                          left_op, _right_op)
+    return left_op ~= nil and left_op:is_ssa()
+end
+
 -- Reduce the store's right operand to a bitvector: int/i64/u32
 -- are already bitvectors on the op-stack, a num and a float are
 -- reinterpreted to their IEEE-754 bits via `fp_to_bits`.
