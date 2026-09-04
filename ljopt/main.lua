@@ -21,9 +21,13 @@ if jit == nil then
 end
 
 local script = arg[1]
+local chunkname
 if script == "-" then
   -- Read the complete stdin.
   script = io.stdin:read("*a")
+  chunkname = "=stdin"
+elseif script then
+  chunkname = "@" .. script
 end
 
 if not script then
@@ -46,7 +50,7 @@ if not lua_code or
   utils.fatal_msg("Lua chunk is empty.", exit_codes.ERR_BAD_LUA_CHUNK)
 end
 
-local ok, res = pcall(load, lua_code)
+local ok, res = pcall(load, lua_code, chunkname)
 if not ok then
   utils.fatal_msg("Syntax error in Lua chunk: " .. res,
     exit_codes.ERR_BAD_LUA_CHUNK)
@@ -65,6 +69,6 @@ end
 -- flush traces before proceeding.
 jit.flush()
 
-local result = ljopt.ir.translate_to_smt(lua_code, true)
+local result = ljopt.ir.translate_to_smt(lua_code, chunkname)
 io.stdout:write(result)
 os.exit(exit_codes.OK)
