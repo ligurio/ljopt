@@ -1952,6 +1952,22 @@ end
         ins = {
             {type = "u32", name = "XSTORE"},
         },
+    }, {
+        name = "ffi.copy string to FFI array",
+        code = [[
+-- ffi.copy of a string literal (no length) reads the bytes from the
+-- literal's constant address; the optimized trace emits a u32 XLOAD
+-- off that address, which is outside the xmem model and must be
+-- dropped as NYI instead of crashing in retrieve_i64_op.
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100, 42)
+for i = 0, 10 do
+  ffi.copy(a + i, "abc")
+end
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+        },
     }}
     test:plan(3 * #srcs)
 
