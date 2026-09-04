@@ -71,6 +71,11 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- 64-bit -> u32: truncate to low 32 bits, zero-extend.
         left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
         data = arith_utils.wrap_u32(left_op)
+    elseif parsed_right_op[1] == 'int.u8' then
+        -- u8 -> int: a cdata byte (e.g. ffi.fill) widens the low
+        -- byte with zero extension into the 64-bit cell.
+        local lo = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
+        data = ('((_ zero_extend 56) ((_ extract 7 0) %s))'):format(lo)
     -- Unsigned 32-bit conversions. u32 values are stored as
     -- zero-extended 64-bit BVs (canonical form); see ir/BinOp.
     elseif parsed_right_op[1] == 'int.u32' then
