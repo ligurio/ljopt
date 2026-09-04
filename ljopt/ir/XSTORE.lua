@@ -23,8 +23,11 @@ local function store_value_bv(right, ctx, typ)
         )
     elseif right:is_ssa() then
         return ctx.op_stack:load(right:get_ssa(), typ)
-    elseif typ == op_type.I64 and right:is_i64() then
-        return ('#x%016x'):format(tonumber(right:get_i64()))
+    elseif right:is_i64() then
+        -- Constant 64-bit store value (a folded ffi.fill byte
+        -- pattern), bit-exact; xmem_store writes only the low
+        -- nbytes bytes, so int/u32 stores work as well.
+        return arith_utils.const_i64_to_smt_bv(right:get_i64())
     end
     return ir_node.retrieve_int_op(right, ctx, typ)
 end
