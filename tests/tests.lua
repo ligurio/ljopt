@@ -1910,6 +1910,19 @@ end
             {type = "flt", name = "CONV",
                 right_op = op_type.new("lit", "flt.int")},
         },
+    }, {
+        name = "CONV int.u8",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 0, 20 do
+  ffi.fill(a + i, 10, i)
+end
+]],
+        ins = {
+            {type = "int", name = "CONV",
+                right_op = op_type.new("lit", "int.u8")},
+        },
     }}
     test:plan(2 * #srcs)
 
