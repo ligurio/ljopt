@@ -96,7 +96,7 @@ local function parsed_and_checked(label, formulas, n_traces)
     return res
 end
 
-test:plan(12)
+test:plan(13)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -2139,6 +2139,27 @@ end
     ljopt_config.set_loop_unroll_limit(unroll_n)
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
+end)
+
+test:test("func.env FLOAD of a constant function", function(test)
+    local code = [[
+local x
+local function f()
+  x = math.huge
+end
+for i = 1, 4 do
+  f()
+end
+]]
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local ok, formulas = pcall(ljopt.ir.traces_to_smt, code)
+    ljopt_config.set_strict_mode(strict_mode)
+
+    test:plan(2)
+    test:ok(ok, "func.env FLOAD chunk translates")
+    local res = ok and parsed_and_checked("func.env FLOAD", formulas, 1)
+    test:ok(res, "func.env FLOAD: SMT-LIB syntax is correct and UNSAT")
 end)
 
 require("tests.coverage").shutdown()
