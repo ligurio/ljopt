@@ -1990,6 +1990,26 @@ end
             {type = "u32", name = "CONV",
                 right_op = op_type.new("lit", "u32.num none")},
         },
+    }, {
+        name = "CONV u64.i64",
+        code = [[
+-- Reinterpreting a ptrdiff_t value written to a void* union member
+-- as a uint64_t folds (store+load through the union) into an i64 ->
+-- u64 CONV after optimization; it is a bit-preserving 64-bit
+-- re-tag, not a widening.
+local ffi = require("ffi")
+local u = ffi.new("union { uint64_t u64[1]; void *v[2]; }")
+u.u64[0] = 0
+for i = -1, 10 do
+  u.v[0] = ffi.cast("void *", ffi.cast("ptrdiff_t", i))
+  _ = 1 + u.u64[0]
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.i64")},
+        },
     }}
     test:plan(3 * #srcs)
 
