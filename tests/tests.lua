@@ -1873,6 +1873,23 @@ foo(6)
             {type = "u64", name = "CONV",
                 right_op = op_type.new("lit", "u64.num none")},
         },
+    }, {
+        name = "CONV flt.int",
+        code = [[
+-- Building an FFI struct with a float field from the traced int
+-- loop counter records an int -> flt (float32) CONV at opt level 3;
+-- the double (unopt) trace converts via flt.num instead.
+local ffi = require("ffi")
+local st = ffi.typeof("struct { float a; }")
+for i = 1, 4 do
+  local y = st(i)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "flt", name = "CONV",
+                right_op = op_type.new("lit", "flt.int")},
+        },
     }}
     test:plan(3 * #srcs)
 
