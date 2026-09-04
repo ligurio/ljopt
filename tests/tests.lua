@@ -1927,6 +1927,19 @@ end
             {type = "u64", name = "CONV",
                 right_op = op_type.new("lit", "u64.int sext")},
         },
+    }, {
+        name = "ffi.fill() constant byte XSTORE",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 1, 100 do
+  ffi.fill(a, 15, 0x1234)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "XSTORE"},
+        },
     }}
     test:plan(3 * #srcs)
 
