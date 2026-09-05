@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(14)
+test:plan(15)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -428,6 +428,30 @@ assert(y == 23 ^ 11)
         test:is(smt:parse(formula), true, "const POW trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "const POW trace check.")
+    end
+end)
+
+-- LuaJIT FOLD rewrites `x ^ 0` to the constant 1 in the optimised
+-- trace even when the base is a runtime value. The unoptimised
+-- trace keeps a POW node whose base is symbolic, so the
+-- (uninterpreted) pow_fp must not be emitted -- fold the exponent
+-- identity instead, or the two sides spuriously differ.
+test:test("POW with runtime base and exponent 0", function(test)
+    test:plan(2)
+    local pow0 = [[
+local function f(a)
+  return a ^ 0
+end
+local y
+y = f(0.5); y = f(1.5); y = f(2.5); y = f(3.5)
+assert(y == 1.0)
+]]
+    local formulas = ljopt.ir.traces_to_smt(pow0)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "x^0 trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "x^0 trace check.")
     end
 end)
 
