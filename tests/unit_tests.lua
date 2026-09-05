@@ -59,7 +59,7 @@ local function mock_solver()
     }
 end
 
-test:plan(13)
+test:plan(14)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -429,7 +429,7 @@ test:test("utils select_traces", function(test)
 end)
 
 test:test("utils solver helpers", function(test)
-    test:plan(13)
+test:plan(13)
 
     local backends = utils.solver_backends()
     test:is(#backends, 2, "solver_backends count")
@@ -499,6 +499,22 @@ test:test("FLOADTab.is_implemented", function(test)
     test:is(impl(tbl, meta), false, "tab.meta of a constant table dropped")
     test:is(impl(ssa, thead_env), false,
         "thread.env not supported")
+end)
+
+test:test("FREF.is_implemented", function(test)
+    test:plan(2)
+    local fref = require("ljopt.ir.FREF")
+    local op_type = require("ljopt.ir.op_type")
+
+    local fre = fref.instance("IRNodeFREFP32")
+
+    local ssa = op_type.new(op_type.SSA, 1)
+    local lit = op_type.new(op_type.LIT, "tab.meta")
+
+    test:is(fre.is_implemented({}, "p32", "FREF", ssa, lit), true,
+        "SSA table with a literal field accepted")
+    test:is(fre.is_implemented({}, "p32", "FREF", lit, lit), false,
+        "constant table dropped")
 end)
 require("tests.coverage").shutdown()
 

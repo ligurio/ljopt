@@ -116,7 +116,7 @@ local function parsed_and_checked(label, formulas, n_traces)
     return res
 end
 
-test:plan(13)
+test:plan(14)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -473,6 +473,47 @@ foo(1.5)
         local res = parsed_and_checked(label, formulas, n_traces)
         test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
     end
+end)
+
+-- setmetatable compiles to `FREF`/`FSTORE` of the table's
+-- tab.meta field. Verify the store survives as a modelled node
+-- (not NYI/dummy) in the recorded trace. A full -O0/-O3
+-- equivalence check is not enabled here because the surrounding
+-- metatable guards (EQ/NE on tab, TBAR) need `tab.hmask`, which
+-- is deliberately unmodelled (issue #51). check_ins_present only
+-- needs FREF/FSTORE to be real nodes; a NYI one would appear as
+-- a `<op>dummy` opcode and would not match.
+test:test("FSTORE of tab.meta is modelled", function(test)
+    test:plan(1)
+    local alias_alloc = [[
+-- Bind setmetatable/getmetatable/assert to locals: a global lookup
+-- inside the trace emits HLOAD fun / metatable guards we do not
+-- model.
+local setmetatable = setmetatable
+local getmetatable = getmetatable
+local assert = assert
+do
+  local mt = {}
+  local t = setmetatable({}, mt)
+  for _ = 1, 100 do
+    local v = {}
+    setmetatable(v, getmetatable(t))
+    assert(getmetatable(v) == mt)
+  end
+end
+]]
+    -- Disable strict mode: the surrounding metatable guards
+    -- (EQ/NE on tab, TBAR) are deliberately unmodelled (issue
+    -- #51), so they would be filtered as NYI instead of failing
+    -- the check.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local ok, err = check_ins_present(alias_alloc, {
+        {type = "p32", name = "FREF"},
+        {type = "tab", name = "FSTORE"},
+    })
+    ljopt_config.set_strict_mode(strict_mode)
+    test:ok(ok, "FREF/FSTORE instructions are modelled: " .. (err or "ok"))
 end)
 
 test:test("Sandbox Lua chunk", function(test)
