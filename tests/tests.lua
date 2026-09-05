@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(19)
+test:plan(20)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -571,6 +571,37 @@ end
         test:is(smt:parse(formula), true, "BSHR trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "BSHR trace check.")
+    end
+end)
+
+-- When the loop counter is narrowed, `tostring(i)` records as
+-- `str TOSTR <int> INT` over an int-val cell. TOSTR must convert
+-- that int to fp (as a num.int CONV does) before applying
+-- tostr_num: reading the int cell with get-fp yields an
+-- unconstrained value, so `tonumber(tostring(i))` no longer
+-- round-trips to i on the opt side and the pair spuriously sats.
+test:test("TOSTR INT of a narrowed operand", function(test)
+    test:plan(2)
+    local cse_conv = [[
+-- Bind tostring/tonumber to locals: a global lookup inside the
+-- trace emits HLOAD fun / metatable guards we do not model.
+local tostring = tostring
+local tonumber = tonumber
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = i
+    y = tonumber(tostring(a))
+  end
+  assert(y == 100)
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(cse_conv)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR INT trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR INT trace check.")
     end
 end)
 

@@ -1,3 +1,4 @@
+local arith_utils = require('ljopt.ir.arith_utils')
 local ir_node = require('ljopt.ir.ir_node_base')
 local op_type = require('ljopt.ir.op_type')
 local utils = require('ljopt.utils')
@@ -33,8 +34,20 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
         end
     end
 
-    -- Get the input value as native FP.
-    local fp = ir_node.retrieve_num_op(left_op, ctx, 'num')
+    -- Get the input as the native fp the tostring is applied to.
+    -- An INT operand lives in an int-val cell, so reading it with
+    -- get-fp (the NUM path) yields an unconstrained value
+    -- unrelated to the integer; convert it to fp exactly like a
+    -- num.int CONV.
+    local fp
+    local const_val
+    if mode == 'INT' and left_op:is_ssa() then
+        local int_bv = ir_node.retrieve_int_op(left_op, ctx, 'int')
+        fp = arith_utils.smt_int_to_fp(int_bv)
+    else
+        fp = ir_node.retrieve_num_op(left_op, ctx, 'num')
+        const_val = utils.resolve_const(left_op, ctx, op_type.NUM)
+    end
 
     -- Apply uninterpreted function to convert FP to string.
     local str_expr = ('(tostr_num %s)'):format(fp)
@@ -48,7 +61,6 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
     -- When the argument is a known constant, emit the exact
     -- string value so the solver doesn't have to guess.
     local const_axiom = ''
-    local const_val = utils.resolve_const(left_op, ctx, op_type.NUM)
     if const_val ~= nil then
         local str_val = tostring(const_val)
         const_axiom = ('\n(assert (= (tostr_num %s) "%s"))'):format(
