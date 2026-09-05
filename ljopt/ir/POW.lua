@@ -1,3 +1,4 @@
+local arith_utils = require('ljopt.ir.arith_utils')
 local bin_op = require('ljopt.ir.BinOp')
 local ir_node = require('ljopt.ir.ir_node_base')
 local utils = require('ljopt.utils')
@@ -44,6 +45,21 @@ function impls.IRNodePOWNum:to_smt_lib(ctx)
         return ctx.op_stack:store(
             ssa_ref, self:get_type(),
             '((_ to_fp 11 53) #x3ff0000000000000)'
+        )
+    end
+    if lc ~= nil and rc ~= nil then
+        -- Both operands are known constants. The optimised trace
+        -- pre-folds `a ^ b` to a KNUM at compile time, while the
+        -- unoptimised trace keeps a POW node; with the operands
+        -- folded to a literal there is nothing left for the
+        -- (uninterpreted) pow_fp to explain, so the two sides are
+        -- exactly equal. Evaluate with Lua's `^`, the same
+        -- operation LuaJIT's own constant folding performs.
+        local p = lc ^ rc
+        ctx.const_nums[ssa_ref] = p
+        return ctx.op_stack:store(
+            ssa_ref, self:get_type(),
+            arith_utils.const_num_to_smt_fp(p)
         )
     end
     return bin_op.BinOpNum.to_smt_lib(self, ctx)
