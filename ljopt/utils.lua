@@ -197,6 +197,52 @@ end
 
 -- Traces are reported (and selectable by) their position in the
 -- list sorted by the source location they start at.
+local function loc_key(loc)
+    local file, line = loc:match("^(.*):(%d+)$")
+    if file ~= nil then
+        return file, tonumber(line)
+    end
+    return loc, 0
+end
+
+local function loc_less(loc_a, loc_b)
+    local file_a, line_a = loc_key(loc_a)
+    local file_b, line_b = loc_key(loc_b)
+    if file_a ~= file_b then
+        return file_a < file_b
+    elseif line_a ~= line_b then
+        return line_a < line_b
+    end
+    return loc_a < loc_b
+end
+
+-- Returns the trace numbers sorted by the source location they
+-- start at.
+local function build_order(traces, trace_locs)
+    local order = {}
+    for traceno in pairs(traces) do
+        table.insert(order, traceno)
+    end
+    table.sort(order, function(a, b)
+        return loc_less(
+            trace_locs[a] or tostring(a), trace_locs[b] or tostring(b)
+        )
+    end)
+    return order
+end
+
+-- Returns the traces to check as {idx = pos, uid = traceno}
+-- records. With a trace number only that trace is returned.
+local function select_traces(order, trace_number)
+    local selected = {}
+    for pos, traceno in ipairs(order) do
+        if trace_number == nil or pos == trace_number then
+            table.insert(selected, {idx = pos, uid = traceno})
+        end
+    end
+    return selected
+end
+
 local function rjust(n, width)
     local s = tostring(n)
     return string.rep(" ", width - #s) .. s
@@ -286,7 +332,9 @@ local function verify_traces(solver, traces, trace_locs, checked,
     local widths = {nw = #("%d"):format(n_traces)}
     widths.counter_w = 2 * widths.nw + 2
     widths.tag_w = widths.nw + 1
-    for idx, traceno in ipairs(checked) do
+    for _, item in ipairs(checked) do
+        local idx = item.idx
+        local traceno = item.uid
         local loc = trace_locs[traceno] or tostring(traceno)
         local verdict, status, solve_time =
             check_trace(solver, traces, traceno, idx, loc, widths)
@@ -310,6 +358,7 @@ end
 
 
 return {
+    build_order = build_order,
     check_trace = check_trace,
     clock_monotonic = clock_monotonic,
     debug_msg = debug_msg,
@@ -319,11 +368,14 @@ return {
     find_solver = find_solver,
     hash = fnv1a_hash,
     join_strings = join_strings,
+    loc_key = loc_key,
+    loc_less = loc_less,
     merge_tables = merge_tables,
     print_trace_line = print_trace_line,
     resolve_const = resolve_const,
     resolve_const_str = resolve_const_str,
     rjust = rjust,
+    select_traces = select_traces,
     solver_backends = solver_backends,
     trim = trim,
     unreachable = unreachable,

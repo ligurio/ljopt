@@ -131,6 +131,18 @@ answer is reported as `Timeout`. The exit code is 0, 3 and 4 for a
 `Passed`, `Failed` and `Timeout` result respectively. Without a solver
 `--check` prints the SMT-LIB formula to stdout and exits with 4.
 
+A trace number can be passed with `-t`/`--trace_no` to restrict the run
+to a single trace (the number shown as `N` in the `N/M Trace #N` report):
+
+```sh
+$ LUA_PATH="./?/init.lua;;" bin/ljopt -t 1 example.lua         # SMT-LIB of trace 1 only
+$ LUA_PATH="./?/init.lua;;" bin/ljopt --check --trace_no 1 example.lua  # verify trace 1 only
+```
+
+An out-of-range trace number is reported as an error
+(`ljopt: trace number N is out of range (1..M)`) and the tool exits with
+code 1.
+
 ### License
 
 The MIT License, see LICENSE.
