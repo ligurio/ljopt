@@ -13,6 +13,7 @@ return {
 	    record = runtime.record_sandboxed,
 	    traces_to_smt = smtlib_ir.traces_to_smt,
 	    translate_to_smt = smtlib_ir.translate_to_smt,
+	    wrap_trace = smtlib_ir.wrap_trace,
     },
 
     VERSION = VERSION,
