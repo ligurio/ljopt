@@ -116,7 +116,7 @@ local function parsed_and_checked(label, formulas, n_traces)
     return res
 end
 
-test:plan(16)
+test:plan(17)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -564,6 +564,39 @@ assert(y == 1.0)
         test:is(smt:check(formula), smt.result.UNSAT,
             "x^0 trace check.")
     end
+end)
+
+-- With narrowing enabled the optimised trace evaluates `(-a) - 5`
+-- on the int-converted loop counter as a *chain* of guarded int
+-- ops (SUBOV(SUBOV(0, i), 5)); the unoptimised trace keeps the
+-- whole expression in floating point. The guards themselves are
+-- lifted to preconditions -- the lifting is covered by the
+-- `mark_narrowed_refs` unit test -- so here it is enough to make
+-- sure the optimised trace really emits the chained int SUBOV
+-- instructions we mean to model.
+test:test("int narrowing chain is modelled", function(test)
+    test:plan(1)
+    local neg_sub = [[
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = i
+    y = (-a) - 5
+  end
+  assert(y == -105)
+end
+]]
+    -- Disable strict mode: loop unrolling introduces RENAME/PHI
+    -- pseudo-nodes with no IR implementation, so they would be
+    -- filtered as NYI instead of failing the check.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local ok, err = check_ins_present(neg_sub, {
+        {type = "int", name = "SUBOV"},
+        {type = "int", name = "SUBOV"},
+    }, "jit.opt.start(3, 'hotloop=1', 'hotexit=1')")
+    ljopt_config.set_strict_mode(strict_mode)
+    test:ok(ok, "chained SUBOV instructions are modelled: " .. (err or "ok"))
 end)
 
 test:test("Sandbox Lua chunk", function(test)
