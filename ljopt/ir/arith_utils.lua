@@ -151,6 +151,17 @@ local function bror32(value, amount)
     return bv_rotate32(value, amount, 'right')
 end
 
+-- 32-bit shift of `value` by `amount` (both 64-bit sign-extended
+-- int cells). Shifts are defined modulo 32: the count is masked
+-- to 5 bits, the shift runs on the low 32 bits and the result is
+-- re-sign-extended. `op` is one of bvshl/bvlshr/bvashr.
+local function bv_shift32(op, value, amount)
+    return ('((_ sign_extend 32) (%s ((_ extract 31 0) %s) ' ..
+        '(bvand ((_ extract 31 0) %s) #x0000001f)))'):format(
+            op, value, amount
+        )
+end
+
 -- Raw FFI memory is modelled byte-granular as a flat array
 -- `xmem : (Array (_ BitVec 64) (_ BitVec 8))`, so overlapping,
 -- sub-word and type-punned accesses alias correctly (SMT array
@@ -242,4 +253,5 @@ return {
     wrap_u32 = wrap_u32,
     brol32 = brol32,
     bror32 = bror32,
+    bv_shift32 = bv_shift32,
 }
