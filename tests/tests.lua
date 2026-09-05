@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(13)
+test:plan(14)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -402,6 +402,32 @@ end
         test:is(smt:parse(formula), true, "FSTORE/FREF trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "FSTORE/FREF trace check.")
+    end
+end)
+
+-- A `^` of two loop-invariant constants is pre-folded to a KNUM
+-- in the optimised trace, while the unoptimised trace keeps a POW
+-- node. `pow_fp` is uninterpreted, so the POW must be folded to
+-- the same literal here -- otherwise the two sides compare an
+-- unconstrained value against the folded constant and the check
+-- spuriously sats.
+test:test("POW of constants across optimizations", function(test)
+    test:plan(2)
+    local const_pow = [[
+local function f()
+  local a, b = 23, 11
+  return a ^ b
+end
+local y
+y = f(); y = f(); y = f(); y = f()
+assert(y == 23 ^ 11)
+]]
+    local formulas = ljopt.ir.traces_to_smt(const_pow)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "const POW trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "const POW trace check.")
     end
 end)
 
