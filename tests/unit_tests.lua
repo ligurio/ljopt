@@ -202,7 +202,7 @@ end)
 test:test("mark_narrowed_refs", function(test)
     local ir_passes = require("ljopt.ir_passes")
 
-    test:plan(3)
+    test:plan(5)
 
     local function ssa(n) return { _is_ssa = true, _v = n,
         is_ssa = function(self) return self._is_ssa end,
@@ -249,6 +249,20 @@ test:test("mark_narrowed_refs", function(test)
     }, ctx)
     test:is(ctx.te_stack.narrowed_refs[1], nil,
         "LE on stray ref not marked")
+
+    -- Overflow-guard chain SUBOV(SUBOV(0, i), 5): the first guard
+    -- takes the C-SLOAD directly, the chained one through a
+    -- derived int ref. Both must be lifted (unlike the LE chain).
+    ctx = fresh_ctx()
+    ir_passes.mark_narrowed_refs({
+        node('SLOAD', 'int', 1, lit('#2'), lit('CI')),
+        node('SUBOV', 'int', 2, lit('#0'), ssa(1)),
+        node('SUBOV', 'int', 3, ssa(2), lit('#5')),
+    }, ctx)
+    test:is(ctx.te_stack.narrowed_refs[2], true,
+        "SUBOV on SLOAD-C marked")
+    test:is(ctx.te_stack.narrowed_refs[3], true,
+        "chained SUBOV guard lifted")
 end)
 
 local LOOP_CHUNK = [[
