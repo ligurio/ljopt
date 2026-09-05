@@ -59,7 +59,7 @@ local function mock_solver()
     }
 end
 
-test:plan(10)
+test:plan(12)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -380,6 +380,52 @@ test:test("utils rjust", function(test)
 
     test:is(utils.rjust(3, 5), "    3", "rjust number")
     test:is(utils.rjust("#1", 3), " #1", "rjust string")
+end)
+
+test:test("utils trace ordering", function(test)
+    test:plan(10)
+
+    local file, line = utils.loc_key("foo.lua:42")
+    test:is(file, "foo.lua", "loc_key file")
+    test:is(line, 42, "loc_key line")
+    file, line = utils.loc_key("no-location")
+    test:is(file, "no-location", "loc_key no-line file")
+    test:is(line, 0, "loc_key no-line line")
+
+    test:is(utils.loc_less("a.lua:1", "b.lua:1"), true,
+        "loc_less orders by file")
+    test:is(utils.loc_less("b.lua:1", "a.lua:1"), false,
+        "loc_less orders by file reversed")
+    test:is(utils.loc_less("a.lua:2", "a.lua:10"), true,
+        "loc_less compares lines numerically")
+    test:is(utils.loc_less("a.lua:10", "a.lua:2"), false,
+        "loc_less compares lines numerically reversed")
+    test:is(utils.loc_less("x:01", "x:1"), true,
+        "loc_less falls back to the string")
+
+    local order = utils.build_order(
+        {[10] = true, [20] = true, [30] = true},
+        {[10] = "b.lua:2", [20] = "a.lua:5", [30] = "a.lua:1"})
+    test:is_deeply(order, {30, 20, 10}, "build_order sorts by location")
+end)
+
+test:test("utils select_traces", function(test)
+    test:plan(5)
+
+    local order = {10, 20, 30}
+    test:is_deeply(utils.select_traces(order, nil),
+        {{idx = 1, uid = 10}, {idx = 2, uid = 20}, {idx = 3, uid = 30}},
+        "select_traces without a number returns all traces")
+    test:is_deeply(utils.select_traces(order, 2),
+        {{idx = 2, uid = 20}},
+        "select_traces picks one trace and keeps its index")
+    test:is_deeply(utils.select_traces(order, 1),
+        {{idx = 1, uid = 10}},
+        "select_traces picks the first trace")
+    test:is_deeply(utils.select_traces(order, 4), {},
+        "select_traces out of range returns nothing")
+    test:is_deeply(utils.select_traces({}, nil), {},
+        "select_traces empty order returns nothing")
 end)
 
 test:test("utils solver helpers", function(test)
