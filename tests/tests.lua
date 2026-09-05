@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(21)
+test:plan(22)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -645,6 +645,35 @@ end
         test:is(smt:parse(formula), true, "shift>=32 trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "shift>=32 trace check.")
+    end
+end)
+
+-- string.char with a *runtime* code still yields a single
+-- character, and the optimised trace folds `#c` to 1. TOSTR must
+-- not fall back to a decimal tostr_num for such a code (that is
+-- multi-digit for codes >= 100): model it as an opaque
+-- one-character string.
+test:test("TOSTR CHAR with a runtime code", function(test)
+    test:plan(2)
+    local char_rt = [[
+-- Bind string.char and bit.band to locals: global lookups
+-- inside the trace emit HLOAD fun / metatable guards we do
+-- not model.
+local char = string.char
+local band = bit.band
+local function f(i)
+  return #char(band(i, 255))
+end
+local y
+y = f(1); y = f(2); y = f(3); y = f(200)
+assert(y == 1)
+]]
+    local formulas = ljopt.ir.traces_to_smt(char_rt)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR CHAR rt trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR CHAR rt trace check.")
     end
 end)
 
