@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(18)
+test:plan(19)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -539,6 +539,38 @@ end
         test:is(smt:parse(formula), true, "TOBIT const trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "TOBIT const trace check.")
+    end
+end)
+
+-- `bit.rshift` is a *logical* shift right, so
+-- `(i >> 4) & 0x0fffffff` folds to `i >> 4` in the optimised
+-- trace. Modelling BSHR as an arithmetic shift (bvashr) breaks
+-- that identity for negative i: the unoptimised side masks the
+-- sign-extended value while the optimised one does not, and the
+-- pair spuriously sats. BSHR must shift the low 32 bits
+-- logically.
+test:test("BSHR is a logical shift right", function(test)
+    test:plan(2)
+    local andk_shiftk = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local band = bit.band
+local rshift = bit.rshift
+do
+  local y = 0
+  for i = 1, 200 do
+    local a = i
+    y = band(rshift(a, 4), 0x0fffffff)
+  end
+  assert(y == 12)
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(andk_shiftk)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "BSHR trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "BSHR trace check.")
     end
 end)
 
