@@ -15,6 +15,7 @@ local smt_constants = require('ljopt.smt_constants')
 local smt_snapshot = require('ljopt.ir.SNAP')
 local ir_passes = require('ljopt.ir_passes')
 local utils = require('ljopt.utils')
+local ir_dump_utils = require('ljopt.ir_dump_utils')
 
 -- Documentation: https://luajit.org/running.html
 local lj_unoptimized = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
@@ -289,9 +290,9 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
 end
 
 -- Helper to record dump with the given optimization.
-local function record_code(lua_code, opt)
+local function record_code(lua_code, opt, chunkname)
     local exec_records = runtime.record_sandboxed(
-        lua_code, opt, ljopt_config.is_debug_mode()
+        lua_code, opt, ljopt_config.is_debug_mode(), chunkname
     )
     assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
     return exec_records
@@ -314,14 +315,29 @@ end
 -- becomes UNSAT, unless solver can find an input
 -- where snap1 != snap2, which means these 2 traces
 -- are not equivalent.
-local function traces_to_smt(lua_code)
-    local rec_unopt = record_code(lua_code, lj_unoptimized)
+local function traces_to_smt(lua_code, chunkname)
+    local rec_unopt = record_code(lua_code, lj_unoptimized, chunkname)
+    -- Both record_code() runs capture the "file:line" of every
+    -- recorded trace (see ir_dump_utils), keyed by the same
+    -- persistent uid. The next record_code() resets the module
+    -- table, so keep a reference to this run's snapshot first.
+    local unopt_locs = ir_dump_utils.ljopt_get_execution_locs()
     utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized)
+    local rec_opt = record_code(lua_code, lj_optimized, chunkname)
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
             format(table.getn(rec_unopt), table.getn(rec_opt)))
+
+    -- Merge the two snapshots so a trace recorded in only one of
+    -- the runs still gets its location.
+    local traces_locs = {}
+    for uid, loc in pairs(unopt_locs) do
+        traces_locs[uid] = loc
+    end
+    for uid, loc in pairs(ir_dump_utils.ljopt_get_execution_locs()) do
+        traces_locs[uid] = loc
+    end
 
     local traces_smtlib = {}
     for traceno in pairs(rec_unopt) do
@@ -381,15 +397,15 @@ local function traces_to_smt(lua_code)
         traces_smtlib[traceno] = cur_trace
         ::continue::
     end
-    return traces_smtlib
+    return traces_smtlib, traces_locs
 end
 
 
 -- Generates SMT formula that should be UNSAT (if optimizations
 -- are correct).
-local function translate_to_smt(lua_code)
+local function translate_to_smt(lua_code, chunkname)
     assert(load(lj_unoptimized))()
-    local traces_formulas = traces_to_smt(lua_code)
+    local traces_formulas = traces_to_smt(lua_code, chunkname)
 
     local SMT_PREAMBLE = [[
 (set-option :print-success false)

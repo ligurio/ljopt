@@ -1,4 +1,4 @@
--- cvc5 backend, drop-in for tests/smtlib2.lua (the z3 one).
+-- cvc5 backend, drop-in for ljopt/smtlib2.lua (the z3 one).
 -- Same API: new(), :parse(str), :check(str), .result.
 --
 -- Uses cvc5's C API (include/cvc5/c) through LuaJIT's FFI, the
@@ -152,7 +152,8 @@ local function new()
     -- fails here rather than on the first query.
     local tm = cvc5.cvc5_term_manager_new()
     local slv = cvc5.cvc5_new(tm)
-    print("cvc5 version: ", ffi.string(cvc5.cvc5_get_version(slv)))
+    local cvc5_version = ffi.string(cvc5.cvc5_get_version(slv))
+    print(("SMT backend: CVC5 %s"):format(cvc5_version))
     cvc5.cvc5_delete(slv)
     cvc5.cvc5_term_manager_delete(tm)
 

@@ -1,5 +1,11 @@
 local ir_dump = require('ljopt.ir_dump')
-local toggle_debug_hook = require('tests.coverage').toggle_debug_hook()
+-- tests.coverage is a test-only module; when it is not installed
+-- (e.g. a luarocks install without the test suite) toggling the
+-- debug hook must be a no-op.
+local has_coverage, coverage = pcall(require, 'tests.coverage')
+local toggle_debug_hook = has_coverage
+    and coverage.toggle_debug_hook()
+    or function() end
 
 -- Disable print to avoid stdout modifications.
 local function capture(f, ...)
@@ -17,10 +23,15 @@ local function capture(f, ...)
     return ok, res, table.concat(result, '\n')
 end
 
-local function record_sandboxed(lua_code, opt, is_debug_mode)
+local function record_sandboxed(lua_code, opt, is_debug_mode, chunkname)
     -- Disable coverage to not interfere with recorded traces.
     toggle_debug_hook()
-    local fn, err = loadstring(lua_code)
+    local fn, err
+    if chunkname ~= nil then
+        fn, err = loadstring(lua_code, chunkname)
+    else
+        fn, err = loadstring(lua_code)
+    end
     if fn == nil then
         error(('cannot load Lua code: %s'):format(err))
     end
