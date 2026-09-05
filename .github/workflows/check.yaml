@@ -95,4 +95,4 @@ jobs:
           export LUA_PATH="$GITHUB_WORKSPACE/.rock/share/lua/5.1/?.lua;$GITHUB_WORKSPACE/.rock/share/lua/5.1/?/init.lua;;"
           printf 'for i = 1, 100 do local a, b = 23, 11; y = a + b end\n' > /tmp/ljopt-tr.lua
           LJOPT_SMT=z3 "$LUAJIT" "$GITHUB_WORKSPACE/bin/ljopt" --check /tmp/ljopt-tr.lua > /tmp/ljopt-check.out
-          grep -q 'VERIFICATION HAS PASSED' /tmp/ljopt-check.out
+          grep -q '100% traces passed, 0 traces failed out of 1' /tmp/ljopt-check.out
