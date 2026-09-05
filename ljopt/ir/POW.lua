@@ -62,6 +62,27 @@ function impls.IRNodePOWNum:to_smt_lib(ctx)
             arith_utils.const_num_to_smt_fp(p)
         )
     end
+    if rc == 0 then
+        -- x^0 = 1. LuaJIT FOLD rewrites the POW away in the
+        -- optimised trace, leaving a constant on the opt side.
+        ctx.const_nums[ssa_ref] = 1
+        return ctx.op_stack:store(
+            ssa_ref, self:get_type(),
+            '((_ to_fp 11 53) #x3ff0000000000000)'
+        )
+    end
+    if rc == 2 then
+        -- x^2 = x*x. LuaJIT FOLD lowers the POW to a MUL in the
+        -- optimised trace, so emit the same product here instead
+        -- of an uninterpreted pow_fp.
+        local left_op = ir_node.retrieve_num_op(
+            self:get_left_op(), ctx, self:get_type()
+        )
+        return ctx.op_stack:store(
+            ssa_ref, self:get_type(),
+            ('(fp.mul RNE %s %s)'):format(left_op, left_op)
+        )
+    end
     return bin_op.BinOpNum.to_smt_lib(self, ctx)
 end
 
