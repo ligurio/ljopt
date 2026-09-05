@@ -65,10 +65,14 @@ local parserlib = ffi.load("cvc5parser")
 local function feed(str)
     local tm = cvc5.cvc5_term_manager_new()
     local slv = cvc5.cvc5_new(tm)
-    cvc5.cvc5_set_option(slv, "tlimit", ljopt_config.get_solver_timeout_ms())
     -- The formulas carry no (set-logic); saying so up front keeps
     -- cvc5 from warning about it on every query.
     cvc5.cvc5_set_option(slv, "force-logic", "ALL")
+    -- Bound every check-sat with tlimit-per: the plain "tlimit"
+    -- (total solver time) is not enforced by cvc5 1.3.0 through
+    -- the C API and lets a single hard query run forever.
+    cvc5.cvc5_set_option(slv, "tlimit-per",
+                         ljopt_config.get_solver_timeout_ms())
 
     local sm = parserlib.cvc5_symbol_manager_new(tm)
     local parser = parserlib.cvc5_parser_new(slv, sm)
