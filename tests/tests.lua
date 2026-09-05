@@ -116,7 +116,7 @@ local function parsed_and_checked(label, formulas, n_traces)
     return res
 end
 
-test:plan(17)
+test:plan(18)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -597,6 +597,34 @@ end
     }, "jit.opt.start(3, 'hotloop=1', 'hotexit=1')")
     ljopt_config.set_strict_mode(strict_mode)
     test:ok(ok, "chained SUBOV instructions are modelled: " .. (err or "ok"))
+end)
+
+-- `string.char(65)` compiles to a `str TOSTR <65> CHAR` node
+-- whose mode (CHAR) must not be treated as the decimal tostr_num:
+-- char 65 is the single-character string "A" (length 1), not
+-- "65". The optimised trace folds `#s` to 1, so a wrong CHAR
+-- model leaves the unoptimised side at length 2 and the pair
+-- spuriously sats.
+test:test("TOSTR CHAR (string.char) across optimizations", function(test)
+    test:plan(2)
+    local char_len = [[
+-- Bind string.char to a local: a global lookup inside the
+-- trace emits HLOAD fun / metatable guards we do not model.
+local char = string.char
+local function f()
+  return #char(65)
+end
+local y
+y = f(); y = f(); y = f(); y = f()
+assert(y == 1)
+]]
+    local formulas = ljopt.ir.traces_to_smt(char_len)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR CHAR trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR CHAR trace check.")
+    end
 end)
 
 test:test("Sandbox Lua chunk", function(test)

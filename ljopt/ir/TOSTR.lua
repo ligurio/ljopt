@@ -9,7 +9,29 @@ ir_node.extended(impls.IRNodeTOSTRStr, ir_node.ir_node_base)
 
 function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
     local left_op = self:get_left_op()
+    local right_op = self:get_right_op()
     local ssa_ref = self:get_ssa_reference()
+
+    -- TOSTR carries its mode (NUM/INT/CHAR) in the right operand.
+    -- The decimal modes (NUM/INT) convert a value to its decimal
+    -- string; CHAR converts a byte code into the single-character
+    -- string, which tostr_num would get wrong (char 65 is "A",
+    -- not "65"). Materialize CHAR on a constant code exactly.
+    local mode = (right_op ~= nil) and op_type.to_string(right_op) or ''
+    if mode == 'CHAR' then
+        local code = utils.resolve_const(left_op, ctx)
+        if code ~= nil then
+            local s = string.char(code)
+            ctx.const_strs[ssa_ref] = s
+            local lit = s:gsub('\\', '\\\\'):gsub('"', '\\"')
+            return ('%s\n%s'):format(
+                ctx.te_stack:store(ssa_ref, 'true'),
+                ctx.op_stack:store(
+                    ssa_ref, op_type.STR, ('"%s"'):format(lit)
+                )
+            )
+        end
+    end
 
     -- Get the input value as native FP.
     local fp = ir_node.retrieve_num_op(left_op, ctx, 'num')
