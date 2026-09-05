@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(17)
+test:plan(18)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -508,6 +508,37 @@ assert(y == 1)
         test:is(smt:parse(formula), true, "TOSTR CHAR trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "TOSTR CHAR trace check.")
+    end
+end)
+
+-- `bit.band(23, 0xffffffff)` lowers to
+-- `BAND 23, TOBIT(4294967295.0)`. bit.tobit wraps to 32 bits
+-- (result -1), which a bounded fp.to_sbv cannot express for a
+-- value above INT32_MAX: the SMT conversion is undefined there,
+-- so the unoptimised side becomes unconstrained while the
+-- optimised one folds to 23. Fold constant tobit operands with
+-- the real bit.tobit.
+test:test("TOBIT of a constant above INT32_MAX", function(test)
+    test:plan(2)
+    local band_ff = [[
+-- Bind bit.band to a local: a global lookup inside the trace
+-- emits HLOAD fun / metatable guards we do not model.
+local band = bit.band
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = 23
+    y = band(a, 0xffffffff)
+  end
+  assert(y == 23)
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(band_ff)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOBIT const trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOBIT const trace check.")
     end
 end)
 
