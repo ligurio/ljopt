@@ -32,6 +32,20 @@ function impls.IRNodeTOSTRStr:to_smt_lib(ctx)
                 )
             )
         end
+        -- A runtime code: string.char always yields a single
+        -- character, so model it as an opaque char string whose
+        -- length is pinned to 1 (a decimal tostr_num of the code
+        -- would be several characters). The code is an int cell.
+        if left_op:is_ssa() then
+            local code_bv = ir_node.retrieve_int_op(left_op, ctx, 'int')
+            local str = ('(str_char %s)'):format(code_bv)
+            ctx.const_lens[ssa_ref] = 1
+            return ('%s\n%s\n%s'):format(
+                ctx.te_stack:store(ssa_ref, 'true'),
+                ctx.op_stack:store(ssa_ref, op_type.STR, str),
+                ('(assert (= (str.len %s) 1))'):format(str)
+            )
+        end
     end
 
     -- Get the input as the native fp the tostring is applied to.
