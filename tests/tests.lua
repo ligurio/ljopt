@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(12)
+test:plan(13)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -373,6 +373,35 @@ foo(1.5)
             test:is(smt:check(formula), smt.result.UNSAT,
                 ("%s trace %s check."):format(label, j))
         end
+    end
+end)
+
+-- setmetatable compiles to `FREF`/`FSTORE` of the table's
+-- tab.meta field. With the `fwd` optimization enabled the
+-- `FLOAD` produced by the following `getmetatable(v)` is
+-- forwarded through that store; at -O0 it stays a real memory
+-- load. The store must be modelled for the pair to compare
+-- equal -- otherwise the unoptimized re-load reads a field that
+-- was never written and the trace pair spuriously sats.
+test:test("FSTORE of tab.meta across optimizations", function(test)
+    test:plan(2)
+    local alias_alloc = [[
+do --- FLOAD forwarding via setmetatable.
+  local mt = {}
+  local t = setmetatable({}, mt)
+  for _ = 1, 100 do
+    local v = {}
+    setmetatable(v, getmetatable(t))
+    assert(getmetatable(v) == mt)
+  end
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(alias_alloc)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "FSTORE/FREF trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "FSTORE/FREF trace check.")
     end
 end)
 
