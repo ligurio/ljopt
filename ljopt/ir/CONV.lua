@@ -39,7 +39,11 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
         -- Truncate to lower 32 bits, then sign-extend back to 64.
         data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(left_op)
-    elseif parsed_right_op[1] == 'i64.int' then
+    -- u64 destinations are stored as 64-bit BVs just like i64, so
+    -- int -> u64 uses the same encoding: sext sign-extends low 32
+    -- bits, otherwise zero-extend.
+    elseif parsed_right_op[1] == 'i64.int' or
+           parsed_right_op[1] == 'u64.int' then
         local lo = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
         if parsed_right_op[2] == 'sext' then
             data = ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(lo)
@@ -52,6 +56,17 @@ function IRNodeCONV:to_smt_lib(ctx)
         )
         -- TODO handle inputs that are out of range.
         data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
+    -- 64-bit <-> 64-bit (i64 <-> u64): same bit vector on the
+    -- op-stack, only the signed interpretation changes.
+    elseif parsed_right_op[1] == 'u64.i64' or
+           parsed_right_op[1] == 'i64.u64' then
+        left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
+        data = left_op
+    elseif parsed_right_op[1] == 'u64.num' then
+        -- num -> u64: C truncation toward zero (RTZ), unsigned.
+        left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
+        -- TODO handle inputs that are out of range.
+        data = string.format('((_ fp.to_ubv 64) RTZ %s)', left_op)
     -- Unsigned 32-bit conversions. u32 values are stored as
     -- zero-extended 64-bit BVs (canonical form); see ir/BinOp.
     elseif parsed_right_op[1] == 'u32.int' then
@@ -62,6 +77,11 @@ function IRNodeCONV:to_smt_lib(ctx)
         -- 64-bit -> u32: truncate to low 32 bits, zero-extend.
         left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, 'i64')
         data = arith_utils.wrap_u32(left_op)
+    elseif parsed_right_op[1] == 'int.u8' then
+        -- u8 -> int: a cdata byte (e.g. ffi.fill) widens the low
+        -- byte with zero extension into the 64-bit cell.
+        local lo = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
+        data = ('((_ zero_extend 56) ((_ extract 7 0) %s))'):format(lo)
     -- Unsigned 32-bit conversions. u32 values are stored as
     -- zero-extended 64-bit BVs (canonical form); see ir/BinOp.
     elseif parsed_right_op[1] == 'int.u32' then
@@ -80,6 +100,10 @@ function IRNodeCONV:to_smt_lib(ctx)
     elseif parsed_right_op[1] == 'num.flt' then
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'flt')
         data = ('((_ to_fp 11 53) RNE %s)'):format(left_op)
+    -- int -> flt: sign-extend int32 and round to float32 (RNE).
+    elseif parsed_right_op[1] == 'flt.int' then
+        left_op = ir_node.retrieve_int_op(self:get_left_op(), ctx, 'int')
+        data = arith_utils.smt_int_to_flt(left_op)
     elseif parsed_right_op[1] == 'num.u32' then
         -- u32 -> num: unsigned integer to floating point.
         left_op = ir_node.retrieve_u32_op(self:get_left_op(), ctx, 'u32')

@@ -81,10 +81,17 @@ test: $(LUA_BUGGY_BIN) $(LUA_BIN)
 $(LUACOV_STATS):
 	LJOPT_COVERAGE=1 $(MAKE) test
 
-# Cheap check that the z3 backend still works.
-test-z3-smoke: $(LUA_BIN)
-	@echo "Smoke-test the z3 backend"
-	LJOPT_SMT=z3 LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/ir_tests.lua
+# Translate smtlib_ir_coverage.lua and parse the emitted SMT-LIB with
+# the solver selected by LJOPT_SMT (tests.smtlib2 dispatcher;
+# defaults to cvc5).  The check only parses, it never runs queries.
+test-smt-backend: $(LUA_BIN)
+	@echo "Testing $(or $(LJOPT_SMT),cvc5) backend"
+	LUA_PATH=$(LUA_PATH) $(LUA_BIN) $(PROJECT_DIR)/tests/smtlib_ir_coverage_check.lua $(PROJECT_DIR)/tests/smtlib_ir_coverage.lua
+
+# Parse-check the SMT-LIB coverage output against every solver.
+test-smt-backends:
+	$(MAKE) test-smt-backend LJOPT_SMT=cvc5
+	$(MAKE) test-smt-backend LJOPT_SMT=z3
 
 coverage: $(LUACOV_STATS)
 	@sed -i -e 's@'"$$(realpath .)"'/@@' $(LUACOV_STATS)
@@ -96,3 +103,4 @@ clean:
 
 .PHONY: test install coverage
 .PHONY: luacheck check deps
+.PHONY: test-smt-backend test-smt-backends
