@@ -12,37 +12,55 @@ local exit_codes = {
 }
 
 local USAGE_MESSAGE = [[
-Usage: ljopt [options] [script]
+Usage: ljopt [options] script [trace_number]
 
 A Lua chunk can be passed as a file, as a string argument or
 through stdin. By default ljopt translates the chunk and prints
 the SMT-LIB formula to stdout.
 
-A Lua chunk can be passed as a file, as a string argument or
-through stdin.
-
 Options:
    -c, --check                 Verify the traces with an SMT solver
                                (Z3 or cvc5) and print the result.
    -                           Read a Lua chunk from stdin.
+
+The optional trace_number (a positive integer, as shown in the
+--check output by "N/M Trace #N") restricts the action to a single
+trace: without --check only the SMT-LIB formula for that trace is
+printed, with --check only that trace is verified.
 ]]
+
+local function trace_number_error(num, total)
+  io.stderr:write(("ljopt: trace number %d is out of range (1..%d)\n")
+    :format(num, total))
+  os.exit(1)
+end
 
 if jit == nil then
   utils.fatal_msg("Unsupported Lua runtime.", exit_codes.ERR_BAD_LUA_RUNTIME)
 end
 
 local check_requested = false
+local trace_number
 local script
+local n_positional = 0
 for i = 1, #arg do
   local opt = arg[i]
   if opt == "-c" or opt == "--check" then
     check_requested = true
   elseif opt == "-" or opt:sub(1, 1) ~= "-" then
-    if script ~= nil then
+    n_positional = n_positional + 1
+    if n_positional == 1 then
+      script = opt
+    elseif n_positional == 2 then
+      if not opt:match("^[1-9]%d*$") then
+        io.stderr:write(USAGE_MESSAGE)
+        os.exit(exit_codes.OK)
+      end
+      trace_number = tonumber(opt)
+    else
       io.stderr:write(USAGE_MESSAGE)
       os.exit(exit_codes.OK)
     end
-    script = opt
   else
     io.stderr:write(USAGE_MESSAGE)
     os.exit(exit_codes.OK)
@@ -99,9 +117,19 @@ end
 -- flush traces before proceeding.
 jit.flush()
 
--- By default print the SMT-LIB formula to stdout.
+-- By default print the SMT-LIB formula to stdout. With a trace
+-- number only that trace is printed.
 if not check_requested then
-  io.stdout:write(ljopt.ir.translate_to_smt(lua_code, chunkname))
+  if trace_number == nil then
+    io.stdout:write(ljopt.ir.translate_to_smt(lua_code, chunkname))
+    os.exit(exit_codes.OK)
+  end
+  local traces, trace_locs = ljopt.ir.traces_to_smt(lua_code, chunkname)
+  local order = utils.build_order(traces, trace_locs)
+  if trace_number > #order then
+    trace_number_error(trace_number, #order)
+  end
+  io.stdout:write(ljopt.ir.wrap_trace(traces[order[trace_number]]))
   os.exit(exit_codes.OK)
 end
 
@@ -128,10 +156,15 @@ local traces, trace_locs = ljopt.ir.traces_to_smt(lua_code, chunkname)
 -- the traces are first sorted by their start location.
 local order = utils.build_order(traces, trace_locs)
 local n_traces = #order
-if n_traces == 0 then
+if n_traces == 0 and trace_number == nil then
   io.stderr:write("No traces recorded, nothing to verify.\n")
   os.exit(exit_codes.OK)
 end
-
-os.exit(utils.verify_traces(solver, traces, trace_locs, order,
+if trace_number ~= nil and trace_number > n_traces then
+  trace_number_error(trace_number, n_traces)
+end
+-- When a trace number is given, only that trace is verified. It
+-- keeps its original number in the N/M report below.
+local selected = utils.select_traces(order, trace_number)
+os.exit(utils.verify_traces(solver, traces, trace_locs, selected,
   n_traces, start_time, exit_codes))

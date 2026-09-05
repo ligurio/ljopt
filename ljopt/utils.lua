@@ -230,6 +230,18 @@ local function build_order(traces, trace_locs)
     return order
 end
 
+-- Returns the traces to check as {idx = pos, uid = traceno}
+-- records. With a trace number only that trace is returned.
+local function select_traces(order, trace_number)
+    local selected = {}
+    for pos, traceno in ipairs(order) do
+        if trace_number == nil or pos == trace_number then
+            table.insert(selected, {idx = pos, uid = traceno})
+        end
+    end
+    return selected
+end
+
 local function rjust(n, width)
     local s = tostring(n)
     return string.rep(" ", width - #s) .. s
@@ -326,7 +338,9 @@ local function verify_traces(solver, traces, trace_locs, checked,
     local widths = {nw = #("%d"):format(n_traces)}
     widths.counter_w = 2 * widths.nw + 2
     widths.tag_w = widths.nw + 1
-    for idx, traceno in ipairs(checked) do
+    for _, item in ipairs(checked) do
+        local idx = item.idx
+        local traceno = item.uid
         local loc = trace_locs[traceno] or tostring(traceno)
         local verdict, status, solve_time =
             check_trace(solver, traces, traceno, idx, loc, widths)
@@ -371,6 +385,7 @@ return {
     resolve_const = resolve_const,
     resolve_const_str = resolve_const_str,
     rjust = rjust,
+    select_traces = select_traces,
     solver_backends = solver_backends,
     trim = trim,
     unreachable = unreachable,

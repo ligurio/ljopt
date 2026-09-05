@@ -401,29 +401,40 @@ local function traces_to_smt(lua_code, chunkname)
 end
 
 
+local SMT_PREAMBLE = [[
+(set-option :print-success false)
+(set-option :produce-models true)
+]] .. smt_constants.LJOPT_SMTLIB
+
+-- Wraps a single trace formula into a self-contained SMT-LIB
+-- script, the block translate_to_smt() emits for every trace.
+-- The preamble is repeated per block because each trace ends with
+-- (reset), which also drops the set-option state.
+local function wrap_trace(tr_smt)
+    local out = SMT_PREAMBLE .. tr_smt
+    -- Check current trace.
+    out = out .. '(check-sat)\n'
+    if ljopt_config.is_dump_model() then
+        -- Print counterexample if found.
+        out = out .. '(get-model)\n'
+    end
+    -- Reset, so next snapshots will be independent.
+    out = out .. '(reset)\n'
+    return out
+end
+
+
 -- Generates SMT formula that should be UNSAT (if optimizations
 -- are correct).
 local function translate_to_smt(lua_code, chunkname)
     assert(load(lj_unoptimized))()
     local traces_formulas = traces_to_smt(lua_code, chunkname)
 
-    local SMT_PREAMBLE = [[
-(set-option :print-success false)
-(set-option :produce-models true)
-]] .. smt_constants.LJOPT_SMTLIB
     local traces_smtlib = ''
 
     -- Concatenate all traces
     for _, tr_smt in pairs(traces_formulas) do
-        traces_smtlib = traces_smtlib .. SMT_PREAMBLE .. tr_smt
-        -- Check current trace.
-        traces_smtlib = traces_smtlib .. '(check-sat)\n'
-        if ljopt_config.is_dump_model() then
-            -- Print counterexample if found.
-            traces_smtlib = traces_smtlib .. '(get-model)\n'
-        end
-        -- Reset, so next snapshots will be independent.
-        traces_smtlib = traces_smtlib .. '(reset)\n'
+        traces_smtlib = traces_smtlib .. wrap_trace(tr_smt)
     end
     return traces_smtlib
 end
@@ -433,4 +444,5 @@ return {
     translate = translate,
     traces_to_smt = traces_to_smt,
     construct_nodes = construct_nodes,
+    wrap_trace = wrap_trace,
 }
