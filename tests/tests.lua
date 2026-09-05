@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(20)
+test:plan(21)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -602,6 +602,49 @@ end
         test:is(smt:parse(formula), true, "TOSTR INT trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "TOSTR INT trace check.")
+    end
+end)
+
+-- 32-bit shifts are defined modulo 32 (the count is masked to 5
+-- bits). The optimised trace normalises a shift by 33/35 to a
+-- shift by 1/3, while the unoptimised one keeps the raw count;
+-- the model must mask it too, or a negative operand shifts the
+-- sign-extended 64-bit value incorrectly and the pair spuriously
+-- sats.
+test:test("shifts with a count >= 32", function(test)
+    local shifts = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local lshift = bit.lshift
+local rshift = bit.rshift
+local arshift = bit.arshift
+local bxor = bit.bxor
+do
+  local y
+  for i = 1, 200 do
+    local a = i
+    y = lshift(a, 33)
+  end
+  assert(y == lshift(200, 33))
+  for i = 1, 200 do
+    local a = i
+    y = rshift(a, 35)
+  end
+  assert(y == rshift(200, 35))
+  for i = 1, 200 do
+    local a = bxor(i, -1)
+    y = arshift(a, 35)
+  end
+  assert(y == arshift(bxor(200, -1), 35))
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(shifts)
+    test:plan(6)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "shift>=32 trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "shift>=32 trace check.")
     end
 end)
 
