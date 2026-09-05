@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(16)
+test:plan(17)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -480,6 +480,34 @@ end
         test:is(smt:parse(formula), true, "narrow chain trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "narrow chain trace check.")
+    end
+end)
+
+-- `string.char(65)` compiles to a `str TOSTR <65> CHAR` node
+-- whose mode (CHAR) must not be treated as the decimal tostr_num:
+-- char 65 is the single-character string "A" (length 1), not
+-- "65". The optimised trace folds `#s` to 1, so a wrong CHAR
+-- model leaves the unoptimised side at length 2 and the pair
+-- spuriously sats.
+test:test("TOSTR CHAR (string.char) across optimizations", function(test)
+    test:plan(2)
+    local char_len = [[
+-- Bind string.char to a local: a global lookup inside the
+-- trace emits HLOAD fun / metatable guards we do not model.
+local char = string.char
+local function f()
+  return #char(65)
+end
+local y
+y = f(); y = f(); y = f(); y = f()
+assert(y == 1)
+]]
+    local formulas = ljopt.ir.traces_to_smt(char_len)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR CHAR trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR CHAR trace check.")
     end
 end)
 
