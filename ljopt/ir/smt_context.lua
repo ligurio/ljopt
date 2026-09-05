@@ -589,6 +589,9 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> known string length (e.g. a TOSTR CHAR result is
+    -- always a single character)
+    self.const_lens = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -611,6 +614,7 @@ end
 function SMTContext:restart()
     self.const_nums = {}
     self.const_strs = {}
+    self.const_lens = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}

@@ -102,6 +102,11 @@ local LJOPT_SMTLIB = ([[
 ; argument never reaches this -- ir/CALLL.lua reverses it in Lua
 ; and emits the resulting literal.
 (declare-fun str_reverse (String) String)
+; Single-character string built from a byte code (string.char with a
+; runtime code). Opaque, but the result is always one character, so
+; every use pins its length to 1. Two equal codes give the same
+; string by congruence.
+(declare-fun str_char ((_ BitVec 64)) String)
 ]]):format(MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP, MAXSNAP)
 -- luacheck: pop
 
