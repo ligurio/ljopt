@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(15)
+test:plan(16)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -452,6 +452,34 @@ assert(y == 1.0)
         test:is(smt:parse(formula), true, "x^0 trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "x^0 trace check.")
+    end
+end)
+
+-- With narrowing enabled the optimised trace evaluates `(-a) - 5`
+-- on the int-converted loop counter as a *chain* of guarded int
+-- ops (SUBOV(SUBOV(0, i), 5)); the unoptimised trace keeps the
+-- whole expression in floating point. The overflow guard of the
+-- second SUBOV must be lifted to a precondition together with the
+-- first, or it shows up as an opt-only exit that can only fire
+-- for out-of-domain loop values and the pair spuriously sats.
+test:test("int narrowing chain with overflow guards", function(test)
+    test:plan(2)
+    local neg_sub = [[
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = i
+    y = (-a) - 5
+  end
+  assert(y == -105)
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(neg_sub)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "narrow chain trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "narrow chain trace check.")
     end
 end)
 
