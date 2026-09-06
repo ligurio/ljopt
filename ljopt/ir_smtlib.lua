@@ -392,6 +392,7 @@ local function translate_to_smt(lua_code)
     local traces_formulas = traces_to_smt(lua_code)
 
     local SMT_PREAMBLE = [[
+(set-logic ALL)
 (set-option :print-success false)
 (set-option :produce-models true)
 ]] .. smt_constants.LJOPT_SMTLIB
