@@ -786,6 +786,23 @@ foo(bswap, 1LL)
             {type = "i64", name = "GT"},
         },
     }, {
+        name = "i64 constant above 2^53 folded by the optimizer",
+        code = [[
+local function foo(x)
+    if x + (0x4000000000000000LL + 0x3fffffffffffffffLL) < 0LL then
+        return 1
+    end
+    return 2
+end
+foo(1LL)
+foo(1LL)
+foo(1LL)
+]],
+        ins = {
+            {type = "i64", name = "ADD"},
+            {type = "i64", name = "LT"},
+        },
+    }, {
         code = [[
 local bit = require('bit');
 local function foo()
