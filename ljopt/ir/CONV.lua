@@ -80,7 +80,7 @@ function IRNodeCONV:to_smt_lib(ctx)
             self:get_left_op(), ctx, 'num'
         )
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
+        data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
     -- Unsigned 32-bit conversions. u32 values are stored as
     -- zero-extended 64-bit BVs (canonical form); see ir/BinOp.
     elseif parsed_right_op[1] == 'u32.int' then

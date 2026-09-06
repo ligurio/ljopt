@@ -2150,6 +2150,21 @@ fill(d)
             {type = "tab", name = "TNEW"},
             {type = "tab", name = "HSTORE"},
         },
+    }, {
+        name = "CONV i64.num",
+        code = [[
+local ffi = require("ffi")
+local function f(y)
+  return tonumber(ffi.cast("int64_t", 3.5)) + y
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "i64", name = "CONV",
+                right_op = op_type.new("lit", "i64.num none")},
+        },
     }}
     test:plan(3 * #srcs)
 
