@@ -25,12 +25,16 @@ function IRNodeTOBIT:to_smt_lib(ctx)
         )
     end
 
-    -- TOBIT converts a floating-point `num` to a 32-bit integer
-    -- using round-to-nearest-even (the "add 2^52+2^51" trick).
+    -- TOBIT converts a floating-point `num` to a 32-bit integer:
+    -- round to nearest even, then wrap to two's complement.
+    -- Round first to a 64-bit integer (fp.to_sbv is defined for
+    -- |x| < 2^63) and take the low 32 bits; a bare `fp.to_sbv 32`
+    -- is undefined once |x| >= 2^31 (tobit(2^31) == -2^31).
     -- Left operand is the num value; right operand is the TOBIT
     -- constant (ignored for SMT purposes).
     local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
-    local data = arith_utils.smt_fp_to_int(left_op, 'RNE')
+    local data = ('((_ sign_extend 32) ((_ extract 31 0) ' ..
+        '((_ fp.to_sbv 64) RNE %s)))'):format(left_op)
 
     local te = ""
     if self:get_flags().irt_guard then

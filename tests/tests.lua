@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(22)
+test:plan(23)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -539,6 +539,36 @@ end
         test:is(smt:parse(formula), true, "TOBIT const trace parse.")
         test:is(smt:check(formula), smt.result.UNSAT,
             "TOBIT const trace check.")
+    end
+end)
+
+-- A *runtime* tobit operand can sit at the INT32 boundary in the
+-- model (the loop counter is unconstrained, e.g. i + 1 == 2^31).
+-- A bare 32-bit fp.to_sbv is undefined there; round to a 64-bit
+-- integer first, then wrap the low 32 bits like bit.tobit does.
+test:test("TOBIT of a runtime value at the INT32 boundary", function(test)
+    test:plan(2)
+    local tobit_rt = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local band = bit.band
+local lshift = bit.lshift
+do
+  local y
+  for i = 1, 200 do
+    local a = band(i, 255)
+    local b = band(i + 1, 15)
+    y = lshift(band(a, b), 3)
+  end
+  assert(y == lshift(band(band(200, 255), band(201, 15)), 3))
+end
+]]
+    local formulas = ljopt.ir.traces_to_smt(tobit_rt)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOBIT rt trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOBIT rt trace check.")
     end
 end)
 
