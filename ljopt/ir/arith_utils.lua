@@ -82,7 +82,7 @@ local function smt_int_to_flt(int_value)
 end
 
 local function smt_i64_to_fp(i64_value)
-    return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
+    return string.format("((_ to_fp 11 53) RNE %s)", i64_value)
 end
 
 -- Canonicalize a 64-bit BV holding a u32 result: keep the low 32

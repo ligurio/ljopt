@@ -2033,6 +2033,20 @@ f(1)
             {type = "i64", name = "CONV",
                 right_op = op_type.new("lit", "i64.num none")},
         },
+    }, {
+        name = "CONV num.i64",
+        code = [[
+local function f(y)
+  return tonumber(9007199254740995LL) + y
+end
+f(3.5)
+f(3.5)
+f(3.5)
+]],
+        ins = {
+            {type = "num", name = "CONV",
+                right_op = op_type.new("lit", "num.i64")},
+        },
     }}
     test:plan(3 * #srcs)
 
