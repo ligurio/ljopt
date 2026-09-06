@@ -83,6 +83,9 @@ function OpType.new(type, value)
         imm          = OpType.IMM,
         int          = OpType.INT,
         int64        = OpType.I64,
+        -- 64-bit cdata constants: the sign lives in the consuming
+        -- IR type on the op-stack, so uint64 is an I64 operand.
+        uint64       = OpType.I64,
         lit          = OpType.LIT,
         number       = OpType.NUM,
         ssa          = OpType.SSA,
