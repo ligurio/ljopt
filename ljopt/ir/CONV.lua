@@ -55,7 +55,7 @@ function IRNodeCONV:to_smt_lib(ctx)
             self:get_left_op(), ctx, 'num'
         )
         -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
+        data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
     -- 64-bit <-> 64-bit (i64 <-> u64): same bit vector on the
     -- op-stack, only the signed interpretation changes.
     elseif parsed_right_op[1] == 'u64.i64' or
