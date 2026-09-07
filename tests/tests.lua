@@ -1388,6 +1388,7 @@ foo()
     }, {
         name = "write to global variable",
         code = [[
+v = 0
 function m()
   v = 1
   return v
@@ -1407,6 +1408,7 @@ m()
     }, {
         name = "read string global variable",
         code = [[
+v = "seed"
 function m()
   v = "hello"
   return v
