@@ -315,9 +315,10 @@ end
 -- where snap1 != snap2, which means these 2 traces
 -- are not equivalent.
 local function traces_to_smt(lua_code)
-    local rec_unopt = record_code(lua_code, lj_unoptimized)
+    local fn = runtime.load_sandboxed(lua_code)
+    local rec_unopt = record_code(fn, lj_unoptimized)
     utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized)
+    local rec_opt = record_code(fn, lj_optimized)
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
