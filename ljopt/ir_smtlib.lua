@@ -324,7 +324,8 @@ end
 -- where snap1 != snap2, which means these 2 traces
 -- are not equivalent.
 local function traces_to_smt(lua_code, chunkname)
-    local rec_unopt = record_code(lua_code, lj_unoptimized, chunkname)
+    local fn = runtime.load_sandboxed(lua_code, chunkname)
+    local rec_unopt = record_code(fn, lj_unoptimized)
     -- ljopt keys snapshot exits by their bytecode offset, which
     -- requires the optional getpos argument of tracesnap()
     -- Without it the JIT handlers cannot record snapshots at all,
@@ -339,7 +340,7 @@ local function traces_to_smt(lua_code, chunkname)
     -- table, so keep a reference to this run's snapshot first.
     local unopt_locs = ir_dump_utils.ljopt_get_execution_locs()
     utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized, chunkname)
+    local rec_opt = record_code(fn, lj_optimized)
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):

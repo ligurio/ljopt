@@ -17,19 +17,19 @@ local function capture(f, ...)
     return ok, res, table.concat(result, '\n')
 end
 
-local function record_sandboxed(lua_code, opt, is_debug_mode, chunkname)
-    -- Disable coverage to not interfere with recorded traces.
-    toggle_debug_hook()
-    local fn, err
-    if chunkname then
-        fn, err = loadstring(lua_code, chunkname)
-    else
-        fn, err = loadstring(lua_code)
-    end
+local function load_sandboxed(lua_code, chunkname)
+    local fn, err = loadstring(lua_code, chunkname or nil)
     if fn == nil then
         error(('cannot load Lua code: %s'):format(err))
     end
+    return fn
+end
 
+local function record_sandboxed(chunk, opt, is_debug_mode, chunkname)
+    -- Disable coverage to not interfere with recorded traces.
+    toggle_debug_hook()
+    local fn = type(chunk) == 'string'
+        and load_sandboxed(chunk, chunkname) or chunk
     local env = setmetatable({}, {__index = _G})
     local mt = getmetatable('string')
     setfenv(fn, env)
@@ -43,5 +43,6 @@ end
 
 return {
     capture = capture,
+    load_sandboxed = load_sandboxed,
     record_sandboxed = record_sandboxed,
 }
