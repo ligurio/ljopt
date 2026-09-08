@@ -8,6 +8,7 @@ local smt = require("tests.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local ir_smtlib = require("ljopt.ir_smtlib")
+local loop_unrolling = require("ljopt.loop_unrolling")
 local op_type = require("ljopt.ir.op_type")
 local test = require("tests.tap").test("ljopt")
 
@@ -33,6 +34,9 @@ end
 local function check_ins_present(lua_chunk, expected_ins, opt)
     local exec_records = record_code(lua_chunk, opt)
     for _, trace in pairs(exec_records) do
+        trace.trace, trace.snapshots = loop_unrolling.loop_unrooling_transform(
+            trace.trace, trace.snapshots, trace.linktype
+        )
         local nodes = ir_smtlib.construct_nodes(trace)
         local ni = 1
         for _, instr in ipairs(expected_ins) do
@@ -329,6 +333,37 @@ h(3.5)
 ]],
         ins = {
             {type = "fun", name = "EQ"},
+        },
+    }, {
+        code = [[
+local x = 12
+for i = 1, 100 do
+    x = x + 5
+end
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD",
+                -- Check that ADD argument is
+                -- previous loop iteration output.
+                left_op = op_type.new("ssa", 4)},
+        },
+    }, {
+        code = [[
+local x = 12
+for i = 1, 100 do
+    x = x + 5
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1', '-narrow')",
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD",
+                -- Make sure phi is correct when optimizations
+                -- enabled.
+                left_op = op_type.new("ssa", 3)},
         },
 --[[
     }, {
@@ -1092,6 +1127,13 @@ foo(false, 5.0)
             {type = "fal", name = "SLOAD"},
         },
     }, {
+        name = "FORL narrowing",
+        -- The narrowed opt trace adds *after* converting the
+        -- induction variable to int32 while the unopt one
+        -- converts after adding in fp, so proving them equal is
+        -- an fp <-> bitvector commutation argument repeated per
+        -- iteration. z3 discharges it at depth 1 but not at 2.
+        unroll_n = 1,
         code = [[
 -- FORL narrowing: IV becomes int SLOAD with CI guard,
 -- step becomes int ADD, and the array write goes through
@@ -1234,6 +1276,7 @@ end
             {type = "num", name = "HSTORE"},
         },
     }, {
+        unroll_n = 0,
         code = [[
 local sin = math.sin
 local res = 0.0
@@ -1844,8 +1887,12 @@ s = s + f(arr, 1e39)
     }}
     test:plan(3 * #srcs)
 
+    local unroll_n = ljopt_config.get_loop_unroll_limit()
     for i, f in ipairs(srcs) do
         local label = f.name or ("test_%d"):format(i)
+        -- Depth is per-test: a chunk may only stay decidable
+        -- below the global setting. See set_loop_unroll_limit.
+        ljopt_config.set_loop_unroll_limit(f.unroll_n or unroll_n)
         local ok, err = check_ins_present(f.code, f.ins, f.opt)
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
@@ -1859,6 +1906,7 @@ s = s + f(arr, 1e39)
                 ("%s trace %s check."):format(label, j))
         end
     end
+    ljopt_config.set_loop_unroll_limit(unroll_n)
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
 end)

@@ -286,7 +286,7 @@ local function dump_ir(tr, dumpsnap, dumpreg)
   local nins = info.nins
   write_out("---- TRACE ", tr, " IR\n")
 
-  ir_dump_utils.ljopt_init_new_trace(tr)
+  ir_dump_utils.ljopt_init_new_trace(tr, info.linktype)
   local irnames = vmdef.irnames
   local snapref = 65536
   local snap, snapno

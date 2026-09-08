@@ -2,8 +2,10 @@
 -- to tests correctnes of arbitrary
 -- data structures we use.
 
+local ljopt = require("ljopt")
 local arith_utils = require("ljopt.ir.arith_utils")
 local ljopt_config = require("ljopt.config")
+local loop_unrolling = require("ljopt.loop_unrolling")
 local utils = require("ljopt.utils")
 
 local smt = require("tests.smtlib2").new()
@@ -17,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(5)
+test:plan(8)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -207,6 +209,130 @@ test:test("mark_narrowed_refs", function(test)
     }, ctx)
     test:is(ctx.te_stack.narrowed_refs[1], nil,
         "LE on stray ref not marked")
+end)
+
+local LOOP_CHUNK = [[
+local sin = math.sin
+local res = 0.0
+for i = 1, 100 do res = res + sin(i) end
+]]
+
+local OPT_LEVELS = {
+    unopt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')",
+    opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+}
+
+local function recorded_loop_trace(level)
+    local records = ljopt.ir.record(LOOP_CHUNK, OPT_LEVELS[level])
+    assert(type(records) == 'table', tostring(records))
+    local found
+    for _, trace in pairs(records) do
+        assert(found == nil, 'expected a single recorded trace')
+        found = trace
+    end
+    assert(found ~= nil, 'nothing was recorded')
+    return found
+end
+
+local function unroll_at(depth, trace, op_stack)
+    local unroll_n = ljopt_config.get_loop_unroll_limit()
+    ljopt_config.set_loop_unroll_limit(depth)
+    local nodes, snaps, smt_out = loop_unrolling.loop_unrooling_transform(
+        trace.trace, trace.snapshots, trace.linktype, op_stack
+    )
+    ljopt_config.set_loop_unroll_limit(unroll_n)
+    return nodes, snaps, smt_out
+end
+
+local function count_irop(nodes, irop)
+    local found = 0
+    for _, node in ipairs(nodes) do
+        if node.irop == irop then found = found + 1 end
+    end
+    return found
+end
+
+local function count_duplicates(refs)
+    local seen, dups = {}, 0
+    for _, ref in ipairs(refs) do
+        if seen[ref] then dups = dups + 1 end
+        seen[ref] = true
+    end
+    return dups
+end
+
+test:test("loop unrolling at depth 0", function(test)
+    test:plan(4)
+
+    local opt = recorded_loop_trace('opt')
+    local loop_idx
+    for i, node in ipairs(opt.trace) do
+        if node.irop == 'LOOP' then loop_idx = i break end
+    end
+    test:ok(loop_idx ~= nil, "the opt trace carries a LOOP marker")
+
+    local nodes = unroll_at(0, opt)
+    test:is(table.getn(nodes), loop_idx - 1,
+        "only the peeled iteration is kept")
+    test:is(count_irop(nodes, 'LOOP') + count_irop(nodes, 'PHI'), 0,
+        "and the markers are gone")
+
+    local unopt = recorded_loop_trace('unopt')
+    test:is(table.getn(unroll_at(0, unopt)), table.getn(unopt.trace),
+        "the unopt trace is left as one iteration")
+end)
+
+test:test("loop unrolling constrains a narrowed IV", function(test)
+    test:plan(4)
+
+    local opt = recorded_loop_trace('opt')
+    local phis = count_irop(opt.trace, 'PHI')
+    test:ok(phis > 0, "the recorded trace has PHI nodes")
+    test:is(select(3, unroll_at(2, opt)), '',
+        "no op_stack, no constraints")
+
+    local loaded = {}
+    local op_stack = {
+        load = function(_, ref)
+            table.insert(loaded, ref)
+            return ('iv_%d'):format(ref)
+        end,
+    }
+    local _, _, smt_out = unroll_at(2, opt, op_stack)
+
+    local constraints = 0
+    for _ in smt_out:gmatch('sign_extend 32') do
+        constraints = constraints + 1
+    end
+    test:is(constraints, phis * 3,
+        "one wrap constraint per PHI per iteration input")
+    test:is(count_duplicates(loaded), 0,
+        "each iteration constrains its own refs")
+end)
+
+test:test("loop unrolling remaps call arguments", function(test)
+    test:plan(3)
+
+    local opt = recorded_loop_trace('opt')
+    local nodes = unroll_at(2, opt)
+    test:is(count_irop(nodes, 'LOOP') + count_irop(nodes, 'PHI'), 0,
+        "no LOOP/PHI left")
+
+    local args = {}
+    for _, node in ipairs(nodes) do
+        local op1 = node.op1
+        if op1 ~= nil and op1.type == 'carg' then
+            local first = op1.value[1]
+            if first ~= nil and first.tab ~= nil
+                and first.tab.type == 'ssa' then
+                table.insert(args, first.tab.value)
+            end
+        end
+    end
+    test:is(table.getn(args), 3,
+        "the peeled call plus one per unrolled iteration")
+    test:is(count_duplicates(args), 0,
+        "every call reads its own iteration's argument")
 end)
 
 require("tests.coverage").shutdown()

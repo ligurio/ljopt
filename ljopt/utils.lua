@@ -94,7 +94,8 @@ local function enrich_snapshots_with_exits(nodes, trace_record)
                 is_inc = true
             end
             if is_inc then
-                if used_snapshots[ins2snap[cur_snap_id].uid] then
+                if used_snapshots[ins2snap[cur_snap_id].uid] and
+                    trace_record.linktype ~= "loop" then
                     return false
                 end
                 used_snapshots[ins2snap[cur_snap_id].uid] = true

@@ -178,7 +178,13 @@ test:test("Fix FOLD rule for BUFHDR append (LuaJIT#791)", function(test)
     local chunk = read_reproducer_file("lj_791.lua")
     test:ok(reproduce_bug_in_runtime(chunk, "assertion is violated"),
         "reproduce in runtime")
-    test:skip("reproduce with SMT")
+    -- The append only diverges once a second iteration writes
+    -- into the buffer the first one built, so a single unrolled
+    -- body proves the traces equivalent and the bug disappears.
+    local unroll_n = ljopt_config.get_loop_unroll_limit()
+    ljopt_config.set_loop_unroll_limit(math.max(unroll_n, 2))
+    test:ok(reproduce_bug_using_smt(chunk), "reproduce with SMT")
+    ljopt_config.set_loop_unroll_limit(unroll_n)
 end)
 
 -- https://github.com/LuaJIT/LuaJIT/issues/792
@@ -207,7 +213,13 @@ test:test("pow() inaccuracy (LuaJIT#817)", function(test)
     -- assertion to match. ljopt catches it symbolically instead.
     test:skip("reproduce in runtime")
     local chunk = read_reproducer_file("lj_817.lua")
+    -- POW is uninterpreted, so each unrolled iteration adds an
+    -- opaque term the solver cannot fold; one body copy stays
+    -- decidable, two do not.
+    local unroll_n = ljopt_config.get_loop_unroll_limit()
+    ljopt_config.set_loop_unroll_limit(math.min(unroll_n, 1))
     test:ok(reproduce_bug_using_smt(chunk), "reproduce using SMT")
+    ljopt_config.set_loop_unroll_limit(unroll_n)
 end)
 
 -- Incorrect narrowing for huge numbers (LuaJIT#1236).
