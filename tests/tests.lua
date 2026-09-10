@@ -68,6 +68,30 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
+local function parsed_and_checked(label, formulas, n_traces)
+    if next(formulas) == nil then
+        test:diag("%s: no traces found", label)
+        return false
+    end
+    local res = true
+    local n_formulas = 0
+    for j, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        if smt:parse(formula) ~= true then
+            test:diag("%s: parse is failed (trace %s)", label, j)
+            res = false
+        end
+        if smt:check(formula) ~= smt.result.UNSAT then
+            test:diag("%s: check is failed (trace %s)", label, j)
+            res = false
+        end
+        n_formulas = n_formulas + 1
+    end
+    assert(n_traces == n_formulas, "a number of traces does not match")
+
+    return res
+end
+
 test:plan(11)
 
 test:test("smt_module", function(test)
@@ -357,7 +381,7 @@ foo(1.5)
         },
 ]]
     }}
-    test:plan(3 * #srcs)
+    test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do
         local label = f.name or ("test_%d"):format(i)
@@ -366,13 +390,9 @@ foo(1.5)
             label, err or "ok"
         ))
         local formulas = ljopt.ir.traces_to_smt(f.code)
-        for j, formula in pairs(formulas) do
-            formula = smt_constants.LJOPT_SMTLIB .. formula
-            test:is(smt:parse(formula), true,
-                ("%s trace %s parse."):format(label, j))
-            test:is(smt:check(formula), smt.result.UNSAT,
-                ("%s trace %s check."):format(label, j))
-        end
+        local n_traces = f.n_traces or 1
+        local res = parsed_and_checked(label, formulas, n_traces)
+        test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
     end
 end)
 
@@ -1842,7 +1862,7 @@ s = s + f(arr, 1e39)
             {type = "num", name = "CONV"},
         },
     }}
-    test:plan(3 * #srcs)
+    test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do
         local label = f.name or ("test_%d"):format(i)
@@ -1851,13 +1871,9 @@ s = s + f(arr, 1e39)
             label, err or "ok"
         ))
         local formulas = ljopt.ir.traces_to_smt(f.code)
-        for j, formula in pairs(formulas) do
-            formula = smt_constants.LJOPT_SMTLIB .. formula
-            test:is(smt:parse(formula), true,
-                ("%s trace %s parse."):format(label, j))
-            test:is(smt:check(formula), smt.result.UNSAT,
-                ("%s trace %s check."):format(label, j))
-        end
+        local n_traces = f.n_traces or 1
+        local res = parsed_and_checked(label, formulas, n_traces)
+        test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
     end
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
