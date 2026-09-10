@@ -132,6 +132,51 @@ local op_stack_prefix = 'op_'
 local te_stack_prefix = 'te_'
 local snap_stack_prefix = 'snap_'
 
+-- Values of the internal FP masks LuaJIT keeps in GG_State and
+-- loads via `num FLOAD nil #<offset>` as the mask operand of num
+-- ABS/NEG. The GG-relative offset depends on the LuaJIT build
+-- (it even differs between versions this project tests), so the
+-- value is derived from the consuming instruction rather than
+-- hardcoded -- see derive_nil_fload_masks().
+local NIL_FLOAD_ABS_MASK = '((_ to_fp 11 53) #x7fffffffffffffff)'
+local NIL_FLOAD_NEG_MASK = '((_ to_fp 11 53) #x8000000000000000)'
+
+-- num ABS/NEG are encoded semantically (fp.abs/fp.neg) and never
+-- read their mask operand, but the mask is still an IR node that
+-- must be translated to SMT. Resolve every `num FLOAD nil #N` (an
+-- internal GG_State mask constant) by looking at the num ABS/NEG
+-- that uses it.
+local function derive_nil_fload_masks(nodes)
+    local masks = {}
+    for i = 1, table.getn(nodes) do
+        local node = nodes[i]
+        if node:get_type() == 'num' then
+            local opcode = node:get_opcode()
+            local mask_val
+            if opcode == 'ABS' then
+                mask_val = NIL_FLOAD_ABS_MASK
+            elseif opcode == 'NEG' then
+                mask_val = NIL_FLOAD_NEG_MASK
+            else
+                goto continue
+            end
+            local right_op = node:get_right_op()
+            if right_op ~= nil and right_op:is_ssa() then
+                local mask_node = nodes[right_op:get_ssa()]
+                if mask_node ~= nil
+                    and mask_node:get_opcode() == 'FLOAD'
+                    and op_type.to_string(mask_node:get_left_op()) == 'nil'
+                then
+                    masks[op_type.to_string(mask_node:get_right_op())] =
+                        mask_val
+                end
+            end
+        end
+        ::continue::
+    end
+    return masks
+end
+
 -- Translates single trace + snapshots into
 -- SMT formula + fill SMTContext.
 local function translate(trace_record, ctx_src,
@@ -192,6 +237,10 @@ local function translate(trace_record, ctx_src,
     if ljopt_config.is_narrowing() then
         ir_passes.mark_narrowed_refs(nodes, ctx_src)
     end
+
+    -- Derive GG_State FP masks (`num FLOAD nil`) from the ABS/NEG
+    -- consumers before translating the nodes.
+    ctx_src.nil_fload_masks = derive_nil_fload_masks(nodes)
 
     -- 3rd stage. Converting to SMT-LIB.
     jit.off(true, true)
