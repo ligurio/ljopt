@@ -11,6 +11,12 @@ local impls = {}
 local function make_xload(typ, nbytes, finalize)
     local cls = {}
     ir_node.extended(cls, ir_node.ir_node_base)
+    -- A load is only modelled for a pointer from a traced cdata
+    -- (an SSA). A constant address, like a string literal, is
+    -- outside the xmem; drop the load as NYI.
+    function cls.is_implemented(_flags, _type, _opcode, left_op, _right_op)
+        return left_op ~= nil and left_op:is_ssa()
+    end
     function cls:to_smt_lib(ctx)
         local ptr = ir_node.retrieve_i64_op(
             self:get_left_op(), ctx, 'p64'

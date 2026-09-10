@@ -17,7 +17,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(5)
+test:plan(6)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -207,6 +207,31 @@ test:test("mark_narrowed_refs", function(test)
     }, ctx)
     test:is(ctx.te_stack.narrowed_refs[1], nil,
         "LE on stray ref not marked")
+end)
+
+test:test("FLOADTab.is_implemented", function(test)
+    test:plan(5)
+    local fload = require("ljopt.ir.FLOAD")
+    local op_type = require("ljopt.ir.op_type")
+
+    local tab = fload.instance("IRNodeFLOADTab")
+    local function impl(left_op, right_op)
+        return tab.is_implemented({}, "tab", "FLOAD", left_op, right_op)
+    end
+
+    local ssa  = op_type.new(op_type.SSA, 1)
+    local fn   = op_type.new(op_type.FUN, "f")
+    local tbl  = op_type.new("table", {})
+    local env  = op_type.new(op_type.LIT, "func.env")
+    local meta = op_type.new(op_type.LIT, "tab.meta")
+    local thead_env = op_type.new(op_type.LIT, "thread.env")
+
+    test:is(impl(ssa, env), true, "func.env from a traced value accepted")
+    test:is(impl(ssa, meta), true, "tab.meta from a traced value accepted")
+    test:is(impl(fn, env), false, "func.env of a constant function dropped")
+    test:is(impl(tbl, meta), false, "tab.meta of a constant table dropped")
+    test:is(impl(ssa, thead_env), false,
+        "thread.env not supported")
 end)
 
 require("tests.coverage").shutdown()

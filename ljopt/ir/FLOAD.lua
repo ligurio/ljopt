@@ -258,9 +258,13 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
 end
 
 function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
-                                              _left_op, right_op_val)
+                                              left_op, right_op_val)
     local right_op = op_type.to_string(right_op_val)
-    if right_op == 'tab.meta' or right_op == 'func.env' then
+    -- func.env/tab.meta is read only from a traced value. The env
+    -- of a constant function (getfenv(0) folded to the traced
+    -- function) is not modelled, so drop such FLOADs as NYI.
+    if (right_op == 'tab.meta' or right_op == 'func.env')
+        and left_op:is_ssa() then
         return true
     end
     return false
