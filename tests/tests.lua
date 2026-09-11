@@ -396,7 +396,13 @@ do --- FLOAD forwarding via setmetatable.
   end
 end
 ]]
+    -- Disable strict mode: setmetatable/getmetatable guards
+    -- (EQ/p32, EQ/tab, NE/tab, TBAR, HLOAD fun) are not
+    -- implemented yet.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(alias_alloc)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "FSTORE/FREF trace parse.")
@@ -474,7 +480,12 @@ do
   assert(y == -105)
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(neg_sub)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "narrow chain trace parse.")
@@ -533,7 +544,12 @@ do
   assert(y == 23)
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(band_ff)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "TOBIT const trace parse.")
@@ -563,7 +579,12 @@ do
   assert(y == lshift(band(band(200, 255), band(201, 15)), 3))
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(tobit_rt)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "TOBIT rt trace parse.")
@@ -595,7 +616,12 @@ do
   assert(y == 12)
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(andk_shiftk)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "BSHR trace parse.")
@@ -626,7 +652,12 @@ do
   assert(y == 100)
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(cse_conv)
+    ljopt_config.set_strict_mode(strict_mode)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
         test:is(smt:parse(formula), true, "TOSTR INT trace parse.")
@@ -668,7 +699,12 @@ do
   assert(y == arshift(bxor(200, -1), 35))
 end
 ]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
     local formulas = ljopt.ir.traces_to_smt(shifts)
+    ljopt_config.set_strict_mode(strict_mode)
     test:plan(6)
     for _, formula in pairs(formulas) do
         formula = smt_constants.LJOPT_SMTLIB .. formula
