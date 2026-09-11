@@ -36,8 +36,7 @@ local function reproduce_bug_in_runtime(chunk, err_msg)
     local expected_result = not buggy_build
     -- Default value is false, when LuaJIT build contains a bug.
     local err_is_matched = not buggy_build
-    if buggy_build then
-       assert(type(err) == "string", "error is not a string")
+    if buggy_build and type(err) == "string" then
        err_is_matched = string.match(err, err_msg) ~= nil
     end
     return ok == expected_result and err_is_matched
@@ -175,8 +174,7 @@ end)
 -- https://github.com/LuaJIT/LuaJIT/commit/bc1bdbf620f58f0978385828bc51272903601e17
 test:test("Fix FOLD rule for BUFHDR append (LuaJIT#791)", function(test)
     test:plan(2)
-    local chunk = read_reproducer_file("lj_791.lua")
-    test:ok(reproduce_bug_in_runtime(chunk, "assertion is violated"),
+    test:ok(reproduce_bug_in_popen("lj_791.lua", "assertion is violated"),
         "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
