@@ -71,12 +71,18 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
             ctx.const_nums[self:get_ssa_reference()] = len
         else
             -- Propagate len when the SSA string was tracked as
-            -- a known constant via HSTORE->HLOAD chains.
+            -- a known constant via HSTORE->HLOAD chains, or when
+            -- its length is known a priori (a TOSTR CHAR result
+            -- is always one character).
             local known = ctx.const_strs[left_op:get_ssa()]
+            local known_len = ctx.const_lens[left_op:get_ssa()]
             if known ~= nil then
                 local len = #known
                 data = arith_utils.const_i64_to_smt_bv(len)
                 ctx.const_nums[self:get_ssa_reference()] = len
+            elseif known_len ~= nil then
+                data = arith_utils.const_i64_to_smt_bv(known_len)
+                ctx.const_nums[self:get_ssa_reference()] = known_len
             else
                 data = ('((_ int2bv %d) (str.len %s))'):format(
                     64,
@@ -258,9 +264,13 @@ function impls.IRNodeFLOADInt.is_implemented(_flags, _type, _opcode,
 end
 
 function impls.IRNodeFLOADTab.is_implemented(_flags, _type, _opcode,
-                                              _left_op, right_op_val)
+                                              left_op, right_op_val)
     local right_op = op_type.to_string(right_op_val)
-    if right_op == 'tab.meta' or right_op == 'func.env' then
+    -- func.env/tab.meta is read only from a traced value. The env
+    -- of a constant function (getfenv(0) folded to the traced
+    -- function) is not modelled, so drop such FLOADs as NYI.
+    if (right_op == 'tab.meta' or right_op == 'func.env')
+        and left_op:is_ssa() then
         return true
     end
     return false

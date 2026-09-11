@@ -68,7 +68,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(11)
+test:plan(23)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -373,6 +373,373 @@ foo(1.5)
             test:is(smt:check(formula), smt.result.UNSAT,
                 ("%s trace %s check."):format(label, j))
         end
+    end
+end)
+
+-- setmetatable compiles to `FREF`/`FSTORE` of the table's
+-- tab.meta field. With the `fwd` optimization enabled the
+-- `FLOAD` produced by the following `getmetatable(v)` is
+-- forwarded through that store; at -O0 it stays a real memory
+-- load. The store must be modelled for the pair to compare
+-- equal -- otherwise the unoptimized re-load reads a field that
+-- was never written and the trace pair spuriously sats.
+test:test("FSTORE of tab.meta across optimizations", function(test)
+    test:plan(2)
+    local alias_alloc = [[
+do --- FLOAD forwarding via setmetatable.
+  local mt = {}
+  local t = setmetatable({}, mt)
+  for _ = 1, 100 do
+    local v = {}
+    setmetatable(v, getmetatable(t))
+    assert(getmetatable(v) == mt)
+  end
+end
+]]
+    -- Disable strict mode: setmetatable/getmetatable guards
+    -- (EQ/p32, EQ/tab, NE/tab, TBAR, HLOAD fun) are not
+    -- implemented yet.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(alias_alloc)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "FSTORE/FREF trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "FSTORE/FREF trace check.")
+    end
+end)
+
+-- A `^` of two loop-invariant constants is pre-folded to a KNUM
+-- in the optimised trace, while the unoptimised trace keeps a POW
+-- node. `pow_fp` is uninterpreted, so the POW must be folded to
+-- the same literal here -- otherwise the two sides compare an
+-- unconstrained value against the folded constant and the check
+-- spuriously sats.
+test:test("POW of constants across optimizations", function(test)
+    test:plan(2)
+    local const_pow = [[
+local function f()
+  local a, b = 23, 11
+  return a ^ b
+end
+local y
+y = f(); y = f(); y = f(); y = f()
+assert(y == 23 ^ 11)
+]]
+    local formulas = ljopt.ir.traces_to_smt(const_pow)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "const POW trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "const POW trace check.")
+    end
+end)
+
+-- LuaJIT FOLD rewrites `x ^ 0` to the constant 1 in the optimised
+-- trace even when the base is a runtime value. The unoptimised
+-- trace keeps a POW node whose base is symbolic, so the
+-- (uninterpreted) pow_fp must not be emitted -- fold the exponent
+-- identity instead, or the two sides spuriously differ.
+test:test("POW with runtime base and exponent 0", function(test)
+    test:plan(2)
+    local pow0 = [[
+local function f(a)
+  return a ^ 0
+end
+local y
+y = f(0.5); y = f(1.5); y = f(2.5); y = f(3.5)
+assert(y == 1.0)
+]]
+    local formulas = ljopt.ir.traces_to_smt(pow0)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "x^0 trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "x^0 trace check.")
+    end
+end)
+
+-- With narrowing enabled the optimised trace evaluates `(-a) - 5`
+-- on the int-converted loop counter as a *chain* of guarded int
+-- ops (SUBOV(SUBOV(0, i), 5)); the unoptimised trace keeps the
+-- whole expression in floating point. The overflow guard of the
+-- second SUBOV must be lifted to a precondition together with the
+-- first, or it shows up as an opt-only exit that can only fire
+-- for out-of-domain loop values and the pair spuriously sats.
+test:test("int narrowing chain with overflow guards", function(test)
+    test:plan(2)
+    local neg_sub = [[
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = i
+    y = (-a) - 5
+  end
+  assert(y == -105)
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(neg_sub)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "narrow chain trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "narrow chain trace check.")
+    end
+end)
+
+-- `string.char(65)` compiles to a `str TOSTR <65> CHAR` node
+-- whose mode (CHAR) must not be treated as the decimal tostr_num:
+-- char 65 is the single-character string "A" (length 1), not
+-- "65". The optimised trace folds `#s` to 1, so a wrong CHAR
+-- model leaves the unoptimised side at length 2 and the pair
+-- spuriously sats.
+test:test("TOSTR CHAR (string.char) across optimizations", function(test)
+    test:plan(2)
+    local char_len = [[
+-- Bind string.char to a local: a global lookup inside the
+-- trace emits HLOAD fun / metatable guards we do not model.
+local char = string.char
+local function f()
+  return #char(65)
+end
+local y
+y = f(); y = f(); y = f(); y = f()
+assert(y == 1)
+]]
+    local formulas = ljopt.ir.traces_to_smt(char_len)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR CHAR trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR CHAR trace check.")
+    end
+end)
+
+-- `bit.band(23, 0xffffffff)` lowers to
+-- `BAND 23, TOBIT(4294967295.0)`. bit.tobit wraps to 32 bits
+-- (result -1), which a bounded fp.to_sbv cannot express for a
+-- value above INT32_MAX: the SMT conversion is undefined there,
+-- so the unoptimised side becomes unconstrained while the
+-- optimised one folds to 23. Fold constant tobit operands with
+-- the real bit.tobit.
+test:test("TOBIT of a constant above INT32_MAX", function(test)
+    test:plan(2)
+    local band_ff = [[
+-- Bind bit.band to a local: a global lookup inside the trace
+-- emits HLOAD fun / metatable guards we do not model.
+local band = bit.band
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = 23
+    y = band(a, 0xffffffff)
+  end
+  assert(y == 23)
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(band_ff)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOBIT const trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOBIT const trace check.")
+    end
+end)
+
+-- A *runtime* tobit operand can sit at the INT32 boundary in the
+-- model (the loop counter is unconstrained, e.g. i + 1 == 2^31).
+-- A bare 32-bit fp.to_sbv is undefined there; round to a 64-bit
+-- integer first, then wrap the low 32 bits like bit.tobit does.
+test:test("TOBIT of a runtime value at the INT32 boundary", function(test)
+    test:plan(2)
+    local tobit_rt = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local band = bit.band
+local lshift = bit.lshift
+do
+  local y
+  for i = 1, 200 do
+    local a = band(i, 255)
+    local b = band(i + 1, 15)
+    y = lshift(band(a, b), 3)
+  end
+  assert(y == lshift(band(band(200, 255), band(201, 15)), 3))
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(tobit_rt)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOBIT rt trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOBIT rt trace check.")
+    end
+end)
+
+-- `bit.rshift` is a *logical* shift right, so
+-- `(i >> 4) & 0x0fffffff` folds to `i >> 4` in the optimised
+-- trace. Modelling BSHR as an arithmetic shift (bvashr) breaks
+-- that identity for negative i: the unoptimised side masks the
+-- sign-extended value while the optimised one does not, and the
+-- pair spuriously sats. BSHR must shift the low 32 bits
+-- logically.
+test:test("BSHR is a logical shift right", function(test)
+    test:plan(2)
+    local andk_shiftk = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local band = bit.band
+local rshift = bit.rshift
+do
+  local y = 0
+  for i = 1, 200 do
+    local a = i
+    y = band(rshift(a, 4), 0x0fffffff)
+  end
+  assert(y == 12)
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(andk_shiftk)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "BSHR trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "BSHR trace check.")
+    end
+end)
+
+-- When the loop counter is narrowed, `tostring(i)` records as
+-- `str TOSTR <int> INT` over an int-val cell. TOSTR must convert
+-- that int to fp (as a num.int CONV does) before applying
+-- tostr_num: reading the int cell with get-fp yields an
+-- unconstrained value, so `tonumber(tostring(i))` no longer
+-- round-trips to i on the opt side and the pair spuriously sats.
+test:test("TOSTR INT of a narrowed operand", function(test)
+    test:plan(2)
+    local cse_conv = [[
+-- Bind tostring/tonumber to locals: a global lookup inside the
+-- trace emits HLOAD fun / metatable guards we do not model.
+local tostring = tostring
+local tonumber = tonumber
+do
+  local y = 0
+  for i = 1, 100 do
+    local a = i
+    y = tonumber(tostring(a))
+  end
+  assert(y == 100)
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(cse_conv)
+    ljopt_config.set_strict_mode(strict_mode)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR INT trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR INT trace check.")
+    end
+end)
+
+-- 32-bit shifts are defined modulo 32 (the count is masked to 5
+-- bits). The optimised trace normalises a shift by 33/35 to a
+-- shift by 1/3, while the unoptimised one keeps the raw count;
+-- the model must mask it too, or a negative operand shifts the
+-- sign-extended 64-bit value incorrectly and the pair spuriously
+-- sats.
+test:test("shifts with a count >= 32", function(test)
+    local shifts = [[
+-- Bind bit.* to locals: a global lookup inside the trace emits
+-- HLOAD fun / metatable guards we do not model.
+local lshift = bit.lshift
+local rshift = bit.rshift
+local arshift = bit.arshift
+local bxor = bit.bxor
+do
+  local y
+  for i = 1, 200 do
+    local a = i
+    y = lshift(a, 33)
+  end
+  assert(y == lshift(200, 33))
+  for i = 1, 200 do
+    local a = i
+    y = rshift(a, 35)
+  end
+  assert(y == rshift(200, 35))
+  for i = 1, 200 do
+    local a = bxor(i, -1)
+    y = arshift(a, 35)
+  end
+  assert(y == arshift(bxor(200, -1), 35))
+end
+]]
+    -- Temporary: the trace contains a LOOP, which the model does
+    -- not support yet. Remove once LOOP handling lands.
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = ljopt.ir.traces_to_smt(shifts)
+    ljopt_config.set_strict_mode(strict_mode)
+    test:plan(6)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "shift>=32 trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "shift>=32 trace check.")
+    end
+end)
+
+-- string.char with a *runtime* code still yields a single
+-- character, and the optimised trace folds `#c` to 1. TOSTR must
+-- not fall back to a decimal tostr_num for such a code (that is
+-- multi-digit for codes >= 100): model it as an opaque
+-- one-character string.
+test:test("TOSTR CHAR with a runtime code", function(test)
+    test:plan(2)
+    local char_rt = [[
+-- Bind string.char and bit.band to locals: global lookups
+-- inside the trace emit HLOAD fun / metatable guards we do
+-- not model.
+local char = string.char
+local band = bit.band
+local function f(i)
+  return #char(band(i, 255))
+end
+local y
+y = f(1); y = f(2); y = f(3); y = f(200)
+assert(y == 1)
+]]
+    local formulas = ljopt.ir.traces_to_smt(char_rt)
+    for _, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        test:is(smt:parse(formula), true, "TOSTR CHAR rt trace parse.")
+        test:is(smt:check(formula), smt.result.UNSAT,
+            "TOSTR CHAR rt trace check.")
     end
 end)
 
@@ -1841,6 +2208,155 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "CONV u64.int sext",
+        code = [[
+local ffi = require("ffi")
+for i = 1, 10 do
+  local _ = ffi.new("uint64_t", 1)
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
+    }, {
+        name = "CONV u64.num",
+        code = [[
+local ffi = require('ffi')
+local function foo(n)
+    ffi.new('uint64_t', n)
+end
+
+foo(1)
+foo(2)
+foo(3)
+foo(4)
+foo(5)
+foo(6)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.num none")},
+        },
+    }, {
+        name = "CONV flt.int",
+        code = [[
+-- Building an FFI struct with a float field from the traced int
+-- loop counter records an int -> flt (float32) CONV at opt level 3;
+-- the double (unopt) trace converts via flt.num instead.
+local ffi = require("ffi")
+local st = ffi.typeof("struct { float a; }")
+for i = 1, 4 do
+  local y = st(i)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "flt", name = "CONV",
+                right_op = op_type.new("lit", "flt.int")},
+        },
+    }, {
+        name = "CONV int.u8",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 0, 20 do
+  ffi.fill(a + i, 10, i)
+end
+]],
+        ins = {
+            {type = "int", name = "CONV",
+                right_op = op_type.new("lit", "int.u8")},
+        },
+    }, {
+        name = "ffi.copy from string literal",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 11)
+for i = 0, 10 do
+  ffi.copy(a + i, "a", 1)
+end
+]],
+        ins = {
+            {type = "p64", name = "ADD"},
+        },
+    }, {
+        name = "uint64 cdata constant operand",
+        code = [[
+local x
+for i = 1, 10 do
+  x = 1 + 1ULL
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
+    }, {
+        name = "ffi.fill() constant byte XSTORE",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 1, 100 do
+  ffi.fill(a, 15, 0x1234)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "XSTORE"},
+        },
+    }, {
+        name = "ffi.copy() string to FFI array",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100, 42)
+for i = 0, 10 do
+  ffi.copy(a + i, "abc")
+end
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+        },
+    }, {
+        name = "module-level cdata union",
+        code = [[
+-- A module-level cdata union shows up as a literal operand of the
+-- p64 ADD that addresses its fields; its address is a compile-time
+-- constant that differs between recording runs, so the pointer
+-- arithmetic must be dropped as NYI instead of crashing.
+local ffi = require("ffi")
+local u = ffi.new("union { struct { uint32_t lo, hi; }; uint64_t u64; }")
+local function conv(lo, hi)
+  u.lo = lo
+  u.hi = hi
+  return u.u64
+end
+for i = 1, 10 do
+  _ = conv(i, i)
+end
+]],
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+        },
+    }, {
+        name = "CONV u64.i64",
+        code = [[
+local ffi = require("ffi")
+local u = ffi.new("union { uint64_t u64[1]; void *v[2]; }")
+u.u64[0] = 0
+for i = -1, 4 do
+  u.v[0] = ffi.cast("void *", ffi.cast("ptrdiff_t", i))
+  _ = 1 + u.u64[0]
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.i64")},
+        },
     }}
     test:plan(3 * #srcs)
 
@@ -1861,6 +2377,38 @@ s = s + f(arr, 1e39)
     end
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
+end)
+
+test:test("func.env FLOAD of a constant function", function(test)
+    local code = [[
+local x
+local function f()
+  x = math.huge
+end
+for i = 1, 4 do
+  f()
+end
+]]
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local formulas = {}
+    local ok = pcall(function()
+        local tmp = {}
+        for _j, formula in pairs(ljopt.ir.traces_to_smt(code)) do
+            tmp[#tmp + 1] = smt_constants.LJOPT_SMTLIB .. formula
+        end
+        formulas = tmp
+    end)
+    ljopt_config.set_strict_mode(strict_mode)
+
+    test:plan(1 + 2 * #formulas)
+    test:ok(ok, "func.env FLOAD chunk translates")
+    for j = 1, #formulas do
+        test:is(smt:parse(formulas[j]), true,
+            ("func.env FLOAD trace %s parse."):format(j))
+        test:is(smt:check(formulas[j]), smt.result.UNSAT,
+            ("func.env FLOAD trace %s check."):format(j))
+    end
 end)
 
 require("tests.coverage").shutdown()

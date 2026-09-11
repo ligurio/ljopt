@@ -100,6 +100,7 @@ build = {
         ['ljopt.ir.CNEW'] = 'ljopt/ir/CNEW.lua',
         ['ljopt.ir.CNEWI'] = 'ljopt/ir/CNEWI.lua',
         ['ljopt.ir.FLOAD'] = 'ljopt/ir/FLOAD.lua',
+        ['ljopt.ir.FREF.lua'] = 'ljopt/ir/FREF.lua',
         ['ljopt.ir.FSTORE'] = 'ljopt/ir/FSTORE.lua',
         ['ljopt.ir.HLOAD'] = 'ljopt/ir/HLOAD.lua',
         ['ljopt.ir.HREF'] = 'ljopt/ir/HREF.lua',

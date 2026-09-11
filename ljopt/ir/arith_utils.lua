@@ -72,6 +72,15 @@ local function smt_int_to_fp(int_value)
     return string.format("((_ to_fp 11 53) %s)", bv)
 end
 
+-- Convert a 32-bit `int` (stored sign-extended in a 64-bit BV)
+-- to a float32 `flt`. RNE is what x86 cvtsi2ss does.
+local function smt_int_to_flt(int_value)
+    return string.format(
+        "((_ to_fp 8 24) RNE ((_ sign_extend 32) ((_ extract 31 0) %s)))",
+        int_value
+    )
+end
+
 local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
@@ -140,6 +149,17 @@ end
 
 local function bror32(value, amount)
     return bv_rotate32(value, amount, 'right')
+end
+
+-- 32-bit shift of `value` by `amount` (both 64-bit sign-extended
+-- int cells). Shifts are defined modulo 32: the count is masked
+-- to 5 bits, the shift runs on the low 32 bits and the result is
+-- re-sign-extended. `op` is one of bvshl/bvlshr/bvashr.
+local function bv_shift32(op, value, amount)
+    return ('((_ sign_extend 32) (%s ((_ extract 31 0) %s) ' ..
+        '(bvand ((_ extract 31 0) %s) #x0000001f)))'):format(
+            op, value, amount
+        )
 end
 
 -- Raw FFI memory is modelled byte-granular as a flat array
@@ -227,9 +247,11 @@ return {
     xmem_load = xmem_load,
     smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
+    smt_int_to_flt = smt_int_to_flt,
     smt_i64_to_fp = smt_i64_to_fp,
     smt_u32_to_fp = smt_u32_to_fp,
     wrap_u32 = wrap_u32,
     brol32 = brol32,
     bror32 = bror32,
+    bv_shift32 = bv_shift32,
 }
