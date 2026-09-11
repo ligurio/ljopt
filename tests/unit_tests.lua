@@ -6,7 +6,7 @@ local arith_utils = require("ljopt.ir.arith_utils")
 local ljopt_config = require("ljopt.config")
 local utils = require("ljopt.utils")
 
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local test = require("tests.tap").test("ljopt")
 
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
@@ -17,7 +17,47 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(5)
+-- Capture everything a function writes to io.stdout.
+local function capture_stdout(fn)
+    local chunks = {}
+    local saved = io.stdout
+    io.stdout = { -- luacheck: ignore 122
+        write = function(_, s) chunks[#chunks + 1] = s end,
+        flush = function() end,
+    }
+    local ok, err = pcall(fn)
+    io.stdout = saved -- luacheck: ignore 122
+    assert(ok, err)
+    return table.concat(chunks)
+end
+
+-- Deterministic stand-in for a solver backend. `check` maps the
+-- marker at the end of the formula to a verdict.
+local SMT_RESULT = {
+    UNSAT = -1,
+    UNKNOWN = 0,
+    SAT = 1,
+}
+local function mock_solver()
+    return {
+        result = SMT_RESULT,
+        parse = function(_self, str)
+            return type(str) == "string"
+        end,
+        check = function(_self, str)
+            if str:sub(-7) == "UNKNOWN" then
+                return SMT_RESULT.UNKNOWN
+            elseif str:sub(-5) == "UNSAT" then
+                return SMT_RESULT.UNSAT
+            elseif str:sub(-3) == "SAT" then
+                return SMT_RESULT.SAT
+            end
+            return SMT_RESULT.UNSAT
+        end,
+    }
+end
+
+test:plan(9)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -207,6 +247,160 @@ test:test("mark_narrowed_refs", function(test)
     }, ctx)
     test:is(ctx.te_stack.narrowed_refs[1], nil,
         "LE on stray ref not marked")
+end)
+
+test:test("utils trace ordering", function(test)
+    test:plan(12)
+
+    local file, line = utils.loc_key("foo.lua:42")
+    test:is(file, "foo.lua", "loc_key file")
+    test:is(line, 42, "loc_key line")
+    file, line = utils.loc_key("no-location")
+    test:is(file, "no-location", "loc_key no-line file")
+    test:is(line, 0, "loc_key no-line line")
+
+    test:is(utils.loc_less("a.lua:1", "b.lua:1"), true,
+        "loc_less orders by file")
+    test:is(utils.loc_less("b.lua:1", "a.lua:1"), false,
+        "loc_less orders by file reversed")
+    test:is(utils.loc_less("a.lua:2", "a.lua:10"), true,
+        "loc_less compares lines numerically")
+    test:is(utils.loc_less("a.lua:10", "a.lua:2"), false,
+        "loc_less compares lines numerically reversed")
+    test:is(utils.loc_less("x:01", "x:1"), true,
+        "loc_less falls back to the string")
+
+    test:is(utils.rjust(3, 5), "    3", "rjust number")
+    test:is(utils.rjust("#1", 3), " #1", "rjust string")
+
+    local order = utils.build_order(
+        {[10] = true, [20] = true, [30] = true},
+        {[10] = "b.lua:2", [20] = "a.lua:5", [30] = "a.lua:1"})
+    test:is_deeply(order, {30, 20, 10}, "build_order sorts by location")
+end)
+
+test:test("utils select_traces", function(test)
+    test:plan(5)
+
+    local order = {10, 20, 30}
+    test:is_deeply(utils.select_traces(order, nil),
+        {{idx = 1, uid = 10}, {idx = 2, uid = 20}, {idx = 3, uid = 30}},
+        "select_traces without a number returns all traces")
+    test:is_deeply(utils.select_traces(order, 2),
+        {{idx = 2, uid = 20}},
+        "select_traces picks one trace and keeps its index")
+    test:is_deeply(utils.select_traces(order, 1),
+        {{idx = 1, uid = 10}},
+        "select_traces picks the first trace")
+    test:is_deeply(utils.select_traces(order, 4), {},
+        "select_traces out of range returns nothing")
+    test:is_deeply(utils.select_traces({}, nil), {},
+        "select_traces empty order returns nothing")
+end)
+
+test:test("utils solver helpers", function(test)
+    test:plan(13)
+
+    local backends = utils.solver_backends()
+    test:is(#backends, 2, "solver_backends count")
+    test:is(backends[1], ljopt_config.get_smt_solver(),
+        "solver_backends preferred first")
+    local names = {[backends[1]] = true, [backends[2]] = true}
+    test:ok(names.z3 and names.cvc5, "solver_backends both backends")
+
+    local solver = utils.find_solver()
+    test:isnt(solver, nil, "find_solver returns a solver")
+    test:is(type(solver.check), "function", "find_solver solver API")
+
+    local t1 = utils.clock_monotonic()
+    test:is(type(t1), "number", "clock_monotonic type")
+    test:ok(utils.clock_monotonic() >= t1, "clock_monotonic monotonic")
+
+    local mock = mock_solver()
+    local widths = {tag_w = 2, counter_w = 4}
+    local traces = {
+        [1] = "UNSAT",
+        [2] = "SAT",
+        [3] = "UNKNOWN",
+    }
+    local verdict, status, solve_time
+    local output = capture_stdout(function()
+        verdict, status, solve_time =
+            utils.check_trace(mock, traces, 1, 1, "a.lua:1", widths)
+    end)
+    test:is(verdict, "Passed", "check_trace UNSAT verdict")
+    test:is(status, "passed", "check_trace UNSAT status")
+    test:is(type(solve_time), "number", "check_trace UNSAT time")
+    test:like(output, "Start", "check_trace prints the start line")
+
+    capture_stdout(function()
+        verdict = utils.check_trace(mock, traces, 2, 2, "b.lua:2",
+            widths)
+    end)
+    test:is(verdict, "Failed", "check_trace SAT verdict")
+
+    capture_stdout(function()
+        verdict = utils.check_trace(mock, traces, 3, 3, "c.lua:3",
+            widths)
+    end)
+    test:is(verdict, "Timeout", "check_trace UNKNOWN verdict")
+end)
+
+test:test("utils verification reporting", function(test)
+    test:plan(13)
+
+    local output = capture_stdout(function()
+        utils.print_trace_line(1, 3, "a.lua:1", "Passed", 0.5,
+            {nw = 1, tag_w = 2})
+    end)
+    test:like(output, "1/3 Trace #1", "print_trace_line prefix")
+    test:like(output, "Passed", "print_trace_line verdict")
+    test:like(output, "0%.50 sec", "print_trace_line time")
+
+    output = capture_stdout(function()
+        utils.print_report(1, 1, 1, {{idx = 2, loc = "b.lua:2"}},
+            {{idx = 3, loc = "c.lua:3"}}, 3, utils.clock_monotonic())
+    end)
+    test:like(output, "33%% traces passed", "print_report percent")
+    test:like(output, "The following traces FAILED",
+        "print_report failed list")
+    test:like(output, "b.lua:2 %(Failed%)", "print_report failed entry")
+    test:like(output, "TIMED OUT", "print_report timeout list")
+    test:like(output, "c.lua:3 %(Timeout%)", "print_report timeout entry")
+
+    output = capture_stdout(function()
+        utils.print_report(3, 0, 0, {}, {}, 3, utils.clock_monotonic())
+    end)
+    test:like(output, "100%% traces passed, 0 traces failed out of 3",
+        "print_report without timeouts")
+    test:unlike(output, "TIMED OUT", "print_report no timeout list")
+
+    local exit_codes = {OK = 0, ERR_VERIFICATION_FAILED = 3,
+        ERR_SMT_UNKNOWN = 4}
+    local trace_locs = {[5] = "a.lua:1", [6] = "b.lua:2", [7] = "c.lua:3"}
+    local mock = mock_solver()
+    local rc
+    capture_stdout(function()
+        rc = utils.verify_traces(mock, {[5] = "UNSAT", [6] = "SAT",
+            [7] = "UNKNOWN"}, trace_locs,
+            {{idx = 1, uid = 5}, {idx = 2, uid = 6}, {idx = 3, uid = 7}},
+            3, utils.clock_monotonic(), exit_codes)
+    end)
+    test:is(rc, exit_codes.ERR_VERIFICATION_FAILED,
+        "verify_traces failed exit code")
+
+    capture_stdout(function()
+        rc = utils.verify_traces(mock, {[5] = "UNSAT"}, trace_locs,
+            {{idx = 1, uid = 5}}, 3, utils.clock_monotonic(), exit_codes)
+    end)
+    test:is(rc, exit_codes.OK, "verify_traces passed exit code")
+
+    capture_stdout(function()
+        rc = utils.verify_traces(mock, {[7] = "UNKNOWN"}, trace_locs,
+            {{idx = 1, uid = 7}}, 3, utils.clock_monotonic(), exit_codes)
+    end)
+    test:is(rc, exit_codes.ERR_SMT_UNKNOWN,
+        "verify_traces timeout exit code")
 end)
 
 require("tests.coverage").shutdown()
