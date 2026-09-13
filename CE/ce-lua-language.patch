@@ -1,0 +1,34 @@
+diff --git a/lib/languages.ts b/lib/languages.ts
+index 079e7809f..1b03107c4 100644
+--- a/lib/languages.ts
++++ b/lib/languages.ts
+@@ -584,6 +584,17 @@ const definitions: Record<LanguageKey, LanguageDefinition> = {
+         monacoDisassembly: null,
+         digitSeparator: '_',
+     },
++    lua: {
++        name: 'Lua',
++        monaco: 'lua',
++        extensions: ['.lua'],
++        alias: [],
++        logoFilename: null,
++        logoFilenameDark: null,
++        formatter: null,
++        previewFilter: null,
++        monacoDisassembly: null,
++    },
+     llvm: {
+         name: 'LLVM IR',
+         monaco: 'llvm-ir',
+diff --git a/types/languages.interfaces.ts b/types/languages.interfaces.ts
+index eb4f9c067..3d41f9ccf 100644
+--- a/types/languages.interfaces.ts
++++ b/types/languages.interfaces.ts
+@@ -72,6 +72,7 @@ export type LanguageKey =
+     | 'julia'
+     | 'javascript'
+     | 'kotlin'
++    | 'lua'
+     | 'llvm'
+     | 'llvm_mir'
+     | 'mlir'
