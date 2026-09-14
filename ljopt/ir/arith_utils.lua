@@ -72,6 +72,15 @@ local function smt_int_to_fp(int_value)
     return string.format("((_ to_fp 11 53) %s)", bv)
 end
 
+-- Convert a 32-bit `int` (stored sign-extended in a 64-bit BV)
+-- to a float32 `flt`. RNE is what x86 cvtsi2ss does.
+local function smt_int_to_flt(int_value)
+    return string.format(
+        "((_ to_fp 8 24) RNE ((_ sign_extend 32) ((_ extract 31 0) %s)))",
+        int_value
+    )
+end
+
 local function smt_i64_to_fp(i64_value)
     return string.format("((_ to_fp 11 53) RTZ %s)", i64_value)
 end
@@ -227,6 +236,7 @@ return {
     xmem_load = xmem_load,
     smt_fp_to_int = smt_fp_to_int,
     smt_int_to_fp = smt_int_to_fp,
+    smt_int_to_flt = smt_int_to_flt,
     smt_i64_to_fp = smt_i64_to_fp,
     smt_u32_to_fp = smt_u32_to_fp,
     wrap_u32 = wrap_u32,
