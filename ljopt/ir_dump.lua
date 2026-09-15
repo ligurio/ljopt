@@ -566,9 +566,9 @@ local function record(fn, opt, is_debug_mode)
   if opt == nil then
       opt = "jit.opt.start(0, 'hotloop=1', 'hotexit=1')"
   end
-  assert(load(opt))()
-
+  local set_opt = assert(load(opt))
   dumpon()
+  set_opt()
   pcall(fn)
   dumpoff()
 

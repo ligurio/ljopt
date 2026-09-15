@@ -4,6 +4,7 @@
 
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
+local runtime = require("ljopt.runtime")
 local smt = require("tests.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
@@ -68,7 +69,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(11)
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -457,8 +458,7 @@ end
 for k = 1, 100 do foo(200) end
 ]]
 
-    local function trace_id_set(opt)
-        local exec_records = ljopt.ir.record(narrowing, opt)
+    local function trace_id_set(exec_records)
         local ids = {}
         for id in pairs(exec_records) do
             ids[id] = true
@@ -469,9 +469,12 @@ for k = 1, 100 do foo(200) end
     local strict_mode = ljopt_config.is_strict_mode()
     ljopt_config.set_strict_mode(false)
 
-    local unopt = trace_id_set("jit.opt.start(0, 'hotloop=1', 'hotexit=1')")
     -- Narrowing left enabled on purpose - that's the whole point.
-    local opt = trace_id_set("jit.opt.start(3, 'hotloop=1', 'hotexit=1')")
+    local rec_unopt, rec_opt = runtime.record_both(narrowing,
+        "jit.opt.start(0, 'hotloop=1', 'hotexit=1')",
+        "jit.opt.start(3, 'hotloop=1', 'hotexit=1')")
+    local unopt = trace_id_set(rec_unopt)
+    local opt = trace_id_set(rec_opt)
 
     ljopt_config.set_strict_mode(strict_mode)
 
@@ -484,6 +487,33 @@ for k = 1, 100 do foo(200) end
         end
     end
     test:ok(matched, "every -O0 trace id is present in -O3 (narrowing)")
+end)
+
+test:test("Both levels record the same call (LJOPT#96)", function(test)
+    test:plan(1)
+    local chunk = [[
+function m()
+  v = 1
+  return v
+end
+m()
+m()
+m()
+m()
+]]
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local sat = 0
+    for _ = 1, 20 do
+        for _, formula in pairs(ljopt.ir.traces_to_smt(chunk)) do
+            formula = smt_constants.LJOPT_SMTLIB .. formula
+            if smt:check(formula) == smt.result.SAT then
+                sat = sat + 1
+            end
+        end
+    end
+    ljopt_config.set_strict_mode(strict_mode)
+    test:is(sat, 0, "no run pairs two different calls")
 end)
 
 -- Relaxed mode tests, which means any code or
