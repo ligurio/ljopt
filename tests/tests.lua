@@ -1488,6 +1488,7 @@ m()
         },
     }, {
         name = "read field through metatable __index",
+        unroll_n = 0,
         code = [[
 local mt = {__index = {x = 42}}
 local t = setmetatable({}, mt)
