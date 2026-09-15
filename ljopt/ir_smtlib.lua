@@ -259,15 +259,6 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     return smt_result
 end
 
--- Helper to record dump with the given optimization.
-local function record_code(lua_code, opt)
-    local exec_records = runtime.record_sandboxed(
-        lua_code, opt, ljopt_config.is_debug_mode()
-    )
-    assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
-    return exec_records
-end
-
 -- Runs Lua code twice with different level of optimizations
 -- and translates obtained JIT traces to SMT-LIB formulas.
 --
@@ -286,9 +277,11 @@ end
 -- where snap1 != snap2, which means these 2 traces
 -- are not equivalent.
 local function traces_to_smt(lua_code)
-    local rec_unopt = record_code(lua_code, lj_unoptimized)
-    utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized)
+    local rec_unopt, rec_opt = runtime.record_both(
+        lua_code, lj_unoptimized, lj_optimized, ljopt_config.is_debug_mode()
+    )
+    assert(type(rec_unopt) == 'table', 'Got type: ' .. type(rec_unopt))
+    assert(type(rec_opt) == 'table', 'Got type: ' .. type(rec_opt))
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
