@@ -46,12 +46,13 @@ end
 
 local ffi = require("ffi")
 
+local converter = ffi.new("union { double d; uint64_t i; }")
+
 -- Convert the bit pattern of a double stored
 -- as #x<hex> to an int64 #x<hex>.
 local function hex_double_to_i64_hex(hex_str)
     local clean_hex = hex_str:gsub("^#x", "")
     local hex_num = tonumber(clean_hex, 16)
-    local converter = ffi.new("union { double d; uint64_t i; }")
     converter.i = hex_num
     local double_val = converter.d
     local int64_val = ffi.cast("int64_t", double_val)
@@ -149,7 +150,7 @@ local function retrieve_str_op(op, ctx)
     if op:is_ssa() then
         return ctx.op_stack:load(op:get_ssa(), op_type.STR)
     elseif op:is_str() then
-        return '"' .. op:get_str() .. '"'
+        return arith_utils.const_str_to_smt_str(op:get_str())
     end
     utils.unreachable(
         'retrieve_str_op: unsupported op type: ' .. tostring(op and op.type)

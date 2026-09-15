@@ -18,10 +18,10 @@ local function i32_overflow_check(value)
     return overflow_check
 end
 
+local num_bits = ffi.new("union { double d; uint64_t i; }")
 local function const_num_to_smt_bv(num_value)
-    local u = ffi.new("union { double d; uint64_t i; }")
-    u.d = num_value
-    return string.format("#x%s", bit.tohex(u.i, 16))
+    num_bits.d = num_value
+    return string.format("#x%s", bit.tohex(num_bits.i, 16))
 end
 
 local function const_num_to_smt_fp(num_value)
@@ -35,26 +35,35 @@ end
 local function memcell_to_str(memcell)
     return ("(get-str %s)"):format(memcell)
 end
+local function escape_smt_str(str)
+    return (str
+        :gsub('\\', '\\u{5c}')
+        :gsub('"', '""')
+        :gsub('%c', function(c)
+            return ('\\u{%x}'):format(c:byte())
+        end))
+end
+
 local function const_str_to_memcell(num_value)
-    return ('(str-val "%s")'):format(num_value)
+    return ('(str-val "%s")'):format(escape_smt_str(num_value))
 end
 
 local function const_str_to_smt_str(str)
-    return ('"%s"'):format(str)
+    return ('"%s"'):format(escape_smt_str(str))
 end
 
 local function const_int_to_smt_bv(int_value)
     return string.format("#x%016X", int_value)
 end
 
+local i64_bits = ffi.new("union { int64_t i; uint64_t u; }")
 local function const_i64_to_smt_bv(int_value)
-    local u = ffi.new("union { int64_t i; uint64_t u; }")
-    u.i = int_value
+    i64_bits.i = int_value
 
     -- Convert uint64_t cdata to hex string without
     -- using string.format on cdata.
-    local lo = tonumber(ffi.cast("uint32_t", bit.band(u.u, 0xFFFFFFFF)))
-    local hi = tonumber(ffi.cast("uint32_t", bit.rshift(u.u, 32)))
+    local lo = tonumber(ffi.cast("uint32_t", bit.band(i64_bits.u, 0xFFFFFFFF)))
+    local hi = tonumber(ffi.cast("uint32_t", bit.rshift(i64_bits.u, 32)))
 
     return string.format("#x%08X%08X", hi, lo)
 end
@@ -199,14 +208,14 @@ local function fp_to_bits(fp, width)
         ('(assert (= %s (%s (%s %s))))'):format(fp, kind.sort, kind.fn, fp)
 end
 
--- LuaJIT treats -0.0 and +0.0 as the same table key.
--- Accepts a MemCell and returns a MemCell: for int-val keys,
--- normalizes -0.0 to +0.0; str-val keys pass through unchanged.
 local function normalize_table_key(memcell)
-    return ('(ite ((_ is fp-val) %s)' ..
+    return ('(ite ((_ is int-val) %s)' ..
+            ' (fp-val ((_ to_fp 11 53) RNE (get-bv %s)))' ..
+            ' (ite ((_ is fp-val) %s)' ..
             ' (ite (fp.isZero (get-fp %s))' ..
-            ' (fp-val ((_ to_fp 11 53) #x0000000000000000)) %s) %s)'):format(
-               memcell, memcell, memcell, memcell
+            ' (fp-val ((_ to_fp 11 53) #x0000000000000000))' ..
+            ' %s) %s))'):format(
+               memcell, memcell, memcell, memcell, memcell, memcell
             )
 end
 
@@ -216,6 +225,7 @@ return {
     const_num_to_smt_fp = const_num_to_smt_fp,
     const_num_to_memcell = const_num_to_memcell,
     const_str_to_memcell = const_str_to_memcell,
+    escape_smt_str = escape_smt_str,
     const_str_to_smt_str = const_str_to_smt_str,
     const_i64_to_memcell = const_i64_to_memcell,
     const_int_to_smt_bv = const_int_to_smt_bv,

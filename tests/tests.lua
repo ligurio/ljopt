@@ -72,7 +72,7 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(11)
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -391,6 +391,87 @@ foo(1.5)
             {type = "int", name = "BROL"},
         },
 ]]
+    }}
+    test:plan(3 * #srcs)
+
+    for i, f in ipairs(srcs) do
+        local label = f.name or ("test_%d"):format(i)
+        local ok, err = check_ins_present(f.code, f.ins, f.opt)
+        test:ok(ok, ("%s instructions present: %s"):format(
+            label, err or "ok"
+        ))
+        local formulas = ljopt.ir.traces_to_smt(f.code)
+        for j, formula in pairs(formulas) do
+            formula = smt_constants.LJOPT_SMTLIB .. formula
+            test:is(smt:parse(formula), true,
+                ("%s trace %s parse."):format(label, j))
+            test:is(smt:check(formula), smt.result.UNSAT,
+                ("%s trace %s check."):format(label, j))
+        end
+    end
+end)
+
+
+test:test("SMT encoding regressions", function(test)
+    local srcs = { {
+        name = "int shift count is masked and BSHR is logical",
+        code = [[
+local rshift = bit.rshift
+local function f(x)
+  return rshift(x, 33), rshift(-8, 1)
+end
+f(7)
+f(7)
+f(7)
+]],
+        ins = {
+            {type = "int", name = "BSHR"},
+        },
+    }, {
+        name = "MIN/MAX keep the fold's sign of zero",
+        code = [[
+local min, max = math.min, math.max
+local function f(x)
+  return min(-0.0, 0.0), max(-0.0, 0.0), x
+end
+f(1.5)
+f(1.5)
+f(1.5)
+]],
+        ins = {
+            {type = "num", name = "MIN"},
+            {type = "num", name = "MAX"},
+        },
+    }, {
+        name = "int MOD floors like Lua %",
+        code = [[
+local band = bit.band
+local function f(a)
+  return band(a, -1) % band(-2147483648, -1)
+end
+f(63)
+f(63)
+f(63)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "int", name = "MOD"},
+        },
+    }, {
+        name = "a folded string constant is escaped in the formula",
+        code = [[
+local function f(t)
+  return 'he said "hi"' .. t
+end
+f("de")
+f("de")
+f("de")
+]],
+        ins = {
+            {type = "p32", name = "BUFHDR"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
+        },
     }}
     test:plan(3 * #srcs)
 
@@ -1883,6 +1964,68 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XSTORE"},
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
+        },
+    }, {
+        name = "numeric EQ compares +0.0 and -0.0 equal",
+        code = [[
+local function f(x)
+  if 0.0 == -0.0 then
+    return x + 1
+  end
+  return x
+end
+f(1.5)
+f(1.5)
+f(1.5)
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+        },
+    }, {
+        name = "i64 BSHR is a logical shift",
+        code = [[
+local rshift = bit.rshift
+local function f(x)
+  return rshift(-8LL, 1), x
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "i64", name = "BSHR"},
+        },
+    }, {
+        name = "a 64-bit rotate takes its operand at 64-bit width",
+        code = [[
+local rol = bit.rol
+local acc = 0LL
+local function f(x)
+  acc = acc + rol(0x123456789abcdef0LL, x)
+  return acc
+end
+f(8)
+f(8)
+f(8)
+f(8)
+]],
+        ins = {
+            {type = "i64", name = "BROL"},
+        },
+    }, {
+        name = "a buffer put republishes the buffer pointer",
+        code = [[
+local function f(s, t)
+  return s:reverse() .. t
+end
+f("abc", "de")
+f("abc", "de")
+f("abc", "de")
+]],
+        ins = {
+            {type = "p32", name = "BUFHDR"},
+            {type = "p32", name = "BUFPUT"},
+            {type = "str", name = "BUFSTR"},
         },
     }}
     test:plan(3 * #srcs)

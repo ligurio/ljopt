@@ -35,7 +35,15 @@ function impls.IRNodeCALLLP32:to_smt_lib(ctx)
         end
 
         local res = ('(str.++ %s %s)'):format(prev, reversed)
-        return ctx.mem_stack:store_index(idx, slot_id, res, op_type.STR)
+        local ssa_ref = self:get_ssa_reference()
+        local buf_const = ctx.const_strs[buf:get_ssa()]
+        if buf_const ~= nil and known ~= nil then
+            ctx.const_strs[ssa_ref] = buf_const .. known:reverse()
+        end
+        return ('%s\n%s'):format(
+            ctx.mem_stack:store_index(idx, slot_id, res, op_type.STR),
+            ctx.op_stack:store(ssa_ref, op_type.TAB, idx)
+        )
     end
 
     error('CALLL: unsupported function ' .. tostring(name:get_lit()))
