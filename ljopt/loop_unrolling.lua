@@ -384,16 +384,27 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                 end
                 local snap_remap = {}
                 for k, v in pairs(remap) do snap_remap[k] = v end
+                local slot_refs = {}
+                for _, slot_entry in ipairs(snap.slots or {}) do
+                    local v = slot_entry[2]
+                    if v ~= nil and v.type == 'ssa' then
+                        slot_refs[v.value] = true
+                    end
+                end
                 for body_ref, prologue_ref in pairs(phi_map) do
                     local target = remap[prologue_ref] or prologue_ref
                     if body_pos[body_ref] ~= nil
                         and body_pos[body_ref] <= snap_pos then
                         target = remap[body_ref] or target
+                    elseif body_pos[body_ref] == nil then
+                        target = remap[body_ref] or body_ref
                     end
                     snap_remap[prologue_ref] = target
                     for _, src in ipairs(preloop_sources(
                             raw_nodes, prologue_ref, loop_idx)) do
-                        snap_remap[src] = target
+                        if src == prologue_ref or not slot_refs[src] then
+                            snap_remap[src] = target
+                        end
                     end
                 end
                 local uid = snap_id + iter * SNAPSHOT_INC
