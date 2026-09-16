@@ -308,7 +308,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     -- snapshot can tell what the copy had already recomputed.
     local body_pos = {}
     for j, bnode in ipairs(body) do
-        body_pos[bnode.num] = body_orig_pos[j]
+        body_pos[bnode.num] = body_orig_num[j]
     end
 
     local n = ljopt_config.get_loop_unroll_limit()
