@@ -416,7 +416,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
 
         prev_phi_remap = {}
         for body_ref, prologue_ref in pairs(phi_map) do
-            prev_phi_remap[prologue_ref] = remap[body_ref]
+            prev_phi_remap[prologue_ref] = remap[body_ref] or body_ref
         end
     end
 
