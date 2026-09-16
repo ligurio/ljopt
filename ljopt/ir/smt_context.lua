@@ -464,9 +464,17 @@ function MemoryStack.allocate_local(self, ssa_ref)
     local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
     table.insert(self.local_tabs, name)
     self.local_by_ssa[ssa_ref] = name
+    -- zero_pointer is unconstrained, not all-nil, so being fresh
+    -- does not by itself say the metatable field is empty -- and
+    -- the recorder guards exactly that in front of a fresh
+    -- table, while the optimizer knows it and drops the guard.
     return name, ('(declare-const %s Int)\n'):format(name) ..
-        ('(assert (= (select (select %s %s) %s) zero_pointer))'):format(
+        ('(assert (= (select (select %s %s) %s) zero_pointer))\n'):format(
             self._name, self:get_version(), name
+        ) ..
+        ('(assert (= (select (select (select %s %s) %s) %s) nil-val))'):format(
+            self._name, self:get_version(), name,
+            ('(str-val "%stab.meta")'):format(smt_constants.FIELD_TAB_PREFIX)
         )
 end
 
@@ -561,8 +569,15 @@ function MemoryStack.allocate(self, inherited_from)
     end
     local slot_num
     current_slot, slot_num = self:alloc_slot()
-    local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
-        :format(self._name, current_slot)
+    -- The table is fresh *now*, not at version 0: a TNEW that
+    -- follows a store must be empty in the version the trace has
+    -- reached. Pinning version 0 instead both leaves the store
+    -- that follows reading whatever the earlier chain held at
+    -- this key, and constrains the shared base memory the other
+    -- pass is tied to -- two allocations claiming the same key at
+    -- version 0 make the whole query vacuously unsat.
+    local result = ('\n(assert (= (select (select %s %s) %s) zero_pointer))')
+        :format(self._name, self:get_version(), current_slot)
     return current_slot, result, slot_num
 end
 
@@ -646,6 +661,12 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -668,6 +689,12 @@ end
 function SMTContext:restart()
     self.const_nums = {}
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}

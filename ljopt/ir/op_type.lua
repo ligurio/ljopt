@@ -141,6 +141,11 @@ function OpType.from_raw(raw, txt)
     if op ~= nil and txt ~= nil and txt ~= '' then
         op.txt = txt
     end
+    -- A table constant carries the sizes of the parts a TDUP
+    -- copies; the value alone does not say what they are.
+    if op ~= nil and raw ~= nil and raw.asize ~= nil then
+        op.asize, op.hmask = raw.asize, raw.hmask
+    end
     return op
 end
 

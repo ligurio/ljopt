@@ -23,19 +23,16 @@ local ir_node_SLOAD = require('ljopt.ir.SLOAD')
 local ir_node_SUB = require('ljopt.ir.SUB')
 local ir_node_ULE = require('ljopt.ir.ULE')
 
+-- Only opcodes that reach construct_nodes() belong here.
+-- Deliberately absent, because they never arrive as nodes:
+--   * K* constants live at negative IR refs and reach a handler
+--     as *operands* (see op_type.from_raw).
+--   * FPM_* are op2 literals of FPMATH, not opcodes.
+--   * SNAP is a parallel stream translated by ir/SNAP.lua.
+--   * LOOP, PHI and RENAME are consumed by loop_unrolling before
+--     nodes are built; BASE, USE and OP carry no semantics.
 local opcodes_table = {
-    -- Constants.
-    ['KPRI'] = false,
-    ['KINT'] = false,
-    ['KGC'] = false,
-    ['KPTR'] = false,
-    ['KKPTR'] = false,
-    ['KNULL'] = false,
-    ['KNUM'] = false,
-    ['KINT64'] = false,
-    ['KSLOT'] = false,
     -- Guarded Assertions.
-    ['OP'] = false,
     ['LT'] = require('ljopt.ir.LT'),
     ['GE'] = require('ljopt.ir.GE'),
     ['LE'] = ir_node_LE,
@@ -46,8 +43,8 @@ local opcodes_table = {
     ['UGT'] = require('ljopt.ir.UGT'),
     ['EQ'] = ir_node_EQ,
     ['NE'] = ir_node_NE,
-    ['ABC'] = false,
-    ['RETF'] = false,
+    ['ABC'] = require('ljopt.ir.ABC'),
+    ['RETF'] = require('ljopt.ir.RETF'),
     -- Bit Ops.
     ['BNOT'] = require('ljopt.ir.BNOT'),
     ['BSWAP'] = require('ljopt.ir.BSWAP'),
@@ -79,45 +76,33 @@ local opcodes_table = {
     ['ADDOV'] = require('ljopt.ir.ADDOV'),
     ['SUBOV'] = require('ljopt.ir.SUBOV'),
     ['MULOV'] = require('ljopt.ir.MULOV'),
-    ['FPM_FLOOR'] = false,
-    ['FPM_CEIL'] = false,
-    ['FPM_TRUNC'] = false,
-    ['FPM_SQRT'] = false,
-    ['FPM_EXP'] = false,
-    ['FPM_EXP2'] = false,
-    ['FPM_LOG'] = false,
-    ['FPM_LOG2'] = false,
-    ['FPM_LOG10'] = false,
-    ['FPM_SIN'] = false,
-    ['FPM_COS'] = false,
-    ['FPM_TAN'] = false,
     -- Memory References.
     ['AREF'] = require('ljopt.ir.AREF'),
     ['HREFK'] = require('ljopt.ir.HREFK'),
     ['HREF'] = require('ljopt.ir.HREF'),
     ['NEWREF'] = require('ljopt.ir.NEWREF'),
-    ['UREFO'] = false,
-    ['UREFC'] = false,
-    ['FREF'] = false,
-    ['STRREF'] = false,
+    ['UREFO'] = require('ljopt.ir.UREF'),
+    ['UREFC'] = require('ljopt.ir.UREF'),
+    ['FREF'] = require('ljopt.ir.FREF'),
+    ['STRREF'] = require('ljopt.ir.STRREF'),
     -- Loads and Stores.
     ['ALOAD'] = require('ljopt.ir.ALOAD'),
     ['HLOAD'] = require('ljopt.ir.HLOAD'),
-    ['ULOAD'] = false,
+    ['ULOAD'] = require('ljopt.ir.ULOAD'),
     ['FLOAD'] = ir_node_FLOAD,
     ['XLOAD'] = require('ljopt.ir.XLOAD'),
     ['SLOAD'] = ir_node_SLOAD,
-    ['VLOAD'] = false,
+    ['VLOAD'] = require('ljopt.ir.VLOAD'),
     ['ASTORE'] = require('ljopt.ir.ASTORE'),
     ['HSTORE'] = require('ljopt.ir.HSTORE'),
-    ['USTORE'] = false,
+    ['USTORE'] = require('ljopt.ir.USTORE'),
     ['FSTORE'] = require('ljopt.ir.FSTORE'),
     ['XSTORE'] = require('ljopt.ir.XSTORE'),
     -- Allocations.
-    ['SNEW'] = false,
-    ['XSNEW'] = false,
+    ['SNEW'] = require('ljopt.ir.SNEW'),
+    ['XSNEW'] = require('ljopt.ir.SNEW'),
     ['TNEW'] = require('ljopt.ir.TNEW'),
-    ['TDUP'] = false,
+    ['TDUP'] = require('ljopt.ir.TDUP'),
     ['CNEW'] = require('ljopt.ir.CNEW'),
     ['CNEWI'] = require('ljopt.ir.CNEWI'),
     -- Strings.
@@ -125,9 +110,9 @@ local opcodes_table = {
     ['BUFPUT'] = require('ljopt.ir.BUFPUT'),
     ['BUFSTR'] = require('ljopt.ir.BUFSTR'),
     -- Barriers.
-    ['TBAR'] = false,
-    ['OBAR'] = false,
-    ['XBAR'] = false,
+    ['TBAR'] = require('ljopt.ir.TBAR'),
+    ['OBAR'] = require('ljopt.ir.TBAR'),
+    ['XBAR'] = require('ljopt.ir.TBAR'),
     -- Type Conversions.
     ['CONV'] = ir_node_CONV,
     ['TOBIT'] = require('ljopt.ir.TOBIT'),
@@ -136,21 +121,19 @@ local opcodes_table = {
     -- Calls.
     ['CALLN'] = require('ljopt.ir.CALLN'),
     ['CALLL'] = require('ljopt.ir.CALLL'),
-    ['CALLS'] = false,
+    ['CALLS'] = require('ljopt.ir.CALLS'),
     ['CALLXS'] = require('ljopt.ir.CALLXS'),
     -- CARG is indeed dummy node. Pass arguments in CALLL.
     ['CARG'] = require('ljopt.ir.ir_node_dummy'),
     -- Miscellaneous Ops.
-    ['SNAP'] = false,
     ['NOP'] = ir_node_NOP,
-    ['BASE'] = false,
-    ['PVAL'] = false,
-    ['GCSTEP'] = false,
-    ['HIOP'] = false,
-    ['LOOP'] = false,
-    ['USE'] = false,
-    ['PHI'] = false,
-    ['RENAME'] = false,
+    -- Parent-trace value forwarding: side traces only, and
+    -- ir_dump_utils disables those, so it cannot arrive.
+    ['PVAL'] = require('ljopt.ir.unreachable'),
+    ['GCSTEP'] = require('ljopt.ir.TBAR'),
+    -- The high word of a split 64-bit operation on 32-bit or
+    -- soft-float builds. Never emitted on x64 hard-float.
+    ['HIOP'] = require('ljopt.ir.unreachable'),
 }
 
 local function get_all_count()
