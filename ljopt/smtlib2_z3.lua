@@ -1,6 +1,6 @@
 -- Requires installed z3 package.
 -- Usage:
--- local smt = require("smtlib2").new()
+-- local smt = require("ljopt.smtlib2").new()
 -- assert(smt:parse("(declare-const p0 Bool)") == true)
 -- assert(smt:check("(declare-const p0 Bool)") == 1)
 -- smt = nil
@@ -167,7 +167,7 @@ end
 
 local function new()
     local z3_version = get_z3_version()
-    print("Z3 version: ", z3_version.version_string)
+    print(("SMT backend: Z3 %s"):format(z3_version.version_string))
     local Z3_MIN_MAJOR = 4
     local Z3_MIN_MINOR = 15
     if version_lt(get_z3_version(), {

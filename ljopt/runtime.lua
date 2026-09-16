@@ -17,10 +17,15 @@ local function capture(f, ...)
     return ok, res, table.concat(result, '\n')
 end
 
-local function record_sandboxed(lua_code, opt, is_debug_mode)
+local function record_sandboxed(lua_code, opt, is_debug_mode, chunkname)
     -- Disable coverage to not interfere with recorded traces.
     toggle_debug_hook()
-    local fn, err = loadstring(lua_code)
+    local fn, err
+    if chunkname ~= nil then
+        fn, err = loadstring(lua_code, chunkname)
+    else
+        fn, err = loadstring(lua_code)
+    end
     if fn == nil then
         error(('cannot load Lua code: %s'):format(err))
     end
