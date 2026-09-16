@@ -18,3 +18,24 @@ jobs:
 
       - name: Run luacheck
         uses: lunarmodules/luacheck@v1
+
+  commit-subject-length:
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit subject length
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || 'origin/devel' }}
+          LC_ALL: C.UTF-8
+        run: |
+          ! git log --no-merges --format=%s "$BASE..HEAD" |
+            grep -vE '^(fixup|squash|amend)! ' | grep -E '^.{50,}'
