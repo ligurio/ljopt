@@ -321,30 +321,15 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     return smt_result
 end
 
--- Runs Lua code twice with different level of optimizations
--- and translates obtained JIT traces to SMT-LIB formulas.
---
--- What's matter in formulas is the snapshot-related part,
--- it looks like
---
--- assert(not (snap1 = snap2))
---
--- Without snapshot related part formula is always SAT -
--- it's just a set of constraints stating valid states
--- of program during execution (and since execution
--- happened there's always at least one valid state).
---
--- When we add Snapshot comparison part this formula
--- becomes UNSAT, unless solver can find an input
--- where snap1 != snap2, which means these 2 traces
--- are not equivalent.
-local function traces_to_smt(lua_code)
-    local rec_unopt, rec_opt = runtime.record_both(
-        lua_code, lj_unoptimized, lj_optimized, ljopt_config.is_debug_mode()
-    )
-    assert(type(rec_unopt) == 'table', 'Got type: ' .. type(rec_unopt))
-    assert(type(rec_opt) == 'table', 'Got type: ' .. type(rec_opt))
-
+-- Given two already-built trace_record maps (traceno ->
+-- trace_record, each with .trace and optional .snapshots),
+-- emit the per-trace equivalence SMT (unopt + opt
+-- translation plus the snapshot comparison disjunct). Shared
+-- by the recorded path (traces_to_smt) and any client that
+-- constructs trace_records directly, e.g. the IR fuzzer -- so
+-- equivalence is always computed one way, through the
+-- snapshot oracle.
+local function compare_trace_records(rec_unopt, rec_opt)
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
             format(table.getn(rec_unopt), table.getn(rec_opt)))
@@ -410,6 +395,32 @@ local function traces_to_smt(lua_code)
     return traces_smtlib
 end
 
+-- Runs Lua code twice with different level of optimizations
+-- and translates obtained JIT traces to SMT-LIB formulas.
+--
+-- What's matter in formulas is the snapshot-related part,
+-- it looks like
+--
+-- assert(not (snap1 = snap2))
+--
+-- Without snapshot related part formula is always SAT -
+-- it's just a set of constraints stating valid states
+-- of program during execution (and since execution
+-- happened there's always at least one valid state).
+--
+-- When we add Snapshot comparison part this formula
+-- becomes UNSAT, unless solver can find an input
+-- where snap1 != snap2, which means these 2 traces
+-- are not equivalent.
+local function traces_to_smt(lua_code)
+    local rec_unopt, rec_opt = runtime.record_both(
+        lua_code, lj_unoptimized, lj_optimized, ljopt_config.is_debug_mode()
+    )
+    assert(type(rec_unopt) == 'table', 'Got type: ' .. type(rec_unopt))
+    assert(type(rec_opt) == 'table', 'Got type: ' .. type(rec_opt))
+    return compare_trace_records(rec_unopt, rec_opt)
+end
+
 
 -- Generates SMT formula that should be UNSAT (if optimizations
 -- are correct).
@@ -442,5 +453,6 @@ return {
     translate_to_smt = translate_to_smt,
     translate = translate,
     traces_to_smt = traces_to_smt,
+    compare_trace_records = compare_trace_records,
     construct_nodes = construct_nodes,
 }
