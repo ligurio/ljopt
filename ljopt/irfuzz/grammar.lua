@@ -82,6 +82,17 @@ sig("ADDOV SUBOV MULOV", {
 
 sig("TOBIT", { types = { T.INT }, op1 = ref({ T.NUM }), op2 = none() })
 
+-- A trace may read a stack slot anywhere, not only at entry: the
+-- recorder emits an SLOAD the first time a slot is touched, which
+-- can be well into the trace. Each one takes a slot of its own --
+-- two reads of the same slot at the same type are the same
+-- instruction after CSE, and at different types they contradict.
+local SLOAD_TYPECHECK = 4
+sig("SLOAD", {
+    types = { T.NUM, T.INT }, root = true,
+    op1 = { kind = "slot" }, op2 = lit({ SLOAD_TYPECHECK }),
+})
+
 -- CONV is what makes the wider types reachable at all: without it
 -- nothing ever produces an i64, so every i64 signature below is
 -- dead. Mode = (dst<<IRCONV_DSH)|src, plus IRCONV_SEXT for a
@@ -288,8 +299,19 @@ sig("ULT UGE ULE UGT", {
 
 
 -- The one-argument math calls ljopt models (CALLN.lua's
--- supported_math_fns), by their jit.vmdef.ircall index.
-local MATH_CALLS = { 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 53 }
+-- supported_math_fns), by their jit.vmdef.ircall index. That
+-- table is 0-based -- ircall[0] is lj_str_cmp -- so walking it
+-- with ipairs and subtracting one names the neighbour of every
+-- function meant here, which emits calls ljopt does not model and
+-- gaps out whatever reads them.
+--   36 log10  37 exp  38 sin  39 cos   40 tan  41 asin
+--   42 acos   43 atan 44 sinh 45 cosh  46 tanh 54 log
+local MATH_CALLS = { 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 54 }
+
+-- atan2 takes both arguments through a CARG pair, which is the
+-- only way a CARG reaches a trace here: the other CARG users are
+-- the buffer calls, and their BUFSTR is unmodelled.
+local IRCALL_ATAN2 = 57
 
 -- op1 has to be a reference. ljopt models these as uninterpreted
 -- SMT functions, and LJFOLD(CALLN KNUM any) constant-folds a call
@@ -309,6 +331,13 @@ sig("CALLN", {
     op1 = ref({ T.NUM }), op2 = lit(MATH_CALLS),
 })
 
+-- A CARG is the argument pair itself: no value, and the call that
+-- consumes it is emitted with it so it cannot be left dangling.
+sig("CARG", {
+    types = { T.NIL }, novalue = true, carg = true,
+    op1 = ref({ T.NUM }), op2 = ref({ T.NUM }),
+})
+
 local missing = {}
 for _, name in ipairs(opcode_class.emit) do
     if SIG[name] == nil then missing[#missing + 1] = name end
@@ -324,6 +353,7 @@ return {
     K = K,
     GUARD = GUARD,
     IRFL_TAB_ARRAY = IRFL_TAB_ARRAY,
+    IRCALL_ATAN2 = IRCALL_ATAN2,
     ARR_IDXS = ARR_IDXS,
     UREF_UVS = UREF_UVS,
     HASH_KEYS = HASH_KEYS,

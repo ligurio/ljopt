@@ -8,7 +8,7 @@ local EMIT = {
     'NEWREF', 'UREFO', 'UREFC', 'FREF', 'ALOAD', 'HLOAD', 'ULOAD',
     'FLOAD', 'XLOAD', 'SLOAD', 'ASTORE', 'HSTORE', 'USTORE', 'FSTORE',
     'XSTORE', 'TNEW', 'TBAR',
-    'CONV', 'TOBIT', 'CALLN', 'CALLL', 'CARG',
+    'CONV', 'TOBIT', 'CALLN', 'CARG',
 }
 
 -- LuaJIT emits these, but ljopt cannot model them soundly yet, so
@@ -22,12 +22,17 @@ local EMIT = {
 --                     disagrees with fload_str_len_snew, 6 of 45
 --                     traces come back SAT on that alone
 --   BUFHDR, BUFPUT,
---   BUFSTR            enum.lua iter_bufcalls leaves the BUFSTR a gap
+--   BUFSTR, CALLL     enum.lua iter_bufcalls leaves the BUFSTR a gap.
+--                     CALLL belongs here too: the one call ljopt
+--                     models for it, lj_buf_putstr_reverse, only
+--                     appears in that chain, and a trace built
+--                     around it comes back skipped -- the result
+--                     is a gap, so nothing it computed is checked
 --   CNEW              cdata.ctypeid differs across the two levels
 --                     (129 vs 317), the gap that blocks lj_1244
 local UNMODELLED = {
     'MOD', 'POW', 'SNEW', 'STRREF', 'TOSTR', 'BUFHDR', 'BUFPUT', 'BUFSTR',
-    'CNEW',
+    'CNEW', 'CALLL',
 }
 
 local CONST = {

@@ -23,6 +23,18 @@ local INPUT_TYPES = { T.NUM, T.INT }
 -- ALIAS_NO.
 local XMEM_OFFSETS = { 0, 1, 2, 4, 8 }
 
+local roots_of
+
+-- The signatures a loop body may use: arithmetic on values that a
+-- stack slot can hold, and the compares over them.
+local VALUE_ONLY = {}
+for _, n in ipairs({
+    "ADD", "SUB", "MUL", "DIV", "MIN", "MAX", "NEG", "ABS", "LDEXP",
+    "FPMATH", "BAND", "BOR", "BXOR", "BNOT", "BSWAP", "BSHL", "BSHR",
+    "BSAR", "BROL", "BROR", "ADDOV", "SUBOV", "MULOV", "TOBIT", "CONV",
+    "LT", "GE", "LE", "GT", "EQ", "NE", "CALLN",
+}) do VALUE_ONLY[n] = true end
+
 local function rng_new(seed)
     local state = (seed * 2654435761) % 2 ^ 32
     return function(n)
@@ -39,7 +51,14 @@ local function gen(seed, opts)
     local ninputs = opts.inputs or 3
     local nbody = opts.insns or 12
     local no_guards = opts.guards == false
-    local tables = opts.tables ~= false
+    -- A loop replay writes output k back into slot k for every
+    -- slot up to the highest SLOAD, so the table, function and
+    -- cdata roots would join the loop's carried state. No recorded
+    -- loop carries those, and gen.lua's loop traces never produce
+    -- them because they only SLOAD num and int -- its loop sweep
+    -- is clean where this one was not. Keeping them left the two
+    -- sides disagreeing over slots that hold no comparable value.
+    local tables = opts.tables ~= false and not opts.loop
 
     local insns = {}
     local pool = {}
@@ -180,6 +199,10 @@ local function gen(seed, opts)
     -- rule emits -- so a structural audit checks the body only.
     local nprologue = #insns
 
+    -- Slots the prologue already claimed; a body SLOAD takes the
+    -- next free one so it never collides or gets CSE'd away.
+    local next_slot = ninputs + (tables and 3 or 0)
+
     -- Resolve one operand spec at instruction type `t`. Returns
     -- kind, value -- or nil when the current pools cannot satisfy
     -- it, which is what makes an opcode unavailable this round.
@@ -190,6 +213,10 @@ local function gen(seed, opts)
         if kind == "kint" then return K.KINT, spec.pool[rand(#spec.pool)] end
         if kind == "knum" then return K.KNUM, spec.pool[rand(#spec.pool)] end
         if kind == "field" then return K.LIT, field end
+        if kind == "slot" then
+            next_slot = next_slot + 1
+            return K.LIT, next_slot
+        end
 
         local types
         if kind == "same" or kind == "same_value" then
@@ -230,7 +257,7 @@ local function gen(seed, opts)
     local function satisfiable(spec, t, types_override)
         if spec.kind == "none" or spec.kind == "lit"
             or spec.kind == "kint" or spec.kind == "knum"
-            or spec.kind == "field" then
+            or spec.kind == "field" or spec.kind == "slot" then
             return true
         end
         if spec.kind == "same_value" or spec.kind == "value" then
@@ -248,6 +275,13 @@ local function gen(seed, opts)
         for _, name in ipairs(grammar.covered) do
             local spec = grammar.sig[name]
             local usable = not (spec.guard and no_guards)
+            -- Loop mode carries values in stack slots, so it stays
+            -- on the value types. Dropping the table, upvalue and
+            -- cdata roots is not enough on its own: TNEW allocates
+            -- a table inside the body, and HREF and its store
+            -- follow it straight back in -- which crashed the
+            -- unroller on seed 51786.
+            if opts.loop and not VALUE_ONLY[name] then usable = false end
             for _, t in ipairs(usable and spec.types or {}) do
                 if spec.conv then
                     if #conv_variants(spec, t) > 0 then
@@ -319,6 +353,18 @@ local function gen(seed, opts)
                 push(c.t, idx)
             end
 
+            -- A CARG is only meaningful as a call's argument
+            -- pair, so the two-argument call that reads it is
+            -- emitted in the same step. LJFOLD(CALLN CARG
+            -- IRCALL_atan2) folds when both arguments are
+            -- constants, and both are refs here.
+            if spec.carg then
+                push(c.t == T.NIL and T.NUM or c.t,
+                    emit("CALLN", T.NUM, K.REF, idx,
+                        K.LIT, grammar.IRCALL_ATAN2))
+                hits["CALLN:" .. T.NUM] = (hits["CALLN:" .. T.NUM] or 0) + 1
+            end
+
             -- Some refs are guards whose result type the snapshot
             -- cannot carry, so nothing downstream keeps them
             -- alive. Emit the consumer here rather than hoping the
@@ -342,6 +388,21 @@ local function gen(seed, opts)
         end
     end
 
+    -- A loop replay writes output k back into the slot SLOAD k
+    -- reads, so a value is only carried when some output has that
+    -- slot's type. Without a top-up the body often leaves one of
+    -- the input types with nothing live -- 5 of 12 seeds formed no
+    -- PHI at all -- and those traces are checked as straight-line
+    -- while the run is reported as covering loops.
+    if opts.loop then
+        for slot = 1, ninputs do
+            local t = insns[slot].t % GUARD
+            local c = CONST_POOL[t]
+            push(t, emit("ADD", t, K.REF, slot,
+                c.kind, c.pool[rand(#c.pool)]))
+        end
+    end
+
     return insns, hits, nprologue
 end
 
@@ -351,7 +412,7 @@ end
 -- get-fp, so an i64 slot -- which no recorder ever writes -- is
 -- compared as a float and reads as a miscompile. i64 still
 -- appears inside a trace; it just cannot be an output.
-local function roots(insns)
+function roots_of(insns)
     local consumed = {}
     for _, ins in ipairs(insns) do
         if ins.ak == K.REF then consumed[ins.av] = true end
@@ -386,5 +447,5 @@ end
 
 return {
     gen = gen,
-    roots = roots,
+    roots = roots_of,
 }
