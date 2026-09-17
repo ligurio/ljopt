@@ -1,5 +1,3 @@
-local ffi = require('ffi')
-
 local ir_node = require('ljopt.ir.ir_node_base')
 
 local utils = require('ljopt.utils')
@@ -22,34 +20,18 @@ function impls.IRNodeFLOADNum:to_smt_lib(ctx)
     -- TODO: Support other fields.
     -- TODO: cdata.type can have different IR type?
     if left_op_str == 'nil' then
-        -- Predefined constants.
-        -- Offset may be different depending on platform.
-        -- on x86-64 it's correct.
-        -- Apparently whether they differ depends only
-        -- on value of LUAJIT_ENABLE_GC64.
-        -- Note: That's all constants we need. Other
-        -- constants appear only in asm.
-        if ffi.abi('gc64') then
-            if right_op_str == '#306' then
-                data = '((_ to_fp 11 53) #x8000000000000000)'
-            elseif right_op_str == '#302' then
-                data = '((_ to_fp 11 53) #x7fffffffffffffff)'
-            else
-                assert(false,
-                    'Unreachable. Other constants should not be here.'
-                )
-            end
-        else
-            if right_op_str == '#226' then
-                data = '((_ to_fp 11 53) #x8000000000000000)'
-            elseif right_op_str == '#222' then
-                data = '((_ to_fp 11 53) #x7fffffffffffffff)'
-            else
-                assert(false,
-                    'Unreachable. Other constants should not be here.'
-                )
-            end
+        -- Predefined GG_State FP masks of num ABS/NEG, loaded as
+        -- `num FLOAD nil #<offset>`. The offset depends on the
+        -- LuaJIT build/layout, so the value is resolved per trace
+        -- from the ABS/NEG consumer (derive_nil_fload_masks).
+        local mask = ctx.nil_fload_masks and
+            ctx.nil_fload_masks[right_op_str]
+        if mask == nil then
+            -- Dead: the mask is never read by a modelled op
+            -- (num ABS/NEG are encoded semantically).
+            mask = '((_ to_fp 11 53) #x0000000000000000)'
         end
+        data = mask
     elseif right_op_str == 'cdata.int64' then
         data = ir_node.retrieve_i64_op(left_op, ctx, self:get_type())
     end
