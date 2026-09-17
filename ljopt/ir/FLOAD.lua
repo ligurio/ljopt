@@ -97,9 +97,17 @@ function impls.IRNodeFLOADInt:to_smt_lib(ctx)
         -- The table id is a term, not a slot number: memory is
         -- addressed by it directly.
         local tab_left = ctx.op_stack:load(left_op:get_ssa(), op_type.TAB)
-        data = ctx.mem_stack:load_index(
+        -- Canonicalize to a sign-extended int32, the way every
+        -- int-producing op does. The memory cell is a 64-bit
+        -- bitvector, so without this the upper half is
+        -- unconstrained while the same value routed through any
+        -- int operation is not. A fold that removes such an
+        -- operation -- `BROR x, 0` folding to x -- then leaves the
+        -- two sides comparing a canonical value against a raw one,
+        -- and an overflow check on it disagrees.
+        data = arith_utils.wrap_i32(ctx.mem_stack:load_index(
             tab_left, field_hash, op_type.INT
-        )
+        ))
         -- Propagate constant table metadata for const-folding.
         if ct ~= nil then
             if right_op == 'tab.asize' and ct.asize ~= nil then
