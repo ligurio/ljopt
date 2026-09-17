@@ -18,9 +18,10 @@ local CONST_POOL = {
 local INPUT_TYPES = { T.NUM, T.INT }
 
 -- Byte offsets from one FFI base. 0 aliases exactly, 1 and 2
--- partially overlap a wider access, 4 is disjoint for every width
--- XLOAD emits here.
-local XMEM_OFFSETS = { 0, 1, 2, 4 }
+-- partially overlap a wider access, and 4 and 8 are disjoint from
+-- a 4-byte access -- the gap aa_xref needs before it can answer
+-- ALIAS_NO.
+local XMEM_OFFSETS = { 0, 1, 2, 4, 8 }
 
 local function rng_new(seed)
     local state = (seed * 2654435761) % 2 ^ 32
@@ -152,15 +153,37 @@ local function gen(seed, opts)
 
         local cd = emit("SLOAD", T.CDATA, K.LIT, ninputs + 3,
             K.LIT, SLOAD_TYPECHECK)
-        for _, ofs in ipairs({ 0, XMEM_OFFSETS[rand(#XMEM_OFFSETS)] }) do
+        push(T.CDATA, cd)
+        -- Two different offsets, drawn independently. They must
+        -- differ, because two identical ADDs are one instruction
+        -- after CSE and two before it and the sides then carry a
+        -- different number of them; and they must be free to land
+        -- far apart, because aa_xref only reaches its
+        -- non-overlapping answer when the gap is at least the
+        -- access width. Taking adjacent pool entries satisfied the
+        -- first and broke the second: every pair was 1 or 2 bytes
+        -- apart, so no 4-byte access was ever disjoint and a fault
+        -- injected into that branch went unreported.
+        local i1 = rand(#XMEM_OFFSETS)
+        local i2 = rand(#XMEM_OFFSETS - 1)
+        if i2 >= i1 then i2 = i2 + 1 end
+        for _, ofs in ipairs({ XMEM_OFFSETS[i1], XMEM_OFFSETS[i2] }) do
             push(T.P64, emit("ADD", T.P64, K.REF, cd, K.KINT, 8 + ofs))
         end
     end
 
+    -- Everything emitted so far is prologue: SLOAD roots and the
+    -- hand-built chains below them (the i64 CONV, tab.array, the
+    -- AREF/HREF pairs, the upvalue refs, the FFI addresses). Those
+    -- are shapes the signature table does not describe -- an
+    -- address is `ADD p64 cdata, k`, which is not the ADD any body
+    -- rule emits -- so a structural audit checks the body only.
+    local nprologue = #insns
+
     -- Resolve one operand spec at instruction type `t`. Returns
     -- kind, value -- or nil when the current pools cannot satisfy
     -- it, which is what makes an opcode unavailable this round.
-    local function resolve(spec, t, allow_const, field)
+    local function resolve(spec, t, allow_const, field, types_override)
         local kind = spec.kind
         if kind == "none" then return K.NONE, 0 end
         if kind == "lit" then return K.LIT, spec.pool[rand(#spec.pool)] end
@@ -172,7 +195,7 @@ local function gen(seed, opts)
         if kind == "same" or kind == "same_value" then
             types = { t }
         else
-            types = spec.types
+            types = types_override or spec.types
         end
         local wants_const = allow_const
             and (kind == "same_value" or kind == "value")
@@ -204,7 +227,7 @@ local function gen(seed, opts)
         return out
     end
 
-    local function satisfiable(spec, t)
+    local function satisfiable(spec, t, types_override)
         if spec.kind == "none" or spec.kind == "lit"
             or spec.kind == "kint" or spec.kind == "knum"
             or spec.kind == "field" then
@@ -213,7 +236,8 @@ local function gen(seed, opts)
         if spec.kind == "same_value" or spec.kind == "value" then
             return true
         end
-        local types = (spec.kind == "same") and { t } or spec.types
+        local types = (spec.kind == "same") and { t }
+            or types_override or spec.types
         return #refs_of(types, spec.from) > 0
     end
 
@@ -229,7 +253,8 @@ local function gen(seed, opts)
                     if #conv_variants(spec, t) > 0 then
                         out[#out + 1] = { name = name, t = t }
                     end
-                elseif satisfiable(spec.op1, t)
+                elseif satisfiable(spec.op1, t,
+                        spec.op1_of and spec.op1_of[t])
                     and satisfiable(spec.op2, t) then
                     out[#out + 1] = { name = name, t = t }
                 end
@@ -265,7 +290,8 @@ local function gen(seed, opts)
             bk, bv = K.LIT, variant[1]
         else
             local field = spec.field_of and spec.field_of[c.t]
-            ak, av = resolve(spec.op1, c.t, false, field)
+            local o1t = spec.op1_of and spec.op1_of[c.t]
+            ak, av = resolve(spec.op1, c.t, false, field, o1t)
             bk, bv = resolve(spec.op2, c.t, true, field)
         end
         -- A guard comparing a ref with itself is recorder-
@@ -298,18 +324,25 @@ local function gen(seed, opts)
             -- alive. Emit the consumer here rather than hoping the
             -- pick supplies one.
             if spec.pair_with then
-                local con = grammar.sig[spec.pair_with]
-                local ct = con.types[rand(#con.types)]
-                local key = spec.pair_with .. ":" .. ct
-                push(ct, emit(spec.pair_with,
-                    con.guard and (ct + GUARD) or ct,
-                    K.REF, idx, K.NONE, 0))
+                local pw = spec.pair_with
+                local con = grammar.sig[pw.op]
+                local ct = pw.t
+                -- The consumer's own op2 still has to be resolved:
+                -- a ULOAD takes none, but an FLOAD needs the field
+                -- literal its result type selects, and emitting
+                -- NONE there reads as field 0, str.len -- a
+                -- string's length read off a table.
+                local cfield = con.field_of and con.field_of[ct]
+                local ck, cv = resolve(con.op2, ct, false, cfield)
+                local key = pw.op .. ":" .. ct
+                push(ct, emit(pw.op, con.guard and (ct + GUARD) or ct,
+                    K.REF, idx, ck, cv))
                 hits[key] = (hits[key] or 0) + 1
             end
         end
     end
 
-    return insns, hits
+    return insns, hits, nprologue
 end
 
 -- Values worth comparing. Only num and int, matching gen.lua's
@@ -333,7 +366,8 @@ local function roots(insns)
         -- the exit with it.
         local t = ins.t % GUARD
         local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
-        local valued = spec and not (spec.cmp or spec.novalue or spec.store)
+        local valued = spec and not (spec.cmp or spec.novalue or spec.store
+            or spec.opaque)
         -- An overflow op is compared whether or not anything reads
         -- it. Being consumed at generation time is not enough:
         -- folding can delete the consumer -- `x ^ x` collapsing to

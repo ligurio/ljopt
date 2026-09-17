@@ -10,7 +10,6 @@ local K = { NONE = 0, REF = 1, KINT = 2, KNUM = 3, LIT = 4, KINT64 = 5,
             KSTR = 6 }
 
 local INT_LIKE = { T.INT, T.I64 }
-local UINT_LIKE = { T.U32, T.U64 }
 local NUMERIC = { T.NUM, T.INT, T.I64 }
 
 local function ref(types) return { kind = "ref", types = types } end
@@ -40,10 +39,8 @@ sig("LT GE LE GT EQ NE", {
     types = NUMERIC, guard = true, cmp = true,
     op1 = same(), op2 = same_value(),
 })
--- ULT/UGE/ULE/UGT compare u32/u64 values, and nothing in this
--- tranche produces one: int<->u32 CONV is dead on x64, so a u32
--- only ever enters a trace through XLOAD of an unsigned C field.
--- They are signed off with the memory ops, not here.
+-- The unsigned compares live with the raw memory ops below:
+-- their operand can only come from an XLOAD.
 
 sig("ADD SUB MUL", { types = NUMERIC, op1 = same(), op2 = same_value() })
 sig("MIN MAX", { types = { T.NUM }, op1 = same(), op2 = same_value() })
@@ -70,8 +67,17 @@ sig("BSHL BSHR BSAR BROL BROR", {
     op2 = { kind = "kint", pool = SHIFT_COUNTS },
 })
 
+-- op2 is a non-zero constant. LJFOLD(ADDOV any KINT) and its SUBOV
+-- sibling return LEFTFOLD when that operand is 0, dropping the
+-- overflow check -- correctly, since `x - 0` cannot overflow --
+-- and the optimized trace then has one exit fewer than the
+-- unoptimized one, which the oracle reports as a miscompile. A
+-- reference is no safer: `x ^ x` folds to 0 and reaches the same
+-- rule, which is what seed 603 did at 12 instructions.
 sig("ADDOV SUBOV MULOV", {
-    types = { T.INT }, guard = true, op1 = same(), op2 = same_value(),
+    types = { T.INT }, guard = true, ovf = true,
+    op1 = same(),
+    op2 = { kind = "kint", pool = { 1, -1, 2, 7, -7, 0x7fffffff } },
 })
 
 sig("TOBIT", { types = { T.INT }, op1 = ref({ T.NUM }), op2 = none() })
@@ -128,10 +134,53 @@ local IRFL_TAB_ASIZE = 8
 -- p32 into the array part, tab.asize the int the bounds check
 -- reads. One opcode, so the choice rides on the type rather than
 -- on a separate signature.
+local IRFL_CDATA_INT64 = 17
+
 sig("FLOAD", {
-    types = { T.P32, T.INT },
-    field_of = { [T.P32] = IRFL_TAB_ARRAY, [T.INT] = IRFL_TAB_ASIZE },
+    types = { T.P32, T.INT, T.I64 },
+    field_of = { [T.P32] = IRFL_TAB_ARRAY, [T.INT] = IRFL_TAB_ASIZE,
+                 [T.I64] = IRFL_CDATA_INT64 },
+    op1_of = { [T.P32] = { T.TAB }, [T.INT] = { T.TAB },
+               [T.I64] = { T.CDATA } },
     op1 = ref({ T.TAB }), op2 = { kind = "field" },
+})
+
+-- Table allocation, guarded because it can fail and exit, and
+-- paired so the guard cannot be left dead. The asize/hbits pools
+-- are the array-only, hash-only and mixed shapes enum.lua
+-- allocates.
+sig("TNEW", {
+    types = { T.TAB }, guard = true,
+    pair_with = { op = "FLOAD", t = T.P32 },
+    op1 = { kind = "kint", pool = { 4, 0, 2 } },
+    op2 = { kind = "kint", pool = { 0, 2, 1 } },
+})
+
+-- NEWREF creates a hash slot, so its key is negative like HREF's
+-- and it feeds HSTORE/HLOAD rather than the array ops.
+sig("NEWREF", {
+    types = { T.P32 },
+    op1 = ref({ T.TAB }),
+    op2 = { kind = "kint", pool = HASH_KEYS },
+})
+
+-- The write barrier yields nothing and takes the table itself.
+sig("TBAR", {
+    types = { T.NIL }, novalue = true,
+    op1 = ref({ T.TAB }), op2 = none(),
+})
+
+-- A cdata field ref and the store through it. CNEW is left out:
+-- its cdata.ctypeid differs between the two optimization levels
+-- (129 vs 317, the gap that blocks lj_1244), so every trace
+-- holding one reads as a miscompile.
+sig("FREF", {
+    types = { T.P64 },
+    op1 = ref({ T.CDATA }), op2 = lit({ IRFL_CDATA_INT64 }),
+})
+sig("FSTORE", {
+    types = { T.I64 }, store = true,
+    op1 = from("FREF", { T.P64 }), op2 = ref({ T.I64 }),
 })
 
 -- ABC checks an index against tab.asize and yields nothing, so
@@ -191,7 +240,8 @@ local UREF_UVS = { 0x011, 0x111, 0x022 }
 -- the ULOAD that consumes it in the same step keeps it live, the
 -- way gen.lua pairs an AREF with its access.
 sig("UREFO UREFC", {
-    types = { T.P32 }, guard = true, pair_with = "ULOAD",
+    types = { T.P32 }, guard = true,
+    pair_with = { op = "ULOAD", t = T.NUM },
     op1 = ref({ T.FUNC }), op2 = lit(UREF_UVS),
 })
 sig("ULOAD", {
@@ -214,13 +264,49 @@ local XTYPES = { T.I8, T.U8, T.I16, T.U16, T.INT }
 -- load side stays int: a narrow result is not a value the final
 -- snapshot can carry, and enum.lua's xref sweep reaches those
 -- through check.lua's value_outputs path instead of a stack slot.
+-- u32 joins int on the load side to feed the unsigned compares.
+-- Neither a u32 nor a narrow width can be a snapshot slot, so
+-- roots() keeps them out of the comparison on its own.
 sig("XLOAD", {
-    types = { T.INT },
+    types = { T.INT, T.U32 },
     op1 = from("ADD", { T.P64 }), op2 = lit({ 0 }),
 })
 sig("XSTORE", {
     types = XTYPES, store = true,
     op1 = from("ADD", { T.P64 }), op2 = ref({ T.INT }),
+})
+
+-- The unsigned compares need a u32, and int<->u32 CONV is dead on
+-- x64, so the only source is an XLOAD of an unsigned C field --
+-- which is why these arrive with the raw memory ops rather than
+-- with the signed compares above.
+sig("ULT UGE ULE UGT", {
+    types = { T.U32 }, guard = true, cmp = true,
+    op1 = from("XLOAD", { T.U32 }),
+    op2 = { kind = "kint", pool = { 0, 1, 7, 255, 65535 } },
+})
+
+
+-- The one-argument math calls ljopt models (CALLN.lua's
+-- supported_math_fns), by their jit.vmdef.ircall index.
+local MATH_CALLS = { 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 53 }
+
+-- op1 has to be a reference. ljopt models these as uninterpreted
+-- SMT functions, and LJFOLD(CALLN KNUM any) constant-folds a call
+-- on a literal through kfold_fpcall1 -- the optimized side then
+-- holds a number the uninterpreted model cannot equate with it,
+-- which is exactly the POW gap. A symbolic argument fires no fold
+-- rule, so the two sides stay comparable.
+-- Its result is not comparable either: ljopt encodes the call as
+-- an uninterpreted function, so naming one in the snapshot leaves
+-- the oracle with a value it cannot reason about and the checker
+-- reports it as a coverage gap. The call still belongs in a trace
+-- -- both sides encode the same uninterpreted function, so
+-- anything computed from it stays comparable, and the folding
+-- around it is exercised.
+sig("CALLN", {
+    types = { T.NUM }, opaque = true,
+    op1 = ref({ T.NUM }), op2 = lit(MATH_CALLS),
 })
 
 local missing = {}

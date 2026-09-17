@@ -3,12 +3,31 @@ local opcodes = require('ljopt.irfuzz.opcodes')
 local EMIT = {
     'LT', 'GE', 'LE', 'GT', 'ULT', 'UGE', 'ULE', 'UGT', 'EQ', 'NE', 'ABC',
     'BNOT', 'BSWAP', 'BAND', 'BOR', 'BXOR', 'BSHL', 'BSHR', 'BSAR', 'BROL',
-    'BROR', 'ADD', 'SUB', 'MUL', 'DIV', 'MOD', 'POW', 'NEG', 'ABS', 'LDEXP',
+    'BROR', 'ADD', 'SUB', 'MUL', 'DIV', 'NEG', 'ABS', 'LDEXP',
     'MIN', 'MAX', 'FPMATH', 'ADDOV', 'SUBOV', 'MULOV', 'AREF', 'HREF',
-    'NEWREF', 'UREFO', 'UREFC', 'FREF', 'STRREF', 'ALOAD', 'HLOAD', 'ULOAD',
+    'NEWREF', 'UREFO', 'UREFC', 'FREF', 'ALOAD', 'HLOAD', 'ULOAD',
     'FLOAD', 'XLOAD', 'SLOAD', 'ASTORE', 'HSTORE', 'USTORE', 'FSTORE',
-    'XSTORE', 'SNEW', 'TNEW', 'CNEW', 'BUFHDR', 'BUFPUT', 'BUFSTR', 'TBAR',
-    'CONV', 'TOBIT', 'TOSTR', 'CALLN', 'CALLL', 'CARG',
+    'XSTORE', 'TNEW', 'TBAR',
+    'CONV', 'TOBIT', 'CALLN', 'CALLL', 'CARG',
+}
+
+-- LuaJIT emits these, but ljopt cannot model them soundly yet, so
+-- a generator that produced one would report a miscompile that is
+-- really a hole in the oracle. Each is recorded where the hole is:
+--   MOD, POW          gen.lua RECORDER_IMPOSSIBLE and
+--                     KNOWN_LJOPT_GAP -- num MOD and int DIV/MOD
+--                     never reach the IR, POW is uninterpreted
+--   SNEW, STRREF,
+--   TOSTR             enum.lua iter_strops -- SNEW's clamped length
+--                     disagrees with fload_str_len_snew, 6 of 45
+--                     traces come back SAT on that alone
+--   BUFHDR, BUFPUT,
+--   BUFSTR            enum.lua iter_bufcalls leaves the BUFSTR a gap
+--   CNEW              cdata.ctypeid differs across the two levels
+--                     (129 vs 317), the gap that blocks lj_1244
+local UNMODELLED = {
+    'MOD', 'POW', 'SNEW', 'STRREF', 'TOSTR', 'BUFHDR', 'BUFPUT', 'BUFSTR',
+    'CNEW',
 }
 
 local CONST = {
@@ -69,7 +88,8 @@ local op_names = {}
 for _, op in ipairs(opcodes.ops) do op_names[#op_names + 1] = op.name end
 
 local ops = classify(op_names, {
-    emit = EMIT, const = CONST, backend = BACKEND, loop = LOOP, todo = TODO,
+    emit = EMIT, const = CONST, backend = BACKEND, loop = LOOP,
+    todo = TODO, unmodelled = UNMODELLED,
 })
 
 local types = classify(opcodes.types, {

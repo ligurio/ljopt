@@ -384,7 +384,7 @@ end)
 
 test:test("table-driven generator reaches everything it declares",
     function(test)
-    test:plan(9)
+    test:plan(16)
 
     local opcodes = require("ljopt.irfuzz.opcodes")
     local opcode_class = require("ljopt.irfuzz.opcode_class")
@@ -546,6 +546,147 @@ test:test("table-driven generator reaches everything it declares",
     end
     test:is(both, 20,
         "every trace carries two AREFs and two HREFs on distinct keys")
+
+    -- LJFOLD(CALLN KNUM any) constant-folds a math call on a
+    -- literal, and ljopt encodes the call as an uninterpreted
+    -- function, so the optimized side ends up holding a number the
+    -- model cannot equate with it. That is the POW gap; a symbolic
+    -- argument fires no fold rule.
+    local folded_call, opaque_out = 0, 0
+    for seed = 1, 200 do
+        local insns = gen_table.gen(seed, { insns = 14 })
+        for _, ins in ipairs(insns) do
+            local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
+            if spec and spec.opaque and ins.ak ~= grammar.K.REF then
+                folded_call = folded_call + 1
+            end
+        end
+        for _, ref in ipairs(gen_table.roots(insns)) do
+            local spec = grammar.sig[opcodes.ops[insns[ref].op + 1].name]
+            if spec and spec.opaque then opaque_out = opaque_out + 1 end
+        end
+    end
+    test:is(folded_call, 0, "no uninterpreted call takes a constant argument")
+    test:is(opaque_out, 0, "no uninterpreted result is compared as an output")
+
+    -- An FLOAD reads a field of a specific object: tab.array and
+    -- tab.asize off a table, cdata.int64 off a cdata. Pairing a
+    -- producer with its consumer used to pass NONE as the field,
+    -- which reads as field 0 -- a string's length taken off a
+    -- table. The two sides agree on that, so the oracle never
+    -- reports it; only this check does.
+    local mistyped = 0
+    for seed = 1, 200 do
+        local insns = gen_table.gen(seed, { insns = 14 })
+        local ty = {}
+        for ref, ins in ipairs(insns) do
+            ty[ref] = ins.t % 0x80
+            local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
+            if spec and spec.field_of then
+                local want = spec.op1_of and spec.op1_of[ty[ref]]
+                local ok = ins.bk == grammar.K.LIT
+                    and ins.bv == spec.field_of[ty[ref]]
+                if want then
+                    local match = false
+                    for _, w in ipairs(want) do
+                        if ty[ins.av] == w then match = true end
+                    end
+                    ok = ok and match
+                end
+                if not ok then mistyped = mistyped + 1 end
+            end
+        end
+    end
+    test:is(mistyped, 0, "every field load names the field its type selects")
+
+    -- Malformed IR that both levels agree on is invisible to the
+    -- oracle: the two sides encode it identically and it compares
+    -- equal. Checking every emitted instruction against the
+    -- signature it came from is the only thing that finds it --
+    -- that is how the TNEW pairing emitting a NONE field, read as
+    -- str.len off a table, was caught.
+    local violations = {}
+    local function note(what)
+        if #violations < 5 then violations[#violations + 1] = what end
+    end
+    for seed = 1, 100 do
+        local insns, _, nprologue = gen_table.gen(seed, { insns = 14 })
+        local ty = {}
+        for ref, ins in ipairs(insns) do
+            local name = opcodes.ops[ins.op + 1].name
+            local t = ins.t % 0x80
+            ty[ref] = t
+            local spec = ref > nprologue and grammar.sig[name] or nil
+            if spec then
+                local allowed = false
+                for _, x in ipairs(spec.types) do
+                    if x == t then allowed = true end
+                end
+                if not allowed then note(name .. " at type " .. t) end
+            end
+            -- Every reference has to point backwards, at an
+            -- instruction that already exists.
+            if ins.ak == grammar.K.REF and not (ins.av < ref) then
+                note(name .. " op1 references " .. ins.av)
+            end
+            if ins.bk == grammar.K.REF and not (ins.bv < ref) then
+                note(name .. " op2 references " .. ins.bv)
+            end
+            -- A `from` constraint names the opcode that must have
+            -- produced the operand.
+            if spec and spec.op1 and spec.op1.from
+                and ins.ak == grammar.K.REF then
+                local src = opcodes.ops[insns[ins.av].op + 1].name
+                if not spec.op1.from[src] then
+                    note(name .. " op1 produced by " .. src)
+                end
+            end
+        end
+    end
+    test:is(table.concat(violations, "; "), "",
+        "every emitted instruction matches the signature it came from")
+
+    -- LJFOLD(ADDOV any KINT) drops the overflow check when that
+    -- operand is 0, and the optimized trace then has one exit
+    -- fewer. A reference is not safe either: seed 603 reached the
+    -- rule through `x ^ x`, which folds to 0.
+    local zeroable = 0
+    for seed = 1, 200 do
+        for _, ins in ipairs(gen_table.gen(seed, { insns = 14 })) do
+            local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
+            if spec and spec.ovf
+                and (ins.bk ~= grammar.K.KINT or ins.bv == 0) then
+                zeroable = zeroable + 1
+            end
+        end
+    end
+    test:is(zeroable, 0,
+        "every overflow guard has a non-zero constant operand")
+
+    -- The two FFI addresses have to differ, or CSE leaves the two
+    -- sides holding a different number of ADDs; and they have to
+    -- be able to land at least one access width apart, or aa_xref
+    -- never reaches its non-overlapping answer. Enforcing only the
+    -- first by taking adjacent pool entries silently removed the
+    -- second, and the fault aimed at that branch went quiet.
+    local identical, disjoint = 0, 0
+    for seed = 1, 200 do
+        local insns = gen_table.gen(seed, { insns = 12 })
+        local ofs = {}
+        for _, ins in ipairs(insns) do
+            if opcodes.ops[ins.op + 1].name == "ADD"
+                and ins.t % 0x80 == grammar.T.P64 then
+                ofs[#ofs + 1] = ins.bv
+            end
+        end
+        if #ofs == 2 then
+            if ofs[1] == ofs[2] then identical = identical + 1 end
+            if math.abs(ofs[1] - ofs[2]) >= 4 then disjoint = disjoint + 1 end
+        end
+    end
+    test:is(identical, 0, "the two FFI addresses are never the same offset")
+    test:ok(disjoint > 0,
+        "some FFI address pairs are disjoint for a 4-byte access")
 end)
 
 require("tests.coverage").shutdown()
