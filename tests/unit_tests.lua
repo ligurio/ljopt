@@ -336,12 +336,13 @@ test:test("loop unrolling remaps call arguments", function(test)
 end)
 
 test:test("IR opcode table covers every LuaJIT opcode", function(test)
-    test:plan(4)
+    test:plan(8)
 
     local opcodes = require("ljopt.irfuzz.opcodes")
     local opcode_class = require("ljopt.irfuzz.opcode_class")
 
-    local irnames = require("jit.vmdef").irnames
+    local vmdef = require("jit.vmdef")
+    local irnames = vmdef.irnames
     local live = {}
     for i = 1, #irnames, 6 do
         live[#live + 1] = (irnames:sub(i, i + 5):gsub("%s+$", ""))
@@ -360,10 +361,25 @@ test:test("IR opcode table covers every LuaJIT opcode", function(test)
     test:is(table.concat(mismatched, " "), "",
         "opcode names and numbers match jit.vmdef.irnames")
 
-    test:is(table.concat(opcode_class.unclassified, " "), "",
+    test:is(table.concat(opcode_class.ops.unclassified, " "), "",
         "every opcode is triaged as emit/const/loop/backend/todo")
-    test:is(table.concat(opcode_class.stale, " "), "",
+    test:is(table.concat(opcode_class.ops.stale, " "), "",
         "no triaged opcode has disappeared from LuaJIT")
+
+    test:is(table.concat(opcode_class.types.unclassified, " "), "",
+        "every IRT type is triaged as emit/todo/dead")
+    test:is(table.concat(opcode_class.types.stale, " "), "",
+        "no triaged IRT type has disappeared from LuaJIT")
+
+    local function runtime_list(t)
+        local names = {}
+        while t[#names] ~= nil do names[#names + 1] = t[#names] end
+        return names
+    end
+    test:is(#opcodes.fields, #runtime_list(vmdef.irfield),
+        "opcodes.lua lists every FLOAD field LuaJIT defines")
+    test:is(#opcodes.fpmath, #runtime_list(vmdef.irfpm),
+        "opcodes.lua lists every FPMATH mode LuaJIT defines")
 end)
 
 require("tests.coverage").shutdown()
