@@ -38,6 +38,7 @@ jit.off()
 local check = require("ljopt.irfuzz.check")
 local gen = require("ljopt.irfuzz.gen")
 local enum = require("ljopt.irfuzz.enum")
+local gen_table = require("ljopt.irfuzz.gen_table")
 
 -- Solve one formula with a standalone solver binary (not an
 -- in-process library): a crash or timeout on one seed then can't
@@ -214,6 +215,12 @@ local function parse_args(argv)
       -- to hunt ljopt coverage gaps rather than LuaJIT
       -- miscompiles.
       o.include_gaps = true; i = i + 1
+    elseif a == "--grammar" then
+      -- Table-driven generation (gen_table.lua): opcodes and
+      -- operand kinds come from the IRDEF-derived signature
+      -- table, and the pick is coverage-guided rather than a
+      -- hand-written menu.
+      o.grammar = true; i = i + 1
     elseif a == "--tables" then
       -- Also generate table/array memory ops (SLOAD tab, FLOAD
       -- tab.array, AREF/HREF, ALOAD/HLOAD, ASTORE/HSTORE).
@@ -434,6 +441,28 @@ local function sweep(o, make_iter, total, repro, gaps_ok)
     end
   end
   report(c, checked)
+  return c.sat
+end
+
+local function build_grammar(seed, o)
+  local insns = gen_table.gen(seed, { insns = o.insns, inputs = o.ninputs })
+  return check.build_from(insns, gen_table.roots(insns), { loop = o.loop },
+    seed)
+end
+
+local function show_grammar(seed, o)
+  show_result(build_grammar(seed, o), "grammar seed " .. seed)
+end
+
+local function run_grammar(o)
+  local timeout_sec = tonumber(os.getenv("LJOPT_Z3_TIMEOUT")) or 15
+  local c = counters()
+  local strict = not o.include_gaps
+  for seed = o.seed, o.seed + o.count - 1 do
+    check_one(build_grammar(seed, o), c, timeout_sec, "seed=" .. seed,
+      "--grammar --show " .. seed, strict)
+  end
+  report(c, o.count)
   return c.sat
 end
 
@@ -670,6 +699,7 @@ if o.show ~= nil then
   elseif o.sink then show_sink(o.show, o)
   elseif o.buffers then show_buffers(o.show, o)
   elseif o.mixed then show_mixed(o.show, o)
+  elseif o.grammar then show_grammar(o.show, o)
   elseif o.enum then show_enum(o.show, o)
   else show(o.show, o) end
   os.exit(0)
@@ -683,5 +713,6 @@ local n_sat = (o.extra and run_extra(o))
   or (o.sink and run_sink(o))
   or (o.buffers and run_buffers(o))
   or (o.mixed and run_mixed(o))
-  or (o.enum and run_enum(o)) or run(o)
+  or (o.enum and run_enum(o))
+  or (o.grammar and run_grammar(o)) or run(o)
 os.exit(n_sat == 0 and 0 or 1)

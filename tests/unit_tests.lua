@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(9)
+test:plan(10)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -380,6 +380,147 @@ test:test("IR opcode table covers every LuaJIT opcode", function(test)
         "opcodes.lua lists every FLOAD field LuaJIT defines")
     test:is(#opcodes.fpmath, #runtime_list(vmdef.irfpm),
         "opcodes.lua lists every FPMATH mode LuaJIT defines")
+end)
+
+test:test("table-driven generator reaches everything it declares",
+    function(test)
+    test:plan(8)
+
+    local opcodes = require("ljopt.irfuzz.opcodes")
+    local opcode_class = require("ljopt.irfuzz.opcode_class")
+    local grammar = require("ljopt.irfuzz.grammar")
+    local gen_table = require("ljopt.irfuzz.gen_table")
+
+    local bad = {}
+    for _, name in ipairs(grammar.covered) do
+        if opcode_class.class[name] ~= "emit" then bad[#bad + 1] = name end
+    end
+    test:is(table.concat(bad, " "), "",
+        "every signature is for an emit-class opcode")
+
+    local declared, want = 0, {}
+    for _, name in ipairs(grammar.covered) do
+        for _, t in ipairs(grammar.sig[name].types) do
+            want[name .. ":" .. t] = true
+            declared = declared + 1
+        end
+    end
+
+    local seen = {}
+    for seed = 1, 100 do
+        local _, hits = gen_table.gen(seed, { insns = 20 })
+        for pair in pairs(hits) do seen[pair] = true end
+    end
+    local unreached = {}
+    for pair in pairs(want) do
+        if not seen[pair] then unreached[#unreached + 1] = pair end
+    end
+    table.sort(unreached)
+    test:is(table.concat(unreached, " "), "",
+        "every declared (opcode, type) pair is emitted within 100 seeds")
+
+    local a = gen_table.gen(7, { insns = 10 })
+    local b = gen_table.gen(7, { insns = 10 })
+    local same = #a == #b
+    for i = 1, #a do
+        same = same and a[i].op == b[i].op and a[i].t == b[i].t
+            and a[i].ak == b[i].ak and a[i].av == b[i].av
+            and a[i].bk == b[i].bk and a[i].bv == b[i].bv
+    end
+    test:is(same, true, "generation is a pure function of the seed")
+
+    local sload = opcodes.by_name.SLOAD.num
+    local known = true
+    for _, ins in ipairs(gen_table.gen(3, { insns = 20 })) do
+        if ins.op ~= sload then
+            known = known and grammar.sig[opcodes.ops[ins.op + 1].name] ~= nil
+        end
+    end
+    test:is(known, true, "every emitted opcode comes from the signature table")
+
+    -- gen.lua's menus carry exclusions IRDEF does not: num MOD and
+    -- int DIV/MOD never reach the IR, num POW is modelled
+    -- uninterpreted, and MIN/MAX are num-only. Deriving signatures
+    -- from IRDEF alone reintroduces every one of them as a false
+    -- SAT, so the arithmetic signatures have to stay inside the
+    -- menus that knowledge lives in.
+    local gen = require("ljopt.irfuzz.gen")
+    local arith_universe, allowed = {}, {}
+    for _, t in ipairs({ gen.IRT_NUM, gen.IRT_INT }) do
+        allowed[t] = {}
+        for _, name in ipairs(gen.menu_for(t, true)) do
+            allowed[t][name] = true
+        end
+        for _, name in ipairs(gen.menu_for(t, false)) do
+            arith_universe[name] = true
+        end
+    end
+
+    local outside = {}
+    for _, name in ipairs(grammar.covered) do
+        for _, t in ipairs(grammar.sig[name].types) do
+            if arith_universe[name] and allowed[t] and not allowed[t][name] then
+                outside[#outside + 1] = name .. ":" .. t
+            end
+        end
+    end
+    table.sort(outside)
+    test:is(table.concat(outside, " "), "",
+        "no arithmetic signature escapes gen.lua's vetted menus")
+
+    -- `x > x` never holds, so the recorder emits the negated
+    -- guard rather than that one, and the two optimization levels
+    -- then disagree about the exit. Measured over 40 seeds before
+    -- this was forbidden: 7 SAT, all of them spurious.
+    local self_cmp = 0
+    for seed = 1, 200 do
+        for _, ins in ipairs(gen_table.gen(seed, { insns = 14 })) do
+            local name = opcodes.ops[ins.op + 1].name
+            if (grammar.sig[name] or {}).cmp and ins.ak == grammar.K.REF
+                and ins.bk == grammar.K.REF and ins.av == ins.bv then
+                self_cmp = self_cmp + 1
+            end
+        end
+    end
+    test:is(self_cmp, 0, "no compare guard has both operands the same ref")
+
+    -- The equivalence disjunction reads every compared slot with
+    -- get-fp, so an output the recorder could not put in a stack
+    -- slot is compared as a float. Measured before this was
+    -- restricted: 10 SAT of 40, every one of them spurious.
+    local bad_out = {}
+    for seed = 1, 100 do
+        local insns = gen_table.gen(seed, { insns = 14 })
+        for _, ref in ipairs(gen_table.roots(insns)) do
+            local t = insns[ref].t % 0x80
+            if t ~= grammar.T.NUM and t ~= grammar.T.INT then
+                bad_out[#bad_out + 1] = opcodes.types[t + 1]
+            end
+        end
+    end
+    test:is(#bad_out, 0, "every compared output is a num or an int")
+
+    -- An ADDOV nothing reads is dead, and DCE drops it together
+    -- with the trace exit it carries, which the oracle reads as
+    -- the optimized trace skipping an exit. Every overflow op has
+    -- to be consumed or compared.
+    local dead = 0
+    for seed = 1, 100 do
+        local insns = gen_table.gen(seed, { insns = 14 })
+        local live = {}
+        for _, ref in ipairs(gen_table.roots(insns)) do live[ref] = true end
+        for _, ins in ipairs(insns) do
+            if ins.ak == grammar.K.REF then live[ins.av] = true end
+            if ins.bk == grammar.K.REF then live[ins.bv] = true end
+        end
+        for ref, ins in ipairs(insns) do
+            local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
+            if spec and spec.guard and not spec.cmp and not live[ref] then
+                dead = dead + 1
+            end
+        end
+    end
+    test:is(dead, 0, "no overflow guard is left dead for DCE to remove")
 end)
 
 require("tests.coverage").shutdown()
