@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(8)
+test:plan(9)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -333,6 +333,37 @@ test:test("loop unrolling remaps call arguments", function(test)
         "the peeled call plus one per unrolled iteration")
     test:is(count_duplicates(args), 0,
         "every call reads its own iteration's argument")
+end)
+
+test:test("IR opcode table covers every LuaJIT opcode", function(test)
+    test:plan(4)
+
+    local opcodes = require("ljopt.irfuzz.opcodes")
+    local opcode_class = require("ljopt.irfuzz.opcode_class")
+
+    local irnames = require("jit.vmdef").irnames
+    local live = {}
+    for i = 1, #irnames, 6 do
+        live[#live + 1] = (irnames:sub(i, i + 5):gsub("%s+$", ""))
+    end
+
+    test:is(#opcodes.ops, #live,
+        "opcodes.lua lists every opcode LuaJIT defines")
+
+    local mismatched = {}
+    for i, name in ipairs(live) do
+        local op = opcodes.ops[i]
+        if op == nil or op.name ~= name or op.num ~= i - 1 then
+            mismatched[#mismatched + 1] = name
+        end
+    end
+    test:is(table.concat(mismatched, " "), "",
+        "opcode names and numbers match jit.vmdef.irnames")
+
+    test:is(table.concat(opcode_class.unclassified, " "), "",
+        "every opcode is triaged as emit/const/loop/backend/todo")
+    test:is(table.concat(opcode_class.stale, " "), "",
+        "no triaged opcode has disappeared from LuaJIT")
 end)
 
 require("tests.coverage").shutdown()
