@@ -384,7 +384,7 @@ end)
 
 test:test("table-driven generator reaches everything it declares",
     function(test)
-    test:plan(8)
+    test:plan(9)
 
     local opcodes = require("ljopt.irfuzz.opcodes")
     local opcode_class = require("ljopt.irfuzz.opcode_class")
@@ -521,6 +521,30 @@ test:test("table-driven generator reaches everything it declares",
         end
     end
     test:is(dead, 0, "no overflow guard is left dead for DCE to remove")
+
+    -- aa_ahref answers a same-ref query from a shortcut and only
+    -- reaches its disambiguation path -- different constant keys,
+    -- base+-offset, key types -- when two refs differ. With one
+    -- AREF per trace that path is unreachable, and injecting a
+    -- fault into it was reported as no miscompile at all.
+    local both = 0
+    for seed = 1, 20 do
+        local insns = gen_table.gen(seed, { insns = 12 })
+        local keys = { AREF = {}, HREF = {} }
+        for _, ins in ipairs(insns) do
+            local name = opcodes.ops[ins.op + 1].name
+            if keys[name] then keys[name][ins.bv] = true end
+        end
+        local distinct = 0
+        for _, set in pairs(keys) do
+            local n = 0
+            for _ in pairs(set) do n = n + 1 end
+            if n >= 2 then distinct = distinct + 1 end
+        end
+        if distinct == 2 then both = both + 1 end
+    end
+    test:is(both, 20,
+        "every trace carries two AREFs and two HREFs on distinct keys")
 end)
 
 require("tests.coverage").shutdown()

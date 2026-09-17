@@ -101,6 +101,64 @@ sig("CONV", {
     op1 = { kind = "conv_src" }, op2 = { kind = "conv_mode" },
 })
 
+-- Array indices and hash keys have to come from disjoint ranges.
+-- LuaJIT keeps a table's array part and hash part in separate
+-- address spaces and the recorder reaches a key through only one
+-- of them, but ljopt models both as make_tab_ref(tab, key): the
+-- same value used for an element and a slot aliases in the SMT
+-- and reads as a store-to-load conflict. Positive for the array,
+-- negative for the hash, exactly as gen.lua splits them.
+local ARR_IDXS = { 1, 2, 3, 4, 5 }
+local HASH_KEYS = { -1, -2, -3, -7 }
+
+local IRFL_TAB_ARRAY = 6
+
+local function from(op, types)
+    return { kind = "ref", types = types, from = { [op] = true } }
+end
+
+sig("FLOAD", {
+    types = { T.P32 }, tab_field = true,
+    op1 = ref({ T.TAB }), op2 = lit({ IRFL_TAB_ARRAY }),
+})
+
+-- AREF indexes the array part, so its op1 is the FLOAD of
+-- tab.array and never the table itself -- the same shape rule that
+-- makes lj_opt_fwd_hrefk read fleft->op1 as a table.
+sig("AREF", {
+    types = { T.P32 },
+    op1 = from("FLOAD", { T.P32 }),
+    op2 = { kind = "kint", pool = ARR_IDXS },
+})
+sig("HREF", {
+    types = { T.P32 },
+    op1 = ref({ T.TAB }),
+    op2 = { kind = "kint", pool = HASH_KEYS },
+})
+
+-- Every ALOAD/HLOAD the recorder emits is a guard: it type-checks
+-- the loaded value. Unguarded ones are recorder-impossible and
+-- were the source of the --tables false SATs -- lj_opt_dse_ahstore
+-- bails on an intervening guard, so without one DSE deletes a
+-- store across a load and the optimized trace reads another value.
+sig("ALOAD", {
+    types = { T.NUM }, guard = true,
+    op1 = from("AREF", { T.P32 }), op2 = none(),
+})
+sig("HLOAD", {
+    types = { T.NUM }, guard = true,
+    op1 = from("HREF", { T.P32 }), op2 = none(),
+})
+
+sig("ASTORE", {
+    types = { T.NUM }, store = true,
+    op1 = from("AREF", { T.P32 }), op2 = value({ T.NUM }),
+})
+sig("HSTORE", {
+    types = { T.NUM }, store = true,
+    op1 = from("HREF", { T.P32 }), op2 = value({ T.NUM }),
+})
+
 local missing = {}
 for _, name in ipairs(opcode_class.emit) do
     if SIG[name] == nil then missing[#missing + 1] = name end
@@ -115,6 +173,9 @@ return {
     T = T,
     K = K,
     GUARD = GUARD,
+    IRFL_TAB_ARRAY = IRFL_TAB_ARRAY,
+    ARR_IDXS = ARR_IDXS,
+    HASH_KEYS = HASH_KEYS,
     sig = SIG,
     covered = covered,
     missing = missing,

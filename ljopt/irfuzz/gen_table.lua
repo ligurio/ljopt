@@ -33,19 +33,39 @@ local function gen(seed, opts)
     local ninputs = opts.inputs or 3
     local nbody = opts.insns or 12
     local no_guards = opts.guards == false
+    local tables = opts.tables ~= false
 
     local insns = {}
     local pool = {}
     local hits = {}
+    local producer = {}
 
     local function push(t, idx)
         pool[t] = pool[t] or {}
         table.insert(pool[t], idx)
     end
 
+    -- Refs of type `t` produced by one of `from`, or all of them
+    -- when `from` is absent. AREF needs an FLOAD tab.array as its
+    -- op1 and a load needs its own AREF/HREF, so an operand spec
+    -- names the opcode that has to have produced the ref rather
+    -- than just its type.
+    local function refs_of(types, from)
+        local out = {}
+        for _, ty in ipairs(types) do
+            for _, idx in ipairs(pool[ty] or {}) do
+                if from == nil or from[producer[idx]] then
+                    out[#out + 1] = idx
+                end
+            end
+        end
+        return out
+    end
+
     local function emit(op, t, ak, av, bk, bv)
         insns[#insns + 1] = { op = opcodes.by_name[op].num, t = t,
                               ak = ak, av = av, bk = bk, bv = bv }
+        producer[#insns] = op
         return #insns
     end
 
@@ -63,6 +83,43 @@ local function gen(seed, opts)
         local src = pool[T.INT][1]
         push(T.I64, emit("CONV", T.I64, K.REF, src,
             K.LIT, T.I64 * 32 + T.INT + 0x800))
+    end
+
+    -- A table also only enters through an SLOAD, and everything
+    -- reachable from one (FLOAD tab.array, AREF/HREF, the loads
+    -- and stores) is gated behind it.
+    if tables then
+        local tab = emit("SLOAD", T.TAB, K.LIT, ninputs + 1,
+            K.LIT, SLOAD_TYPECHECK)
+        push(T.TAB, tab)
+        -- The access chain is four links long
+        -- (tab -> FLOAD tab.array -> AREF -> load/store), so
+        -- materialize it here rather than hoping the random pick
+        -- completes it: at a 12-instruction body no ALOAD or HLOAD
+        -- was emitted at all, and at 20 only 6 per 100 seeds.
+        -- Seeding the refs also makes a store and a load land on
+        -- the same one, which is the store-to-load forwarding case
+        -- worth checking.
+        local arr = emit("FLOAD", T.P32, K.REF, tab,
+            K.LIT, grammar.IRFL_TAB_ARRAY)
+        push(T.P32, arr)
+        -- Two refs per part, on distinct keys. With a single AREF
+        -- every access aliases through aa_ahref's `refa == refb`
+        -- shortcut and the whole disambiguation path below it --
+        -- different constant keys, base+offset arithmetic, key
+        -- types -- is unreachable. Fault-injecting that path
+        -- against a one-AREF generator reported no miscompile at
+        -- all, which is what exposed this.
+        local ia = rand(#grammar.ARR_IDXS)
+        local ka = rand(#grammar.HASH_KEYS)
+        for _, i in ipairs({ ia, (ia % #grammar.ARR_IDXS) + 1 }) do
+            push(T.P32, emit("AREF", T.P32, K.REF, arr,
+                K.KINT, grammar.ARR_IDXS[i]))
+        end
+        for _, k in ipairs({ ka, (ka % #grammar.HASH_KEYS) + 1 }) do
+            push(T.P32, emit("HREF", T.P32, K.REF, tab,
+                K.KINT, grammar.HASH_KEYS[k]))
+        end
     end
 
     -- Resolve one operand spec at instruction type `t`. Returns
@@ -84,10 +141,7 @@ local function gen(seed, opts)
         local wants_const = allow_const
             and (kind == "same_value" or kind == "value")
 
-        local refs = {}
-        for _, ty in ipairs(types) do
-            for _, idx in ipairs(pool[ty] or {}) do refs[#refs + 1] = idx end
-        end
+        local refs = refs_of(types, spec.from)
 
         if wants_const and (#refs == 0 or rand(5) <= 2) then
             local c = CONST_POOL[types[rand(#types)]]
@@ -123,10 +177,7 @@ local function gen(seed, opts)
             return true
         end
         local types = (spec.kind == "same") and { t } or spec.types
-        for _, ty in ipairs(types) do
-            if pool[ty] and #pool[ty] > 0 then return true end
-        end
-        return false
+        return #refs_of(types, spec.from) > 0
     end
 
     -- Candidate (opcode, type) pairs whose operands the current
@@ -200,7 +251,7 @@ local function gen(seed, opts)
             -- reads is dead, DCE drops it together with its exit,
             -- and the oracle sees an exit the optimized trace
             -- never takes.
-            if not spec.cmp then push(c.t, idx) end
+            if not spec.cmp and not spec.store then push(c.t, idx) end
         end
     end
 
@@ -229,7 +280,7 @@ local function roots(insns)
         local t = ins.t % GUARD
         local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
         if not consumed[i] and ins.op ~= sload
-            and not (spec and spec.cmp)
+            and not (spec and (spec.cmp or spec.store))
             and (t == T.NUM or t == T.INT) then
             out[#out + 1] = i
         end
