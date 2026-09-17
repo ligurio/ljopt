@@ -113,13 +113,33 @@ local HASH_KEYS = { -1, -2, -3, -7 }
 
 local IRFL_TAB_ARRAY = 6
 
-local function from(op, types)
-    return { kind = "ref", types = types, from = { [op] = true } }
+-- Index keys for the bounds check, matching enum.lua's sweep.
+local ABC_KEYS = { 1, 3, 5, 100 }
+
+local function from(ops, types)
+    local set = {}
+    for name in ops:gmatch("%S+") do set[name] = true end
+    return { kind = "ref", types = types, from = set }
 end
 
+local IRFL_TAB_ASIZE = 8
+
+-- The field literal is decided by the result type: tab.array is a
+-- p32 into the array part, tab.asize the int the bounds check
+-- reads. One opcode, so the choice rides on the type rather than
+-- on a separate signature.
 sig("FLOAD", {
-    types = { T.P32 }, tab_field = true,
-    op1 = ref({ T.TAB }), op2 = lit({ IRFL_TAB_ARRAY }),
+    types = { T.P32, T.INT },
+    field_of = { [T.P32] = IRFL_TAB_ARRAY, [T.INT] = IRFL_TAB_ASIZE },
+    op1 = ref({ T.TAB }), op2 = { kind = "field" },
+})
+
+-- ABC checks an index against tab.asize and yields nothing, so
+-- like a compare guard it never enters the value pool.
+sig("ABC", {
+    types = { T.INT }, guard = true, novalue = true,
+    op1 = from("FLOAD", { T.INT }),
+    op2 = { kind = "kint", pool = ABC_KEYS },
 })
 
 -- AREF indexes the array part, so its op1 is the FLOAD of
@@ -159,6 +179,50 @@ sig("HSTORE", {
     op1 = from("HREF", { T.P32 }), op2 = value({ T.NUM }),
 })
 
+-- Upvalue indices paired with their disambiguation hash: the same
+-- index under a different hash, and a different index under the
+-- same one, so aa_uref has to separate them rather than answering
+-- from the index alone.
+local UREF_UVS = { 0x011, 0x111, 0x022 }
+
+-- A upvalue ref is a guard that yields a p32, and a p32 is not a
+-- value the snapshot can compare, so one nothing reads is dead and
+-- DCE takes its exit with it -- the ADDOV failure again. Emitting
+-- the ULOAD that consumes it in the same step keeps it live, the
+-- way gen.lua pairs an AREF with its access.
+sig("UREFO UREFC", {
+    types = { T.P32 }, guard = true, pair_with = "ULOAD",
+    op1 = ref({ T.FUNC }), op2 = lit(UREF_UVS),
+})
+sig("ULOAD", {
+    types = { T.NUM }, guard = true,
+    op1 = from("UREFO UREFC", { T.P32 }), op2 = none(),
+})
+sig("USTORE", {
+    types = { T.NUM }, store = true,
+    op1 = from("UREFO UREFC", { T.P32 }), op2 = value({ T.NUM }),
+})
+
+-- Raw FFI memory. An element address is `ADD p64 cdata, k`, which
+-- is how the recorder forms one for any `arr[i] = v`, and the
+-- narrow C widths only ever reach the IR through XLOAD/XSTORE --
+-- LuaJIT promotes them to int for arithmetic.
+local XTYPES = { T.I8, T.U8, T.I16, T.U16, T.INT }
+
+-- The store side takes every width, so a narrow store under a
+-- wider load exercises the partial-overlap answer in aa_xref. The
+-- load side stays int: a narrow result is not a value the final
+-- snapshot can carry, and enum.lua's xref sweep reaches those
+-- through check.lua's value_outputs path instead of a stack slot.
+sig("XLOAD", {
+    types = { T.INT },
+    op1 = from("ADD", { T.P64 }), op2 = lit({ 0 }),
+})
+sig("XSTORE", {
+    types = XTYPES, store = true,
+    op1 = from("ADD", { T.P64 }), op2 = ref({ T.INT }),
+})
+
 local missing = {}
 for _, name in ipairs(opcode_class.emit) do
     if SIG[name] == nil then missing[#missing + 1] = name end
@@ -175,6 +239,7 @@ return {
     GUARD = GUARD,
     IRFL_TAB_ARRAY = IRFL_TAB_ARRAY,
     ARR_IDXS = ARR_IDXS,
+    UREF_UVS = UREF_UVS,
     HASH_KEYS = HASH_KEYS,
     sig = SIG,
     covered = covered,

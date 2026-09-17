@@ -17,6 +17,11 @@ local CONST_POOL = {
 
 local INPUT_TYPES = { T.NUM, T.INT }
 
+-- Byte offsets from one FFI base. 0 aliases exactly, 1 and 2
+-- partially overlap a wider access, 4 is disjoint for every width
+-- XLOAD emits here.
+local XMEM_OFFSETS = { 0, 1, 2, 4 }
+
 local function rng_new(seed)
     local state = (seed * 2654435761) % 2 ^ 32
     return function(n)
@@ -120,17 +125,48 @@ local function gen(seed, opts)
             push(T.P32, emit("HREF", T.P32, K.REF, tab,
                 K.KINT, grammar.HASH_KEYS[k]))
         end
+
+        -- A function to take upvalue refs from, and a cdata box
+        -- whose payload is a base address. Both are SLOAD-only
+        -- roots like the table, and both need two refs so the
+        -- aliasing questions below them stay reachable.
+        local fn = emit("SLOAD", T.FUNC, K.LIT, ninputs + 2,
+            K.LIT, SLOAD_TYPECHECK)
+        push(T.FUNC, fn)
+
+        -- Two refs of the same UREFx kind on different upvalue
+        -- indices, because aa_uref answers a different kind from
+        -- its first line and a different index is the case worth
+        -- reaching. Each gets a ULOAD so the guard stays live.
+        -- Without these a USTORE is only ever satisfiable after
+        -- the pick happens to produce a uref first: one store in
+        -- 100 seeds, and the aliasing fault below went unreported.
+        local kind = ({ "UREFO", "UREFC" })[rand(2)]
+        local uv = rand(#grammar.UREF_UVS)
+        for _, u in ipairs({ uv, (uv % #grammar.UREF_UVS) + 1 }) do
+            local ur = emit(kind, T.P32 + GUARD, K.REF, fn,
+                K.LIT, grammar.UREF_UVS[u])
+            push(T.P32, ur)
+            push(T.NUM, emit("ULOAD", T.NUM + GUARD, K.REF, ur, K.NONE, 0))
+        end
+
+        local cd = emit("SLOAD", T.CDATA, K.LIT, ninputs + 3,
+            K.LIT, SLOAD_TYPECHECK)
+        for _, ofs in ipairs({ 0, XMEM_OFFSETS[rand(#XMEM_OFFSETS)] }) do
+            push(T.P64, emit("ADD", T.P64, K.REF, cd, K.KINT, 8 + ofs))
+        end
     end
 
     -- Resolve one operand spec at instruction type `t`. Returns
     -- kind, value -- or nil when the current pools cannot satisfy
     -- it, which is what makes an opcode unavailable this round.
-    local function resolve(spec, t, allow_const)
+    local function resolve(spec, t, allow_const, field)
         local kind = spec.kind
         if kind == "none" then return K.NONE, 0 end
         if kind == "lit" then return K.LIT, spec.pool[rand(#spec.pool)] end
         if kind == "kint" then return K.KINT, spec.pool[rand(#spec.pool)] end
         if kind == "knum" then return K.KNUM, spec.pool[rand(#spec.pool)] end
+        if kind == "field" then return K.LIT, field end
 
         local types
         if kind == "same" or kind == "same_value" then
@@ -170,7 +206,8 @@ local function gen(seed, opts)
 
     local function satisfiable(spec, t)
         if spec.kind == "none" or spec.kind == "lit"
-            or spec.kind == "kint" or spec.kind == "knum" then
+            or spec.kind == "kint" or spec.kind == "knum"
+            or spec.kind == "field" then
             return true
         end
         if spec.kind == "same_value" or spec.kind == "value" then
@@ -227,8 +264,9 @@ local function gen(seed, opts)
             ak, av = resolve({ kind = "ref", types = variant[2] }, c.t, false)
             bk, bv = K.LIT, variant[1]
         else
-            ak, av = resolve(spec.op1, c.t, false)
-            bk, bv = resolve(spec.op2, c.t, true)
+            local field = spec.field_of and spec.field_of[c.t]
+            ak, av = resolve(spec.op1, c.t, false, field)
+            bk, bv = resolve(spec.op2, c.t, true, field)
         end
         -- A guard comparing a ref with itself is recorder-
         -- impossible in one direction and a tautology in the
@@ -251,7 +289,23 @@ local function gen(seed, opts)
             -- reads is dead, DCE drops it together with its exit,
             -- and the oracle sees an exit the optimized trace
             -- never takes.
-            if not spec.cmp and not spec.store then push(c.t, idx) end
+            if not (spec.cmp or spec.novalue or spec.store) then
+                push(c.t, idx)
+            end
+
+            -- Some refs are guards whose result type the snapshot
+            -- cannot carry, so nothing downstream keeps them
+            -- alive. Emit the consumer here rather than hoping the
+            -- pick supplies one.
+            if spec.pair_with then
+                local con = grammar.sig[spec.pair_with]
+                local ct = con.types[rand(#con.types)]
+                local key = spec.pair_with .. ":" .. ct
+                push(ct, emit(spec.pair_with,
+                    con.guard and (ct + GUARD) or ct,
+                    K.REF, idx, K.NONE, 0))
+                hits[key] = (hits[key] or 0) + 1
+            end
         end
     end
 
@@ -279,9 +333,17 @@ local function roots(insns)
         -- the exit with it.
         local t = ins.t % GUARD
         local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
-        if not consumed[i] and ins.op ~= sload
-            and not (spec and (spec.cmp or spec.store))
-            and (t == T.NUM or t == T.INT) then
+        local valued = spec and not (spec.cmp or spec.novalue or spec.store)
+        -- An overflow op is compared whether or not anything reads
+        -- it. Being consumed at generation time is not enough:
+        -- folding can delete the consumer -- `x ^ x` collapsing to
+        -- 0 takes the BSAR that read the ADDOV with it -- and DCE
+        -- then drops the ADDOV together with its trace exit, which
+        -- reads as the optimized side skipping an exit. Naming it
+        -- in the snapshot pins it on both sides.
+        local pinned = valued and spec.guard
+        if (pinned or not consumed[i]) and ins.op ~= sload
+            and valued and (t == T.NUM or t == T.INT) then
             out[#out + 1] = i
         end
     end

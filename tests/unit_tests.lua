@@ -515,7 +515,8 @@ test:test("table-driven generator reaches everything it declares",
         end
         for ref, ins in ipairs(insns) do
             local spec = grammar.sig[opcodes.ops[ins.op + 1].name]
-            if spec and spec.guard and not spec.cmp and not live[ref] then
+            if spec and spec.guard and not spec.cmp and not spec.novalue
+                and not live[ref] then
                 dead = dead + 1
             end
         end
