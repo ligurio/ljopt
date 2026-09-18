@@ -31,6 +31,8 @@ local function reproduce_bug_in_runtime(chunk, err_msg)
     local fn = assert(load(chunk), "Lua chunk is broken")
     -- Enabled code coverage breaks LuaJIT compilation.
     toggle_debug_hook()
+    jit.flush()
+    jit.opt.start(3, 'hotloop=56', 'hotexit=10')
     local ok, err = pcall(fn)
     toggle_debug_hook()
     local expected_result = not buggy_build
