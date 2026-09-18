@@ -350,7 +350,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     -- snapshot can tell what the copy had already recomputed.
     local body_pos = {}
     for j, bnode in ipairs(body) do
-        body_pos[bnode.num] = body_orig_pos[j]
+        body_pos[bnode.num] = body_orig_num[j]
     end
 
     local n = ljopt_config.get_loop_unroll_limit()
@@ -445,7 +445,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                 -- holds what the copy was entered with, which
                 -- `remap` already carries.
                 local body_end = body_len > 0
-                    and body_orig_pos[body_len] or 0
+                    and body_orig_num[body_len] or 0
                 for prologue_ref, const in pairs(phi_const) do
                     local target = remap[prologue_ref]
                     if body_len > 0 and snap_pos >= body_end then
