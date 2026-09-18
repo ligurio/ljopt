@@ -150,7 +150,7 @@ local opcodes_table = {
     ['LOOP'] = false,
     ['USE'] = false,
     ['PHI'] = false,
-    ['RENAME'] = false,
+    ['RENAME'] = ir_node_NOP,
 }
 
 local function get_all_count()

@@ -12,6 +12,7 @@ local dev_checks = require('ljopt.dev_checks')
 local ljopt_config = require('ljopt.config')
 local op_type = require('ljopt.ir.op_type')
 local utils = require('ljopt.utils')
+local arith_utils = require('ljopt.ir.arith_utils')
 
 -- Some huge value to distinguish snapshots from different loop
 -- iterations.
@@ -34,7 +35,8 @@ local function remap_operand(operand, remap)
             -- spells the original ref and wins in to_string().
             local txt = arg.txt
             if arg.tab ~= nil and arg.tab.type == 'ssa' then
-                txt = nil
+                local r = remap[arg.tab.value]
+                txt = type(r) == 'table' and r.txt or nil
             end
             args[i] = {tab = tab, txt = txt}
         end
@@ -43,8 +45,14 @@ local function remap_operand(operand, remap)
     if operand.type ~= 'ssa' then
         return operand
     end
-    if remap[operand.value] then
-        return {type = 'ssa', value = remap[operand.value]}
+    local r = remap[operand.value]
+    if type(r) == 'table' then
+        -- A carried value the optimizer folded to a constant: the
+        -- substitution is the constant itself, not a ref.
+        return r.tab
+    end
+    if r then
+        return {type = 'ssa', value = r}
     end
     return operand
 end
@@ -54,7 +62,18 @@ local function remap_snap_slots(slots, remap)
     local new_slots = {}
     for _, slot in ipairs(slots) do
         local info = slot[2]
-        if info.type == 'ssa' then
+        if info.type == 'ssa' and type(remap[info.value]) == 'table' then
+            -- A slot the optimizer folded to a constant. The snap
+            -- stack wants the double's bit pattern, not the IR
+            -- operand the body nodes are remapped to.
+            table.insert(new_slots, {slot[1], {
+                type = 'const',
+                const_type = 'number',
+                value = arith_utils.const_num_to_smt_bv(
+                    remap[info.value].tab.value
+                ),
+            }})
+        elseif info.type == 'ssa' then
             local new_ref = remap[info.value] or info.value
             table.insert(new_slots,
                 {slot[1], {type = 'ssa', value = new_ref}}
@@ -76,16 +95,52 @@ local function remap_snap_slots(slots, remap)
     return new_slots
 end
 
+-- The prologue refs a loop-carried value was computed from. A
+-- snapshot taken at the loop entry records the slot as it was
+-- *before* the prologue updated it -- `i`, where the PHI's left
+-- input is `i + 1` -- so remapping the PHI input alone leaves
+-- that slot pointing at the value the loop started with, one
+-- update behind the copy the snapshot belongs to.
+local function preloop_sources(nodes, ref, loop_idx, seen, out)
+    seen = seen or {}
+    out = out or {}
+    if ref == nil or seen[ref] or ref >= loop_idx then
+        return out
+    end
+    seen[ref] = true
+    out[#out + 1] = ref
+    local node = nodes[ref]
+    if node ~= nil then
+        for _, op in ipairs({node.op1, node.op2}) do
+            if op ~= nil and op.type == 'ssa' then
+                preloop_sources(nodes, op.value, loop_idx, seen, out)
+            end
+        end
+    end
+    return out
+end
+
+-- Returns body_ref -> prologue_ref, plus prologue_ref -> operand
+-- for the carried values the optimizer folded to a constant.
+-- Dropping those (they have no body ref to map) loses the slot
+-- from the model entirely, and the trace then reads iteration 1's
+-- value forever.
 local function infer_phi_map_opt(phi_nodes)
-    local phi_map = {}
+    local phi_map, phi_const = {}, {}
     for _, phi in ipairs(phi_nodes) do
         local prologue_ref = phi.op1 and phi.op1.type == 'ssa' and phi.op1.value
         local body_ref = phi.op2 and phi.op2.type == 'ssa' and phi.op2.value
         if prologue_ref and body_ref then
             phi_map[body_ref] = prologue_ref
+        elseif prologue_ref and phi.op2 ~= nil
+            and phi.op2.type == 'number' then
+            -- The SMT literal for a constant lives in the display
+            -- text, which to_string() prefers, so the text has to
+            -- travel with the operand.
+            phi_const[prologue_ref] = {tab = phi.op2, txt = phi.op2_txt}
         end
     end
-    return phi_map
+    return phi_map, phi_const
 end
 
 
@@ -104,16 +159,29 @@ local function clone_txt(operand, txt)
     return txt
 end
 
+-- Returns the remapped operand and the text that belongs to it.
+local function clone_operand(operand, txt, remap)
+    if operand ~= nil and operand.type == 'ssa' then
+        local r = remap[operand.value]
+        if type(r) == 'table' then
+            return r.tab, r.txt
+        end
+    end
+    return remap_operand(operand, remap), clone_txt(operand, txt)
+end
+
 local function clone_node(id, bnode, remap)
+    local op1, op1_txt = clone_operand(bnode.op1, bnode.op1_txt, remap)
+    local op2, op2_txt = clone_operand(bnode.op2, bnode.op2_txt, remap)
     return {
         num = id,
         flags = bnode.flags,
         irtype = bnode.irtype,
         irop = bnode.irop,
-        op1 = remap_operand(bnode.op1, remap),
-        op2 = remap_operand(bnode.op2, remap),
-        op1_txt = clone_txt(bnode.op1, bnode.op1_txt),
-        op2_txt = clone_txt(bnode.op2, bnode.op2_txt),
+        op1 = op1,
+        op2 = op2,
+        op1_txt = op1_txt,
+        op2_txt = op2_txt,
     }
 end
 
@@ -226,7 +294,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     local body_len = table.getn(body)
 
     -- Build phi_map: body_output_ref -> prologue_input_ref.
-    local phi_map = infer_phi_map_opt(phi_nodes)
+    local phi_map, phi_const = infer_phi_map_opt(phi_nodes)
 
     -- Classify snapshots and split mixed ones.
     local new_snapshots = nil
@@ -277,6 +345,13 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     local result = {}
     for _, node in ipairs(prologue) do
         table.insert(result, node)
+    end
+
+    -- Where each body instruction sat in the recorded trace, so a
+    -- snapshot can tell what the copy had already recomputed.
+    local body_pos = {}
+    for j, bnode in ipairs(body) do
+        body_pos[bnode.num] = body_orig_num[j]
     end
 
     local n = ljopt_config.get_loop_unroll_limit()
@@ -334,10 +409,72 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                     end
                 end
 
+                -- What a loop-carried slot holds at this
+                -- snapshot depends on where the snapshot sits: if
+                -- the copy has already recomputed the slot by
+                -- then it holds the new value, otherwise the one
+                -- the copy was entered with -- the prologue's own
+                -- value for the first copy, the previous copy's
+                -- output after that. The prologue refs a PHI
+                -- input was computed from stand for the same
+                -- slot, so they move with it; leaving them behind
+                -- is what made the two traces disagree about the
+                -- induction variable by one step at every
+                -- snapshot after the first.
+                local snap_pos = 0
+                for _, nins in ipairs(snap.nins) do
+                    if nins > snap_pos then snap_pos = nins end
+                end
                 local snap_remap = {}
                 for k, v in pairs(remap) do snap_remap[k] = v end
+                local phi_vars = {}
+                for _, prologue_ref in pairs(phi_map) do
+                    phi_vars[prologue_ref] = true
+                end
+                for prologue_ref in pairs(phi_const) do
+                    phi_vars[prologue_ref] = true
+                end
+                local phi_target = {}
                 for body_ref, prologue_ref in pairs(phi_map) do
-                    snap_remap[prologue_ref] = remap[body_ref]
+                    local target = remap[prologue_ref] or prologue_ref
+                    if body_pos[body_ref] == nil then
+                        target = remap[body_ref] or body_ref
+                    elseif body_pos[body_ref] <= snap_pos then
+                        target = remap[body_ref] or target
+                    end
+                    phi_target[prologue_ref] = target
+                    for _, src in ipairs(preloop_sources(
+                            raw_nodes, prologue_ref, loop_idx)) do
+                        if not phi_vars[src] then
+                            snap_remap[src] = target
+                        end
+                    end
+                end
+                for prologue_ref, target in pairs(phi_target) do
+                    snap_remap[prologue_ref] = target
+                end
+                -- A folded slot holds the constant from the end
+                -- of the body onwards -- on every copy, the first
+                -- included, since the body computes the same
+                -- constant each time. Before that point it still
+                -- holds what the copy was entered with, which
+                -- `remap` already carries.
+                local body_end = body_len > 0
+                    and body_orig_num[body_len] or 0
+                for prologue_ref, const in pairs(phi_const) do
+                    local target = remap[prologue_ref]
+                    if snap_pos >= body_end then
+                        target = const
+                    end
+                    if type(target) == 'table' then
+                        snap_remap[prologue_ref] = target
+                        for _, src in ipairs(preloop_sources(
+                                raw_nodes, prologue_ref, loop_idx)) do
+                            if not phi_vars[src] then
+                                snap_remap[src] = target
+                            end
+                        end
+                    end
                 end
                 local uid = snap_id + iter * SNAPSHOT_INC
                 new_snapshots[uid] = clone_snap(
@@ -348,7 +485,12 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
 
         prev_phi_remap = {}
         for body_ref, prologue_ref in pairs(phi_map) do
-            prev_phi_remap[prologue_ref] = remap[body_ref]
+            prev_phi_remap[prologue_ref] = remap[body_ref] or body_ref
+        end
+        -- A folded carried value is the same constant on every
+        -- iteration after the first, so it needs no ref.
+        for prologue_ref, const in pairs(phi_const) do
+            prev_phi_remap[prologue_ref] = const
         end
     end
 

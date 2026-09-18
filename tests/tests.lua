@@ -1885,6 +1885,22 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "loop PHI fed by a hoisted PHI variable",
+        code = [[
+local a, b = 1, 2
+local x, y = 0, 0
+for i = 1, 100 do
+    x = a + 3
+    y = b + 3
+    a = b
+    b = b * 2
+end
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "MUL"},
+        },
     }}
     test:plan(3 * #srcs)
 
