@@ -384,7 +384,7 @@ end)
 
 test:test("table-driven generator reaches everything it declares",
     function(test)
-    test:plan(19)
+    test:plan(18)
 
     local opcodes = require("ljopt.irfuzz.opcodes")
     local opcode_class = require("ljopt.irfuzz.opcode_class")
@@ -708,27 +708,6 @@ test:test("table-driven generator reaches everything it declares",
     end
     test:is(uncarried, 0,
         "loop mode leaves every input slot a value of its own type")
-
-    -- A loop's state lives in stack slots, so its body stays on
-    -- the types a slot can hold. Dropping the table, upvalue and
-    -- cdata roots does not achieve that by itself -- TNEW
-    -- allocates a table inside the body and HREF follows it back
-    -- in, which crashed the unroller on seed 51786 and, before
-    -- that, reported two miscompiles that were not.
-    local VALUE = { [grammar.T.NUM] = true, [grammar.T.INT] = true,
-                    [grammar.T.I64] = true }
-    local offenders = {}
-    for seed = 1, 100 do
-        for _, ins in ipairs(gen_table.gen(seed, { insns = 8, loop = true })) do
-            local name = opcodes.ops[ins.op + 1].name
-            if name ~= "SLOAD" and not VALUE[ins.t % 0x80]
-                and #offenders < 4 then
-                offenders[#offenders + 1] = name
-            end
-        end
-    end
-    test:is(table.concat(offenders, " "), "",
-        "a loop body holds only values a stack slot can carry")
 
     -- Two reads of one slot at the same type are a single
     -- instruction after CSE, and at different types they

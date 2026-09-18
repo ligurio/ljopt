@@ -70,6 +70,34 @@ local function gen(seed, opts)
         return out
     end
 
+    local cell_type = {}
+    local function cell_table(ref)
+        if producer[ref] == "AREF" then return insns[insns[ref].av].av end
+        return insns[ref].av
+    end
+    local function cell_of(ref)
+        local ins = insns[ref]
+        local op = producer[ref]
+        if op == "AREF" then
+            return "A:" .. insns[ins.av].av .. ":" .. ins.bv
+        elseif op == "HREF" or op == "NEWREF" then
+            return "H:" .. ins.av .. ":" .. ins.bv
+        end
+    end
+    local function typed_refs(spec, types, t)
+        local refs = refs_of(types, spec.from)
+        if not spec.cell_typed then return refs end
+        local out = {}
+        for _, r in ipairs(refs) do
+            local ct = cell_type[cell_of(r)]
+            if ct == nil and producer[cell_table(r)] == "TNEW" then
+                ct = T.NIL
+            end
+            if ct == nil or ct == t then out[#out + 1] = r end
+        end
+        return out
+    end
+
     local function emit(op, t, ak, av, bk, bv)
         insns[#insns + 1] = { op = opcodes.by_name[op].num, t = t,
                               ak = ak, av = av, bk = bk, bv = bv }
@@ -219,7 +247,7 @@ local function gen(seed, opts)
         local wants_const = allow_const
             and (kind == "same_value" or kind == "value")
 
-        local refs = refs_of(types, spec.from)
+        local refs = typed_refs(spec, types, t)
 
         if wants_const and (#refs == 0 or rand(5) <= 2) then
             local c = CONST_POOL[types[rand(#types)]]
@@ -258,7 +286,7 @@ local function gen(seed, opts)
         end
         local types = (spec.kind == "same") and { t }
             or types_override or spec.types
-        return #refs_of(types, spec.from) > 0
+        return #typed_refs(spec, types, t) > 0
     end
 
     -- Candidate (opcode, type) pairs whose operands the current
@@ -330,6 +358,10 @@ local function gen(seed, opts)
             hits[c.name .. ":" .. c.t] = (hits[c.name .. ":" .. c.t] or 0) + 1
             local t = spec.guard and (c.t + GUARD) or c.t
             local idx = emit(c.name, t, ak, av, bk, bv)
+            if (spec.store or spec.op1.cell_typed) and ak == K.REF
+                and cell_of(av) then
+                cell_type[cell_of(av)] = c.t
+            end
             -- Only a compare guard is valueless. ADDOV and its
             -- siblings compute x+y and carry the overflow check,
             -- so their result has to stay usable: an OV op nothing
@@ -356,8 +388,9 @@ local function gen(seed, opts)
             -- cannot carry, so nothing downstream keeps them
             -- alive. Emit the consumer here rather than hoping the
             -- pick supplies one.
-            if spec.pair_with then
-                local pw = spec.pair_with
+            local pw = spec.pair_with
+                or (spec.pair_with_of and spec.pair_with_of[c.t])
+            if pw then
                 local con = grammar.sig[pw.op]
                 local ct = pw.t
                 -- The consumer's own op2 still has to be resolved:

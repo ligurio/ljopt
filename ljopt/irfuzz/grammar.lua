@@ -226,13 +226,17 @@ sig("HREF", {
 -- were the source of the --tables false SATs -- lj_opt_dse_ahstore
 -- bails on an intervening guard, so without one DSE deletes a
 -- store across a load and the optimized trace reads another value.
+local function cell(spec) spec.cell_typed = true return spec end
+
 sig("ALOAD", {
-    types = { T.NUM }, guard = true,
-    op1 = from("AREF", { T.P32 }), op2 = none(),
+    types = { T.NUM, T.TAB }, guard = true,
+    pair_with_of = { [T.TAB] = { op = "FLOAD", t = T.INT } },
+    op1 = cell(from("AREF", { T.P32 })), op2 = none(),
 })
 sig("HLOAD", {
-    types = { T.NUM }, guard = true,
-    op1 = from("HREF", { T.P32 }), op2 = none(),
+    types = { T.NUM, T.TAB }, guard = true,
+    pair_with_of = { [T.TAB] = { op = "FLOAD", t = T.INT } },
+    op1 = cell(from("HREF", { T.P32 })), op2 = none(),
 })
 
 sig("ASTORE", {
