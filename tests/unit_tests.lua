@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(10)
+test:plan(11)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -399,6 +399,35 @@ test:test("loop unrolling keeps a constant call argument literal",
     test:is(table.getn(args), 2, "one call per unrolled copy")
     test:is(args[2] and args[2].txt, '#x3fd0000000000000',
         "the argument remapped to the constant keeps its literal")
+end)
+
+test:test("loop unrolling carries a constant through an empty body",
+    function(test)
+    test:plan(2)
+
+    local flags = {irt_guard = false, raw = ' '}
+    local nodes = {
+        {num = 1, flags = flags, irtype = 'int', irop = 'SLOAD',
+            op1 = {type = 'lit', value = 1}, op2 = {type = 'lit', value = 0}},
+        {num = 2, flags = flags, irtype = 'nil', irop = 'LOOP'},
+        {num = 3, flags = flags, irtype = 'int', irop = 'PHI',
+            op1 = {type = 'ssa', value = 1},
+            op2 = {type = 'number', value = 5},
+            op2_txt = '#x4014000000000000'},
+    }
+    local snapshots = {
+        [1] = {nins = {3}, slots = {{1, {type = 'ssa', value = 1}}}},
+    }
+    local _, snaps = unroll_at(2, {
+        trace = nodes, snapshots = snapshots, linktype = 'loop',
+    })
+
+    for iter = 1, 2 do
+        local snap = snaps[1 + iter * 1e6]
+        local slot = snap and snap.slots[1][2]
+        test:is(slot and slot.type, 'const',
+            ("copy %d reads the folded constant"):format(iter))
+    end
 end)
 
 require("tests.coverage").shutdown()
