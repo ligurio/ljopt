@@ -463,7 +463,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                     and body_orig_num[body_len] or 0
                 for prologue_ref, const in pairs(phi_const) do
                     local target = remap[prologue_ref]
-                    if body_len > 0 and snap_pos >= body_end then
+                    if snap_pos >= body_end then
                         target = const
                     end
                     if type(target) == 'table' then
