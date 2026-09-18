@@ -7,7 +7,7 @@ impls.IRNodeBSARI64 = { op_str = 'bvashr' }
 ir_node.extended(impls.IRNodeBSARI64, bin_op.BinOpInt)
 
 impls.IRNodeBSARInt = { op_str = 'bvashr' }
-ir_node.extended(impls.IRNodeBSARInt, bin_op.BinOpInt)
+ir_node.extended(impls.IRNodeBSARInt, bin_op.BinOpShiftInt)
 
 local function instance(node_str)
     return impls[node_str]
