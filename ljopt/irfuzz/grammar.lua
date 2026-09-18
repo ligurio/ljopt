@@ -18,6 +18,7 @@ local function lit(pool) return { kind = "lit", pool = pool } end
 local function same() return { kind = "same" } end
 local function same_value() return { kind = "same_value" } end
 local function none() return { kind = "none" } end
+local function mirror() return { kind = "mirror" } end
 
 local SHIFT_COUNTS = { 0, 1, 7, 31, 32, 63, 65 }
 local FPMATH_MODES = { 0, 1, 2, 3 }
@@ -44,8 +45,8 @@ sig("LT GE LE GT EQ NE", {
 
 sig("ADD SUB MUL", { types = NUMERIC, op1 = same(), op2 = same_value() })
 sig("MIN MAX", { types = { T.NUM }, op1 = same(), op2 = same_value() })
-sig("NEG", { types = { T.NUM, T.INT }, op1 = same(), op2 = none() })
-sig("ABS", { types = { T.NUM }, op1 = same(), op2 = none() })
+sig("NEG", { types = { T.NUM, T.INT }, op1 = same(), op2 = mirror() })
+sig("ABS", { types = { T.NUM }, op1 = same(), op2 = mirror() })
 
 -- num DIV only, and no MOD at all. gen.lua's RECORDER_IMPOSSIBLE
 -- records why: lj_opt_narrow_mod means a num MOD never reaches
@@ -80,7 +81,11 @@ sig("ADDOV SUBOV MULOV", {
     op2 = { kind = "kint", pool = { 1, -1, 2, 7, -7, 0x7fffffff } },
 })
 
-sig("TOBIT", { types = { T.INT }, op1 = ref({ T.NUM }), op2 = none() })
+local TOBIT_BIAS = 6755399441055744
+sig("TOBIT", {
+    types = { T.INT }, op1 = ref({ T.NUM }),
+    op2 = { kind = "knum", pool = { TOBIT_BIAS } },
+})
 
 -- A trace may read a stack slot anywhere, not only at entry: the
 -- recorder emits an SLOAD the first time a slot is touched, which
@@ -163,8 +168,8 @@ sig("FLOAD", {
 sig("TNEW", {
     types = { T.TAB }, guard = true,
     pair_with = { op = "FLOAD", t = T.P32 },
-    op1 = { kind = "kint", pool = { 4, 0, 2 } },
-    op2 = { kind = "kint", pool = { 0, 2, 1 } },
+    op1 = lit({ 4, 0, 2 }),
+    op2 = lit({ 0, 2, 1 }),
 })
 
 -- NEWREF creates a hash slot, so its key is negative like HREF's
@@ -212,7 +217,7 @@ sig("AREF", {
 })
 sig("HREF", {
     types = { T.P32 },
-    op1 = ref({ T.TAB }),
+    op1 = from("SLOAD", { T.TAB }),
     op2 = { kind = "kint", pool = HASH_KEYS },
 })
 
@@ -231,12 +236,12 @@ sig("HLOAD", {
 })
 
 sig("ASTORE", {
-    types = { T.NUM }, store = true,
-    op1 = from("AREF", { T.P32 }), op2 = value({ T.NUM }),
+    types = { T.NUM, T.TAB }, store = true,
+    op1 = from("AREF", { T.P32 }), op2 = same_value(),
 })
 sig("HSTORE", {
-    types = { T.NUM }, store = true,
-    op1 = from("HREF", { T.P32 }), op2 = value({ T.NUM }),
+    types = { T.NUM, T.TAB }, store = true,
+    op1 = from("HREF NEWREF", { T.P32 }), op2 = same_value(),
 })
 
 -- Upvalue indices paired with their disambiguation hash: the same

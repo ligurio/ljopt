@@ -25,16 +25,6 @@ local XMEM_OFFSETS = { 0, 1, 2, 4, 8 }
 
 local roots_of
 
--- The signatures a loop body may use: arithmetic on values that a
--- stack slot can hold, and the compares over them.
-local VALUE_ONLY = {}
-for _, n in ipairs({
-    "ADD", "SUB", "MUL", "DIV", "MIN", "MAX", "NEG", "ABS", "LDEXP",
-    "FPMATH", "BAND", "BOR", "BXOR", "BNOT", "BSWAP", "BSHL", "BSHR",
-    "BSAR", "BROL", "BROR", "ADDOV", "SUBOV", "MULOV", "TOBIT", "CONV",
-    "LT", "GE", "LE", "GT", "EQ", "NE", "CALLN",
-}) do VALUE_ONLY[n] = true end
-
 local function rng_new(seed)
     local state = (seed * 2654435761) % 2 ^ 32
     return function(n)
@@ -51,14 +41,7 @@ local function gen(seed, opts)
     local ninputs = opts.inputs or 3
     local nbody = opts.insns or 12
     local no_guards = opts.guards == false
-    -- A loop replay writes output k back into slot k for every
-    -- slot up to the highest SLOAD, so the table, function and
-    -- cdata roots would join the loop's carried state. No recorded
-    -- loop carries those, and gen.lua's loop traces never produce
-    -- them because they only SLOAD num and int -- its loop sweep
-    -- is clean where this one was not. Keeping them left the two
-    -- sides disagreeing over slots that hold no comparable value.
-    local tables = opts.tables ~= false and not opts.loop
+    local tables = opts.tables ~= false
 
     local insns = {}
     local pool = {}
@@ -170,6 +153,13 @@ local function gen(seed, opts)
             push(T.NUM, emit("ULOAD", T.NUM + GUARD, K.REF, ur, K.NONE, 0))
         end
 
+        for _ = 1, 2 do
+            local tn = emit("TNEW", T.TAB + GUARD, K.LIT, 4, K.LIT, 1)
+            push(T.TAB, tn)
+            push(T.P32, emit("FLOAD", T.P32, K.REF, tn,
+                K.LIT, grammar.IRFL_TAB_ARRAY))
+        end
+
         local cd = emit("SLOAD", T.CDATA, K.LIT, ninputs + 3,
             K.LIT, SLOAD_TYPECHECK)
         push(T.CDATA, cd)
@@ -206,9 +196,11 @@ local function gen(seed, opts)
     -- Resolve one operand spec at instruction type `t`. Returns
     -- kind, value -- or nil when the current pools cannot satisfy
     -- it, which is what makes an opcode unavailable this round.
+    local mirror_k, mirror_v
     local function resolve(spec, t, allow_const, field, types_override)
         local kind = spec.kind
         if kind == "none" then return K.NONE, 0 end
+        if kind == "mirror" then return mirror_k, mirror_v end
         if kind == "lit" then return K.LIT, spec.pool[rand(#spec.pool)] end
         if kind == "kint" then return K.KINT, spec.pool[rand(#spec.pool)] end
         if kind == "knum" then return K.KNUM, spec.pool[rand(#spec.pool)] end
@@ -257,7 +249,8 @@ local function gen(seed, opts)
     local function satisfiable(spec, t, types_override)
         if spec.kind == "none" or spec.kind == "lit"
             or spec.kind == "kint" or spec.kind == "knum"
-            or spec.kind == "field" or spec.kind == "slot" then
+            or spec.kind == "field" or spec.kind == "slot"
+            or spec.kind == "mirror" then
             return true
         end
         if spec.kind == "same_value" or spec.kind == "value" then
@@ -275,13 +268,6 @@ local function gen(seed, opts)
         for _, name in ipairs(grammar.covered) do
             local spec = grammar.sig[name]
             local usable = not (spec.guard and no_guards)
-            -- Loop mode carries values in stack slots, so it stays
-            -- on the value types. Dropping the table, upvalue and
-            -- cdata roots is not enough on its own: TNEW allocates
-            -- a table inside the body, and HREF and its store
-            -- follow it straight back in -- which crashed the
-            -- unroller on seed 51786.
-            if opts.loop and not VALUE_ONLY[name] then usable = false end
             for _, t in ipairs(usable and spec.types or {}) do
                 if spec.conv then
                     if #conv_variants(spec, t) > 0 then
@@ -326,6 +312,7 @@ local function gen(seed, opts)
             local field = spec.field_of and spec.field_of[c.t]
             local o1t = spec.op1_of and spec.op1_of[c.t]
             ak, av = resolve(spec.op1, c.t, false, field, o1t)
+            mirror_k, mirror_v = ak, av
             bk, bv = resolve(spec.op2, c.t, true, field)
         end
         -- A guard comparing a ref with itself is recorder-
