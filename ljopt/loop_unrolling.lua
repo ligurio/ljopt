@@ -426,17 +426,31 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                 end
                 local snap_remap = {}
                 for k, v in pairs(remap) do snap_remap[k] = v end
+                local phi_vars = {}
+                for _, prologue_ref in pairs(phi_map) do
+                    phi_vars[prologue_ref] = true
+                end
+                for prologue_ref in pairs(phi_const) do
+                    phi_vars[prologue_ref] = true
+                end
+                local phi_target = {}
                 for body_ref, prologue_ref in pairs(phi_map) do
                     local target = remap[prologue_ref] or prologue_ref
-                    if body_pos[body_ref] ~= nil
-                        and body_pos[body_ref] <= snap_pos then
+                    if body_pos[body_ref] == nil then
+                        target = remap[body_ref] or body_ref
+                    elseif body_pos[body_ref] <= snap_pos then
                         target = remap[body_ref] or target
                     end
-                    snap_remap[prologue_ref] = target
+                    phi_target[prologue_ref] = target
                     for _, src in ipairs(preloop_sources(
                             raw_nodes, prologue_ref, loop_idx)) do
-                        snap_remap[src] = target
+                        if not phi_vars[src] then
+                            snap_remap[src] = target
+                        end
                     end
+                end
+                for prologue_ref, target in pairs(phi_target) do
+                    snap_remap[prologue_ref] = target
                 end
                 -- A folded slot holds the constant from the end
                 -- of the body onwards -- on every copy, the first
@@ -455,7 +469,9 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                         snap_remap[prologue_ref] = target
                         for _, src in ipairs(preloop_sources(
                                 raw_nodes, prologue_ref, loop_idx)) do
-                            snap_remap[src] = target
+                            if not phi_vars[src] then
+                                snap_remap[src] = target
+                            end
                         end
                     end
                 end
@@ -468,7 +484,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
 
         prev_phi_remap = {}
         for body_ref, prologue_ref in pairs(phi_map) do
-            prev_phi_remap[prologue_ref] = remap[body_ref]
+            prev_phi_remap[prologue_ref] = remap[body_ref] or body_ref
         end
         -- A folded carried value is the same constant on every
         -- iteration after the first, so it needs no ref.
