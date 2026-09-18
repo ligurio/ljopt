@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(9)
+test:plan(10)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -365,6 +365,40 @@ test:test("loop unrolling carries a folded constant PHI", function(test)
         test:is(slot and slot.type, 'const',
             ("copy %d reads the folded constant"):format(iter))
     end
+end)
+
+test:test("loop unrolling keeps a constant call argument literal",
+    function(test)
+    test:plan(2)
+
+    local flags = {irt_guard = false, raw = ' '}
+    local nodes = {
+        {num = 1, flags = flags, irtype = 'num', irop = 'SLOAD',
+            op1 = {type = 'lit', value = 1}, op2 = {type = 'lit', value = 0}},
+        {num = 2, flags = flags, irtype = 'nil', irop = 'LOOP'},
+        {num = 3, flags = flags, irtype = 'num', irop = 'CALLN',
+            op1 = {type = 'carg', value = {
+                {tab = {type = 'ssa', value = 1}, txt = '0001'},
+                {tab = {type = 'number', value = 2},
+                    txt = '#x4000000000000000'},
+            }},
+            op2 = {type = 'lit', value = 'atan2'}},
+        {num = 4, flags = flags, irtype = 'num', irop = 'PHI',
+            op1 = {type = 'ssa', value = 1},
+            op2 = {type = 'number', value = 0.25},
+            op2_txt = '#x3fd0000000000000'},
+    }
+    local out = unroll_at(2, {trace = nodes, linktype = 'loop'})
+
+    local args = {}
+    for _, node in ipairs(out) do
+        if node.irop == 'CALLN' then
+            table.insert(args, node.op1.value[1])
+        end
+    end
+    test:is(table.getn(args), 2, "one call per unrolled copy")
+    test:is(args[2] and args[2].txt, '#x3fd0000000000000',
+        "the argument remapped to the constant keeps its literal")
 end)
 
 require("tests.coverage").shutdown()
