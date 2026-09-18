@@ -38,18 +38,20 @@ local PREAMBLE = [[
 -- `pass.map[g]` is the decoded ref: > 0 is an SSA node
 -- (snapshot references it and ljopt reads its typed value),
 -- < 0 is a folded constant (materialized in the snapshot).
-local function attach_snapshot(rec, pass, cmp, loop, insns)
+local function attach_snapshot(rec, pass, cmp, loop, insns, outputs)
+  local pos = {}
+  for i, g in ipairs(outputs) do pos[g] = pos[g] or i end
   local slots = {}
   for i, g in ipairs(cmp) do
     local ref = pass.map[g]
     local ins = insns[g]
-    if loop and ins.op == gen.op_num("SLOAD") and ins.av == i then
+    if loop and ins.op == gen.op_num("SLOAD") and ins.av == pos[g] then
       goto continue
     end
     -- A loop replay writes its outputs back into the slots the
     -- SLOADs read (slot 1 up), which is how the unroller pairs a
     -- body result with its input and infers the PHI.
-    local slot = loop and i or (i - 1)
+    local slot = loop and pos[g] or (i - 1)
     if ref > 0 then
       slots[#slots + 1] = { slot, { type = "ssa", value = ref } }
     else
@@ -241,8 +243,8 @@ local function build_from(insns, outputs, opts, seed)
   local formula, identical, commut_only = nil, false, false
   local skipped = (#cmp == 0)
   if not skipped then
-    attach_snapshot(trace_u, unopt_pass, cmp, opts.loop, insns)
-    attach_snapshot(trace_o, opt_pass, cmp, opts.loop, insns)
+    attach_snapshot(trace_u, unopt_pass, cmp, opts.loop, insns, outputs)
+    attach_snapshot(trace_o, opt_pass, cmp, opts.loop, insns, outputs)
     -- The optimized pass changed nothing: both traces render (and
     -- thus translate) identically, so equivalence is trivially
     -- unsat and a driver may skip z3. Exact because constants
