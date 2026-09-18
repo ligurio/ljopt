@@ -35,7 +35,8 @@ local function remap_operand(operand, remap)
             -- spells the original ref and wins in to_string().
             local txt = arg.txt
             if arg.tab ~= nil and arg.tab.type == 'ssa' then
-                txt = nil
+                local r = remap[arg.tab.value]
+                txt = type(r) == 'table' and r.txt or nil
             end
             args[i] = {tab = tab, txt = txt}
         end
