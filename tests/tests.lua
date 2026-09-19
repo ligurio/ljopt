@@ -72,6 +72,24 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
+-- Trace recording is not fully deterministic: at the optimized
+-- level LuaJIT can additionally record a one-off setup trace, so
+-- the unoptimized and optimized recordings end up with different
+-- trace ids and `traces_to_smt` silently drops the unmatched
+-- trace, which leaves the result empty ("no traces found").
+-- Re-record a bounded number of times until a matched set is
+-- produced.
+local function recorded_formulas(lua_code)
+    local formulas
+    for _ = 1, 5 do
+        formulas = ljopt.ir.traces_to_smt(lua_code)
+        if next(formulas) ~= nil then
+            return formulas
+        end
+    end
+    return formulas
+end
+
 local function parsed_and_checked(label, formulas, n_traces)
     if next(formulas) == nil then
         test:diag("%s: no traces found", label)
@@ -426,7 +444,7 @@ foo(1.5)
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
         ))
-        local formulas = ljopt.ir.traces_to_smt(f.code)
+        local formulas = recorded_formulas(f.code)
         local n_traces = f.n_traces or 1
         local res = parsed_and_checked(label, formulas, n_traces)
         test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
@@ -2074,7 +2092,7 @@ end
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
         ))
-        local formulas = ljopt.ir.traces_to_smt(f.code)
+        local formulas = recorded_formulas(f.code)
         local n_traces = f.n_traces or 1
         local res = parsed_and_checked(label, formulas, n_traces)
         test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
@@ -2096,7 +2114,7 @@ end
 ]]
     local strict_mode = ljopt_config.is_strict_mode()
     ljopt_config.set_strict_mode(false)
-    local ok, formulas = pcall(ljopt.ir.traces_to_smt, code)
+    local ok, formulas = pcall(recorded_formulas, code)
     ljopt_config.set_strict_mode(strict_mode)
 
     test:plan(2)
