@@ -7,6 +7,14 @@ local impls = {}
 local IRNodeXSTOREBase = {}
 ir_node.extended(IRNodeXSTOREBase, ir_node.ir_node_base)
 
+-- A store is modelled only for a pointer from a traced cdata (an
+-- SSA). A constant address (e.g. a string literal) is outside the
+-- xmem; drop the store as NYI.
+function IRNodeXSTOREBase.is_implemented(_flags, _type, _opcode,
+                                          left_op, _right_op)
+    return left_op ~= nil and left_op:is_ssa()
+end
+
 -- Reduce the store's right operand to a bitvector: int/i64/u32
 -- are already bitvectors on the op-stack, a num and a float are
 -- reinterpreted to their IEEE-754 bits via `fp_to_bits`.
@@ -23,8 +31,11 @@ local function store_value_bv(right, ctx, typ)
         )
     elseif right:is_ssa() then
         return ctx.op_stack:load(right:get_ssa(), typ)
-    elseif typ == op_type.I64 and right:is_i64() then
-        return ('#x%016x'):format(tonumber(right:get_i64()))
+    elseif right:is_i64() then
+        -- Constant 64-bit store value (a folded ffi.fill byte
+        -- pattern), bit-exact; xmem_store writes only the low
+        -- nbytes bytes, so int/u32 stores work as well.
+        return arith_utils.const_i64_to_smt_bv(right:get_i64())
     end
     return ir_node.retrieve_int_op(right, ctx, typ)
 end

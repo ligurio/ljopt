@@ -72,7 +72,51 @@ local function check_ins_present(lua_chunk, expected_ins, opt)
     return true
 end
 
-test:plan(11)
+-- Trace recording is not fully deterministic: at the optimized
+-- level LuaJIT can additionally record a one-off setup trace, so
+-- the unoptimized and optimized recordings end up with different
+-- trace ids and `traces_to_smt` silently drops the unmatched
+-- trace, which leaves the result empty ("no traces found").
+-- Re-record a bounded number of times until a matched set is
+-- produced.
+local function recorded_formulas(lua_code)
+    local formulas
+    for _ = 1, 5 do
+        formulas = ljopt.ir.traces_to_smt(lua_code)
+        if next(formulas) ~= nil then
+            return formulas
+        end
+    end
+    return formulas
+end
+
+local function parsed_and_checked(label, formulas, n_traces)
+    if next(formulas) == nil then
+        test:diag("%s: no traces found", label)
+        return false
+    end
+    local res = true
+    local n_formulas = 0
+    for j, formula in pairs(formulas) do
+        formula = smt_constants.LJOPT_SMTLIB .. formula
+        if smt:parse(formula) ~= true then
+            test:diag("%s: parse is failed (trace %s)", label, j)
+            res = false
+        end
+        if smt:check(formula) ~= smt.result.UNSAT then
+            test:diag("%s: check is failed (trace %s)", label, j)
+            res = false
+        end
+        n_formulas = n_formulas + 1
+    end
+    if n_traces ~= nil then
+        assert(n_traces == n_formulas, "a number of traces does not match")
+    end
+
+    return res
+end
+
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -392,7 +436,7 @@ foo(1.5)
         },
 ]]
     }}
-    test:plan(3 * #srcs)
+    test:plan(2 * #srcs)
 
     for i, f in ipairs(srcs) do
         local label = f.name or ("test_%d"):format(i)
@@ -400,14 +444,10 @@ foo(1.5)
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
         ))
-        local formulas = ljopt.ir.traces_to_smt(f.code)
-        for j, formula in pairs(formulas) do
-            formula = smt_constants.LJOPT_SMTLIB .. formula
-            test:is(smt:parse(formula), true,
-                ("%s trace %s parse."):format(label, j))
-            test:is(smt:check(formula), smt.result.UNSAT,
-                ("%s trace %s check."):format(label, j))
-        end
+        local formulas = recorded_formulas(f.code)
+        local n_traces = f.n_traces or 1
+        local res = parsed_and_checked(label, formulas, n_traces)
+        test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
     end
 end)
 
@@ -1885,8 +1925,162 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
         },
+    }, {
+        name = "CONV u64.int sext",
+        code = [[
+local ffi = require("ffi")
+for i = 1, 3 do
+  local _ = ffi.new("uint64_t", 1)
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
+    }, {
+        name = "CONV u64.num",
+        code = [[
+local ffi = require('ffi')
+local function foo(n)
+    ffi.new('uint64_t', n)
+end
+
+foo(1)
+foo(2)
+foo(3)
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.num none")},
+        },
+    }, {
+        name = "CONV flt.int",
+        code = [[
+-- Building an FFI struct with a float field from the traced int
+-- loop counter records an int -> flt (float32) CONV at opt level 3;
+-- the double (unopt) trace converts via flt.num instead.
+local ffi = require("ffi")
+local st = ffi.typeof("struct { float a; }")
+for i = 1, 4 do
+  local y = st(i)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "flt", name = "CONV",
+                right_op = op_type.new("lit", "flt.int")},
+        },
+    }, {
+        name = "CONV int.u8",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 1, 3 do
+  ffi.fill(a + i, 10, i)
+end
+]],
+        ins = {
+            {type = "int", name = "CONV",
+                right_op = op_type.new("lit", "int.u8")},
+        },
+    }, {
+        name = "ffi.copy from string literal",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 11)
+for i = 1, 3 do
+  ffi.copy(a + i, "a", 1)
+end
+]],
+        ins = {
+            {type = "p64", name = "ADD"},
+        },
+    }, {
+        name = "uint64 cdata constant operand",
+        code = [[
+local x
+for i = 1, 3 do
+  x = 1 + 1ULL
+end
+]],
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.int sext")},
+        },
+    }, {
+        name = "ffi.fill() constant byte XSTORE",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100)
+for i = 1, 3 do
+  ffi.fill(a, 15, 0x4c)
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u32", name = "XSTORE"},
+        },
+    }, {
+        name = "ffi.copy() string to FFI array",
+        code = [[
+local ffi = require("ffi")
+local a = ffi.new("uint8_t[?]", 100, 42)
+for i = 1, 3 do
+  ffi.copy(a + i, "abc")
+end
+]],
+        ins = {
+            {type = "cdt", name = "SLOAD"},
+        },
+    }, {
+        name = "module-level cdata union",
+        unroll_n = 0,
+        code = [[
+-- A module-level cdata union shows up as a literal operand of the
+-- p64 ADD that addresses its fields; its address is a compile-time
+-- constant that differs between recording runs, so the pointer
+-- arithmetic must be dropped as NYI instead of crashing.
+local ffi = require("ffi")
+local u = ffi.new("union { struct { uint32_t lo, hi; }; uint64_t u64; }")
+local function conv(lo, hi)
+  u.lo = lo
+  u.hi = hi
+  return u.u64
+end
+for i = 1, 3 do
+  _ = conv(i, i)
+end
+]],
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+        },
+    }, {
+        name = "CONV u64.i64",
+        unroll_n = 0,
+        code = [[
+local ffi = require("ffi")
+local u = ffi.new("union { uint64_t u64[1]; void *v[2]; }")
+u.u64[0] = 0
+for i = -1, 4 do
+  u.v[0] = ffi.cast("void *", ffi.cast("ptrdiff_t", i))
+  -- The variable below must be global; if it were local, the
+  -- result would be unused, causing LuaJIT to apply dead code
+  -- elimination (DCE) to the load operation and remove the
+  -- `u64.i64 CONV` conversion along with it. Consequently, the
+  -- `check_ins_present()` check fails with the error:
+  -- `Instruction CONV(u64,u64.i64) not found`.
+  _ = 1 + u.u64[0]
+end
+]],
+        opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
+        ins = {
+            {type = "u64", name = "CONV",
+                right_op = op_type.new("lit", "u64.i64")},
+        },
     }}
-    test:plan(3 * #srcs)
+    test:plan(2 * #srcs)
 
     local unroll_n = ljopt_config.get_loop_unroll_limit()
     for i, f in ipairs(srcs) do
@@ -1898,18 +2092,35 @@ s = s + f(arr, 1e39)
         test:ok(ok, ("%s instructions present: %s"):format(
             label, err or "ok"
         ))
-        local formulas = ljopt.ir.traces_to_smt(f.code)
-        for j, formula in pairs(formulas) do
-            formula = smt_constants.LJOPT_SMTLIB .. formula
-            test:is(smt:parse(formula), true,
-                ("%s trace %s parse."):format(label, j))
-            test:is(smt:check(formula), smt.result.UNSAT,
-                ("%s trace %s check."):format(label, j))
-        end
+        local formulas = recorded_formulas(f.code)
+        local n_traces = f.n_traces or 1
+        local res = parsed_and_checked(label, formulas, n_traces)
+        test:ok(res, ("%s: SMT-LIB syntax is correct and UNSAT"):format(label))
     end
     ljopt_config.set_loop_unroll_limit(unroll_n)
     -- Restore strict mode.
     ljopt_config.set_strict_mode(strict_mode)
+end)
+
+test:test("func.env FLOAD of a constant function", function(test)
+    local code = [[
+local x
+local function f()
+  x = math.huge
+end
+for i = 1, 4 do
+  f()
+end
+]]
+    local strict_mode = ljopt_config.is_strict_mode()
+    ljopt_config.set_strict_mode(false)
+    local ok, formulas = pcall(recorded_formulas, code)
+    ljopt_config.set_strict_mode(strict_mode)
+
+    test:plan(2)
+    test:ok(ok, "func.env FLOAD chunk translates")
+    local res = ok and parsed_and_checked("func.env FLOAD", formulas)
+    test:ok(res, "func.env FLOAD: SMT-LIB syntax is correct and UNSAT")
 end)
 
 require("tests.coverage").shutdown()
