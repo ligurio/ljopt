@@ -1980,6 +1980,7 @@ end
 foo(1)
 foo(2)
 foo(3)
+foo(2.1)
 ]],
         opt = "jit.opt.start(3, 'hotloop=1', 'hotexit=1')",
         ins = {
