@@ -97,6 +97,18 @@ end
 -- to_string() fall back to the remapped value; literals (mode
 -- flags, field names) keep theirs, since op_type.from_raw()
 -- needs the text to reconstruct them.
+local function slots_at_snapshot(snap)
+    local current = {}
+    for _, slot in ipairs(snap.last_slots or {}) do
+        current[slot[1]] = slot[2]
+    end
+    local out = {}
+    for _, slot in ipairs(snap.slots) do
+        table.insert(out, {slot[1], current[slot[1]] or slot[2]})
+    end
+    return out
+end
+
 local function clone_txt(operand, txt)
     if operand ~= nil and operand.type == 'ssa' then
         return nil
@@ -334,14 +346,9 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                     end
                 end
 
-                local snap_remap = {}
-                for k, v in pairs(remap) do snap_remap[k] = v end
-                for body_ref, prologue_ref in pairs(phi_map) do
-                    snap_remap[prologue_ref] = remap[body_ref]
-                end
                 local uid = snap_id + iter * SNAPSHOT_INC
                 new_snapshots[uid] = clone_snap(
-                    new_nins, snap.slots, snap_remap
+                    new_nins, slots_at_snapshot(snap), remap
                 )
             end
         end
