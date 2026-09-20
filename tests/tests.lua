@@ -389,6 +389,21 @@ end
                 -- enabled.
                 left_op = op_type.new("ssa", 3)},
         },
+    }, {
+        name = "loop carrying a value across a register rename",
+        code = [[
+local x, y = 0, 1
+local i = 0
+while i < 100 do
+    x = y
+    y = 5
+    i = i + 1
+end
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "LT"},
+        },
 --[[
     }, {
 -- Fix BV <-> FP casts, now it's too slow:
