@@ -99,6 +99,13 @@ local trace_loc = {}
 -- uid -> "file:line" string where the trace starts.
 local execution_locs = {}
 
+-- true when the running LuaJIT provides jit.util.tracesnap(...,
+-- getpos) (commit 8e6520a). It describes the binary, not the
+-- recording state, so it is not reset by
+-- ljopt_init_trace_state(). Set to false on the first call that
+-- reports the missing argument.
+local tracesnap_getpos_supported = true
+
 local ffi = require("ffi")
 local dev_checks = require('ljopt.dev_checks')
 
@@ -127,6 +134,10 @@ end
 
 local function ljopt_get_execution_locs()
   return execution_locs
+end
+
+local function ljopt_tracesnap_getpos_supported()
+  return tracesnap_getpos_supported
 end
 
 -- Helper function used only in tests to map trace_id to
@@ -237,6 +248,11 @@ local function ljopt_init_trace_uid(tr, func, pc, what, otr, oex)
         traces_num[tr] = traces_num[tr] .. parent_trace_id
         if oex >= 0 then
           local _, snap_id = tracesnap(otr, oex, true)
+          if snap_id == nil then
+            tracesnap_getpos_supported = false
+            traces_num[tr] = nil
+            return
+          end
           if #(exec_record[parent_trace_id].snapshots[snap_id].nins) == 1 then
             traces_num[tr] = traces_num[tr] .. "_" .. snap_id
           else
@@ -391,6 +407,10 @@ local function ljopt_savesnap(tr, nins, snap, snapno, _linktype)
     end
   end
   local _, snap_id = jutil.tracesnap(tr, snapno, true)
+  if snap_id == nil then
+    tracesnap_getpos_supported = false
+    return
+  end
   assert(snap_id >= 0, "Snapshot ID must be positive")
   if ljopt_config.is_debug_mode() then
     io.stderr:write("Snap offset: " .. snap_id .. "\n")
@@ -474,6 +494,7 @@ return {
   ljopt_savesnap = ljopt_savesnap,
   ljopt_record_trace = ljopt_record_trace,
   ljopt_savetrace = ljopt_savetrace,
+  ljopt_tracesnap_getpos_supported = ljopt_tracesnap_getpos_supported,
   ljopt_formatsmt = ljopt_formatsmt,
   ljopt_init = ljopt_init,
 }
