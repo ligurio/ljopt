@@ -582,7 +582,9 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
 
                 local new_nins = {}
                 for _, nins in ipairs(snap.nins) do
-                    table.insert(new_nins, base_pos + nins)
+                    if not phi_sloads[nins] then
+                        table.insert(new_nins, base_pos + nins)
+                    end
                 end
 
                 local uid = snap_id + (iter - 1) * SNAPSHOT_INC

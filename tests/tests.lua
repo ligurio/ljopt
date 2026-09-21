@@ -372,6 +372,21 @@ end
                 left_op = op_type.new("ssa", 3)},
         },
     }, {
+        name = "loop with a guard before the carried update",
+        code = [[
+local x = 12
+local n = 0
+for i = 1, 100 do
+    if x < 1e6 then n = n + 1 end
+    x = x + 5
+end
+]],
+        ins = {
+            {type = "num", name = "LT"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
+        },
+    }, {
         -- math.random goes through a helper that takes the
         -- lua_State, which records as CALLS. It was NYI, so the
         -- call and the value it produced left the formula.
