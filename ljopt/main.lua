@@ -37,6 +37,17 @@ local function trace_number_error(num, total)
   os.exit(1)
 end
 
+-- Trace translation requires a compatible LuaJIT and may raise;
+-- report such failures as a runtime error instead of a traceback.
+local function checked_call(fn, ...)
+  local ok, a, b = pcall(fn, ...)
+  if not ok then
+    utils.fatal_msg("ljopt: " .. tostring(a),
+      exit_codes.ERR_BAD_LUA_RUNTIME)
+  end
+  return a, b
+end
+
 if jit == nil then
   utils.fatal_msg("Unsupported Lua runtime.", exit_codes.ERR_BAD_LUA_RUNTIME)
 end
@@ -125,10 +136,12 @@ jit.flush()
 -- number only that trace is printed.
 if not check_requested then
   if trace_number == nil then
-    io.stdout:write(ljopt.ir.translate_to_smt(lua_code, chunkname))
+    io.stdout:write(checked_call(
+      ljopt.ir.translate_to_smt, lua_code, chunkname))
     os.exit(exit_codes.OK)
   end
-  local traces, trace_locs = ljopt.ir.traces_to_smt(lua_code, chunkname)
+  local traces, trace_locs = checked_call(
+    ljopt.ir.traces_to_smt, lua_code, chunkname)
   local order = utils.build_order(traces, trace_locs)
   if trace_number > #order then
     trace_number_error(trace_number, #order)
@@ -141,7 +154,8 @@ local solver = utils.find_solver()
 if solver == nil then
   io.stderr:write("SMT solver is not available (install Z3 or cvc5), "
     .. "the SMT-LIB formula is printed to stdout.\n")
-  io.stdout:write(ljopt.ir.translate_to_smt(lua_code, chunkname))
+  io.stdout:write(checked_call(
+    ljopt.ir.translate_to_smt, lua_code, chunkname))
   os.exit(exit_codes.ERR_SMT_UNKNOWN)
 end
 
@@ -153,7 +167,8 @@ end
 -- otherwise it would only surface with the first flush below.
 io.stdout:flush()
 local start_time = utils.clock_monotonic()
-local traces, trace_locs = ljopt.ir.traces_to_smt(lua_code, chunkname)
+local traces, trace_locs = checked_call(
+  ljopt.ir.traces_to_smt, lua_code, chunkname)
 
 -- Traces are checked one by one and their verdict is printed as
 -- soon as a formula is ready. To make the stream deterministic
