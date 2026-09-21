@@ -4,7 +4,7 @@
 
 local ljopt = require("ljopt")
 local ljopt_config = require("ljopt.config")
-local smt = require("tests.smtlib2").new()
+local smt = require("ljopt.smtlib2").new()
 local ir_dump_utils = require("ljopt.ir_dump_utils")
 local smt_constants = require("ljopt.smt_constants")
 local ir_smtlib = require("ljopt.ir_smtlib")
@@ -96,7 +96,7 @@ local function parsed_and_checked(label, formulas, n_traces)
     return res
 end
 
-test:plan(11)
+test:plan(12)
 
 test:test("smt_module", function(test)
     test:plan(2)
@@ -455,6 +455,34 @@ foo()
     -- Testing formula is redundant.
     -- What matters is that we do not crashed on parsing traces.
     test:is(smt:parse(formula), true, "Sandbox parsing.")
+end)
+
+test:test("Trace start locations use the chunkname", function(test)
+    test:plan(2)
+    -- The recorded chunk is compiled with an optional chunkname
+    -- so funcinfo() reports "<chunkname>:<line>" for a trace
+    -- start instead of an anonymous address. Check that the
+    -- chunkname reaches every recorded trace location.
+    local code = [[
+local function foo()
+    return 1
+end
+foo()
+foo()
+foo()
+]]
+    local _, locs =
+        ljopt.ir.traces_to_smt(code, "@trace_locs_test.lua")
+    test:is(type(locs), "table", "locations are returned")
+
+    local all_named = next(locs) ~= nil
+    for _, loc in pairs(locs) do
+        if not loc:match("^trace_locs_test%.lua:%d+$") then
+            all_named = false
+            test:diag("unexpected trace location: %s", loc)
+        end
+    end
+    test:ok(all_named, "every location uses the chunkname")
 end)
 
 test:test("Stitching test", function(test)

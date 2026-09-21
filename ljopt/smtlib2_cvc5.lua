@@ -1,4 +1,4 @@
--- cvc5 backend, drop-in for tests/smtlib2.lua (the z3 one).
+-- cvc5 backend, drop-in for ljopt/smtlib2.lua (the z3 one).
 -- Same API: new(), :parse(str), :check(str), .result.
 --
 -- Uses cvc5's C API (include/cvc5/c) through LuaJIT's FFI, the
@@ -65,10 +65,14 @@ local parserlib = ffi.load("cvc5parser")
 local function feed(str)
     local tm = cvc5.cvc5_term_manager_new()
     local slv = cvc5.cvc5_new(tm)
-    cvc5.cvc5_set_option(slv, "tlimit", ljopt_config.get_solver_timeout_ms())
     -- The formulas carry no (set-logic); saying so up front keeps
     -- cvc5 from warning about it on every query.
     cvc5.cvc5_set_option(slv, "force-logic", "ALL")
+    -- Bound every check-sat with tlimit-per: the plain "tlimit"
+    -- (total solver time) is not enforced by cvc5 1.3.0 through
+    -- the C API and lets a single hard query run forever.
+    cvc5.cvc5_set_option(slv, "tlimit-per",
+                         ljopt_config.get_solver_timeout_ms())
 
     local sm = parserlib.cvc5_symbol_manager_new(tm)
     local parser = parserlib.cvc5_parser_new(slv, sm)
@@ -152,7 +156,8 @@ local function new()
     -- fails here rather than on the first query.
     local tm = cvc5.cvc5_term_manager_new()
     local slv = cvc5.cvc5_new(tm)
-    print("cvc5 version: ", ffi.string(cvc5.cvc5_get_version(slv)))
+    local cvc5_version = ffi.string(cvc5.cvc5_get_version(slv))
+    print(("SMT backend: CVC5 %s"):format(cvc5_version))
     cvc5.cvc5_delete(slv)
     cvc5.cvc5_term_manager_delete(tm)
 
