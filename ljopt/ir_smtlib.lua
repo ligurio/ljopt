@@ -288,6 +288,14 @@ end
 -- are not equivalent.
 local function traces_to_smt(lua_code, chunkname)
     local rec_unopt = record_code(lua_code, lj_unoptimized, chunkname)
+    -- ljopt keys snapshot exits by their bytecode offset, which
+    -- requires the optional getpos argument of tracesnap()
+    -- Without it the JIT handlers cannot record snapshots at all,
+    -- so fail with a clear message instead of leaking "VM handler
+    -- failed" for every snapshot.
+    if not ir_dump_utils.ljopt_tracesnap_getpos_supported() then
+        error('requires a LuaJIT with jit.util.tracesnap() getpos support.', 0)
+    end
     -- Both record_code() runs capture the "file:line" of every
     -- recorded trace (see ir_dump_utils), keyed by the same
     -- persistent uid. The next record_code() resets the module
