@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(10)
+test:plan(11)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -748,6 +748,55 @@ test:test("table-driven generator reaches everything it declares",
     for seed = 1, 100 do replay(seed, 14) end
     test:is(table.concat(retyped, "; "), "",
         "optimization never changes the type of a generated value")
+end)
+
+test:test("unrolling keeps a slot a carried value only reads",
+    function(test)
+    test:plan(2)
+
+    -- IR fuzzer seed 1791425470 (--tables --loop --insns 12). The
+    -- optimizer folds `BAND x x` to the SLOAD of slot 3, and the
+    -- carried BROL is computed from that same SLOAD. Slot 3 is
+    -- not carried, so every unrolled copy of the snapshot has to
+    -- keep reading the SLOAD. Walking the PHI's dataflow back to
+    -- the prologue rewrote it to the BROL of each copy, and the
+    -- check reported a miscompile. A later change to gen.lua can
+    -- make this seed build something else.
+    local check = require("ljopt.irfuzz.check")
+    local orig = loop_unrolling.loop_unrooling_transform
+    local slot3 = {}
+    loop_unrolling.loop_unrooling_transform = function(raw, ...)
+        local nodes, snaps, smt = orig(raw, ...)
+        local has_loop = false
+        for _, node in ipairs(raw) do
+            if node.irop == "LOOP" then has_loop = true end
+        end
+        for uid, snap in pairs(has_loop and snaps or {}) do
+            if uid >= 1e6 then
+                for _, slot in ipairs(snap.slots) do
+                    if slot[1] == 3 then
+                        slot3[#slot3 + 1] = ("%s:%s"):format(
+                            slot[2].type, tostring(slot[2].value))
+                    end
+                end
+            end
+        end
+        return nodes, snaps, smt
+    end
+    local ok, err = pcall(check.build, 1791425470, {
+        insns = 12, ints = true, exclude_gaps = true,
+        tables = true, loop = true,
+    })
+    loop_unrolling.loop_unrooling_transform = orig
+    assert(ok, err)
+
+    local moved = {}
+    for _, s in ipairs(slot3) do
+        if s ~= "ssa:3" then moved[#moved + 1] = s end
+    end
+    test:ok(#slot3 > 0, "the optimized trace has unrolled snapshots")
+    test:is(table.concat(moved, " "), "",
+        "every copy keeps slot 3 on its SLOAD")
 end)
 
 require("tests.coverage").shutdown()
