@@ -78,6 +78,18 @@ local function attach_snapshot(rec, pass, cmp, loop, insns, outputs)
   }
 end
 
+local function empty_loop_body(rec)
+  local loop_idx
+  for i, ins in ipairs(rec.trace) do
+    if ins.irop == "LOOP" then loop_idx = i break end
+  end
+  if loop_idx == nil then return false end
+  for i = loop_idx + 1, #rec.trace do
+    if rec.trace[i].irop ~= "PHI" then return false end
+  end
+  return true
+end
+
 -- Classify an output ref on one side: nil if comparable, else
 -- the op name that makes it a gap (dummy/NYI or uninterpreted).
 local function gap_op(trace, nyi, pass, ref)
@@ -242,6 +254,7 @@ local function build_from(insns, outputs, opts, seed)
 
   local formula, identical, commut_only = nil, false, false
   local skipped = (#cmp == 0)
+    or (opts.loop and empty_loop_body(trace_o))
   if not skipped then
     attach_snapshot(trace_u, unopt_pass, cmp, opts.loop, insns, outputs)
     attach_snapshot(trace_o, opt_pass, cmp, opts.loop, insns, outputs)
