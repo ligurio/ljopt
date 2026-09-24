@@ -463,6 +463,30 @@ foo(3)
             {type = "int", name = "ABC"},
             {type = "num", name = "ALOAD"},
         },
+    }, {
+        -- `tmp` is dead, so -O3 drops its TNEW and only the
+        -- unoptimized trace allocates. The table read from `o`
+        -- existed before the trace, so it cannot be `tmp`, and
+        -- both traces check `inner[2]` against the same size.
+        name = "table read from memory is not a fresh table",
+        code = [[
+local outer = {{1, 2, 3}}
+local function f(o)
+    local tmp = {}
+    local inner = o[1]
+    return inner[2]
+end
+f(outer)
+f(outer)
+f(outer)
+f(outer)
+]],
+        ins = {
+            {type = "tab", name = "ALOAD"},
+            {type = "int", name = "FLOAD"},
+            {type = "int", name = "ABC"},
+            {type = "num", name = "ALOAD"},
+        },
 --[[
     }, {
 -- Fix BV <-> FP casts, now it's too slow:

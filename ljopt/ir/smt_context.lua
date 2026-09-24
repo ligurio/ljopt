@@ -432,6 +432,10 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.local_by_ssa = {}
     self.escaped_tabs = {}
     self.escaped_set = {}
+    -- Memory version each local table was allocated at, and
+    -- the table ids read from memory (see note_table_load).
+    self.local_versions = {}
+    self.table_loads = {}
     -- [Version][Slot][Data]
     local mutable_memory = string.format(
         '(declare-fun %s () MemPtr)',
@@ -464,6 +468,7 @@ function MemoryStack.allocate_local(self, ssa_ref)
     local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
     table.insert(self.local_tabs, name)
     self.local_by_ssa[ssa_ref] = name
+    self.local_versions[name] = self._version
     -- zero_pointer is unconstrained, not all-nil, so being fresh
     -- does not by itself say the metatable field is empty -- and
     -- the recorder guards exactly that in front of a fresh
@@ -492,6 +497,25 @@ function MemoryStack.mark_escaped(self, ssa_ref)
     table.insert(self.escaped_tabs, name)
 end
 
+-- The cell `key` of table `ptr` at memory version `version`.
+function MemoryStack.cell_at(self, version, ptr, key)
+    return ('(select (select (select %s %s) %s) %s)'):format(
+        self._name, version, ptr, key
+    )
+end
+
+-- Records a table id read from cell `key` of table `ptr`;
+-- `decode` turns a cell into the table id it holds.
+function MemoryStack.note_table_load(self, ptr, key, decode)
+    dev_checks('table', 'string', 'string', 'function')
+
+    table.insert(self.table_loads, {
+        ptr = ptr, key = key, decode = decode,
+        id = decode(self:cell_at(self._version, ptr, key)),
+        locals = #self.local_tabs,
+    })
+end
+
 -- Keeps the locally allocated tables apart from each other and
 -- from every counter-allocated slot.
 function MemoryStack.local_tabs_constraints(self)
@@ -510,6 +534,25 @@ function MemoryStack.local_tabs_constraints(self)
                 table.concat(self.local_tabs, ' ')
             )
         )
+    end
+    -- A table is new when it is allocated: no cell holds its id
+    -- yet. So a table read from memory is a local one only if a
+    -- store put it into that cell after the allocation, which the
+    -- store chain between the two versions already models. For a
+    -- table allocated after the read, the id read is still live
+    -- and cannot be handed out again.
+    for _, load in ipairs(self.table_loads) do
+        for i, name in ipairs(self.local_tabs) do
+            local id = load.id
+            if i <= load.locals then
+                id = load.decode(self:cell_at(
+                    self.local_versions[name], load.ptr, load.key
+                ))
+            end
+            table.insert(out,
+                ('(assert (not (= %s %s)))'):format(id, name)
+            )
+        end
     end
     return table.concat(out, '\n') .. '\n'
 end

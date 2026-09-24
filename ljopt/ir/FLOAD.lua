@@ -240,9 +240,6 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     local field_hash = arith_utils.const_str_to_memcell(
         smt_constants.FIELD_TAB_PREFIX .. right_op_str
     )
-    local raw_cell = ('(select %s %s)'):format(
-        ctx.mem_stack:load(parent_ptr), field_hash
-    )
     -- A table has no metatable until something sets one, and a
     -- table allocated in this trace starts out with every field
     -- nil -- which is exactly the state the `EQ tab.meta NULL`
@@ -252,7 +249,7 @@ function impls.IRNodeFLOADTab:to_smt_lib(ctx)
     -- assert cannot hold for a fresh table, and one unsatisfiable
     -- assert makes every question about the trace pair answer
     -- "unsat", which reads as "equivalent".
-    local data = ir_node.get_table_uid(raw_cell)
+    local data = ir_node.load_table_uid(ctx, parent_ptr, field_hash)
     return ctx.op_stack:store(ssa_ref, op_type.TAB, data)
 end
 

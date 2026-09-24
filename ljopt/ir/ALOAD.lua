@@ -24,7 +24,7 @@ ir_node.extended(impls.IRNodeALOADTab, ir_node.ir_node_base)
 
 function impls.IRNodeALOADTab:to_smt_lib(ctx)
     local left_op = self:get_left_op()
-    local _, _, raw_cell = ir_node.retrieve_tab_ref(left_op, ctx)
+    local tab_left, idx_left = ir_node.retrieve_tab_ref(left_op, ctx)
 
     local ssa_ref = self:get_ssa_reference()
     -- An array slot that holds no table is a state the trace
@@ -32,7 +32,7 @@ function impls.IRNodeALOADTab:to_smt_lib(ctx)
     -- it with get_table_uid()'s fallback instead of asserting it
     -- holds a table. One unsatisfiable assert makes every
     -- question about the trace pair answer "unsat".
-    local tab_id = ir_node.get_table_uid(raw_cell)
+    local tab_id = ir_node.load_table_uid(ctx, tab_left, idx_left)
     return ('%s\n%s'):format(
         ctx.te_stack:store(ssa_ref, 'true'),
         ctx.op_stack:store(ssa_ref, op_type.TAB, tab_id)

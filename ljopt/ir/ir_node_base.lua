@@ -242,6 +242,16 @@ local function get_table_uid(raw_cell)
     )
 end
 
+-- Reads the table id held in cell `key` of table `ptr`, and
+-- tells the memory stack, which keeps it apart from the tables
+-- this trace allocates.
+local function load_table_uid(ctx, ptr, key)
+    ctx.mem_stack:note_table_load(ptr, key, get_table_uid)
+    return get_table_uid(
+        ('(select %s %s)'):format(ctx.mem_stack:load(ptr), key)
+    )
+end
+
 local ir_node_base = {}
 function ir_node_base:new(ssa_ref, flags, type, opcode, left_op, right_op)
     dev_checks(
@@ -298,6 +308,7 @@ return {
     retrieve_tab_ptr = retrieve_tab_ptr,
     retrieve_tab_ref = retrieve_tab_ref,
     get_table_uid = get_table_uid,
+    load_table_uid = load_table_uid,
     retrieve_num_op = retrieve_num_op,
     retrieve_str_op = retrieve_str_op,
     retrieve_int_op = retrieve_int_op,
