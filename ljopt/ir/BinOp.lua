@@ -53,6 +53,22 @@ function IRNodeBinOpInt:to_smt_lib(ctx)
         self:get_right_op(), ctx, self:get_type()
     )
     local data = string.format('(%s %s %s)', self.op_str, left_op, right_op)
+
+    -- LuaJIT's int arithmetic is 32-bit and wraps, so a folded
+    -- result is only the real one while it stays in range. Out of
+    -- range the node keeps its symbolic form, which is always
+    -- sound -- just less folded.
+    if self.const_fn then
+        local lc = utils.resolve_const(self:get_left_op(), ctx)
+        local rc = utils.resolve_const(self:get_right_op(), ctx)
+        if lc ~= nil and rc ~= nil then
+            local v = self.const_fn(lc, rc)
+            if v == math.floor(v) and v >= -2 ^ 31 and v < 2 ^ 31 then
+                ctx.const_nums[self:get_ssa_reference()] = v
+            end
+        end
+    end
+
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 

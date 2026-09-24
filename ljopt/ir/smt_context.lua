@@ -432,6 +432,10 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.local_by_ssa = {}
     self.escaped_tabs = {}
     self.escaped_set = {}
+    -- Memory version each local table was allocated at, and
+    -- the table ids read from memory (see note_table_load).
+    self.local_versions = {}
+    self.table_loads = {}
     -- [Version][Slot][Data]
     local mutable_memory = string.format(
         '(declare-fun %s () MemPtr)',
@@ -464,9 +468,18 @@ function MemoryStack.allocate_local(self, ssa_ref)
     local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
     table.insert(self.local_tabs, name)
     self.local_by_ssa[ssa_ref] = name
+    self.local_versions[name] = self._version
+    -- zero_pointer is unconstrained, not all-nil, so being fresh
+    -- does not by itself say the metatable field is empty -- and
+    -- the recorder guards exactly that in front of a fresh
+    -- table, while the optimizer knows it and drops the guard.
     return name, ('(declare-const %s Int)\n'):format(name) ..
-        ('(assert (= (select (select %s %s) %s) zero_pointer))'):format(
+        ('(assert (= (select (select %s %s) %s) zero_pointer))\n'):format(
             self._name, self:get_version(), name
+        ) ..
+        ('(assert (= (select (select (select %s %s) %s) %s) nil-val))'):format(
+            self._name, self:get_version(), name,
+            ('(str-val "%stab.meta")'):format(smt_constants.FIELD_TAB_PREFIX)
         )
 end
 
@@ -482,6 +495,25 @@ function MemoryStack.mark_escaped(self, ssa_ref)
     end
     self.escaped_set[name] = true
     table.insert(self.escaped_tabs, name)
+end
+
+-- The cell `key` of table `ptr` at memory version `version`.
+function MemoryStack.cell_at(self, version, ptr, key)
+    return ('(select (select (select %s %s) %s) %s)'):format(
+        self._name, version, ptr, key
+    )
+end
+
+-- Records a table id read from cell `key` of table `ptr`;
+-- `decode` turns a cell into the table id it holds.
+function MemoryStack.note_table_load(self, ptr, key, decode)
+    dev_checks('table', 'string', 'string', 'function')
+
+    table.insert(self.table_loads, {
+        ptr = ptr, key = key, decode = decode,
+        id = decode(self:cell_at(self._version, ptr, key)),
+        locals = #self.local_tabs,
+    })
 end
 
 -- Keeps the locally allocated tables apart from each other and
@@ -502,6 +534,25 @@ function MemoryStack.local_tabs_constraints(self)
                 table.concat(self.local_tabs, ' ')
             )
         )
+    end
+    -- A table is new when it is allocated: no cell holds its id
+    -- yet. So a table read from memory is a local one only if a
+    -- store put it into that cell after the allocation, which the
+    -- store chain between the two versions already models. For a
+    -- table allocated after the read, the id read is still live
+    -- and cannot be handed out again.
+    for _, load in ipairs(self.table_loads) do
+        for i, name in ipairs(self.local_tabs) do
+            local id = load.id
+            if i <= load.locals then
+                id = load.decode(self:cell_at(
+                    self.local_versions[name], load.ptr, load.key
+                ))
+            end
+            table.insert(out,
+                ('(assert (not (= %s %s)))'):format(id, name)
+            )
+        end
     end
     return table.concat(out, '\n') .. '\n'
 end
@@ -561,8 +612,15 @@ function MemoryStack.allocate(self, inherited_from)
     end
     local slot_num
     current_slot, slot_num = self:alloc_slot()
-    local result = ('\n(assert (= (select (select %s 0) %s) zero_pointer))')
-        :format(self._name, current_slot)
+    -- The table is fresh *now*, not at version 0: a TNEW that
+    -- follows a store must be empty in the version the trace has
+    -- reached. Pinning version 0 instead both leaves the store
+    -- that follows reading whatever the earlier chain held at
+    -- this key, and constrains the shared base memory the other
+    -- pass is tied to -- two allocations claiming the same key at
+    -- version 0 make the whole query vacuously unsat.
+    local result = ('\n(assert (= (select (select %s %s) %s) zero_pointer))')
+        :format(self._name, self:get_version(), current_slot)
     return current_slot, result, slot_num
 end
 
@@ -646,6 +704,12 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     self.const_nums = {}
     -- ssa_ref -> string constant value (for constant propagation)
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     -- ssa_ref -> Lua-level key string (set by HREFK/HREF)
     self.href_keys = {}
     -- ssa_ref -> { asize, hmask, content = { key -> OpKind } }
@@ -668,6 +732,12 @@ end
 function SMTContext:restart()
     self.const_nums = {}
     self.const_strs = {}
+    -- ssa_ref -> length of a string whose contents are unknown
+    -- but whose size is not (see ir/SNEW.lua).
+    self.const_str_lens = {}
+    -- ssa_ref -> true for the frame arithmetic that names
+    -- the vararg region (see ir/VLOAD.lua).
+    self.vararg_refs = {}
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}

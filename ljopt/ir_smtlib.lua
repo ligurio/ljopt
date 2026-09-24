@@ -147,6 +147,23 @@ local function translate(trace_record, ctx_src,
         ctx_src.snap_stack:init_smt(snap_stack_prefix .. smt_suffix .. tr_id) ..
         '\n'
 
+    if os.getenv("LJOPT_DBG_RAW") then
+        local abc, loopm = 0, false
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then abc = abc + 1 end
+            if n.irop == 'LOOP' then loopm = true end
+        end
+        io.stderr:write(("[raw] %s link=%s nodes=%d ABC=%d loop=%s\n")
+            :format(tostring(smt_suffix), tostring(trace_record.linktype),
+                #trace_record.trace, abc, tostring(loopm)))
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then
+                io.stderr:write(("[raw]   ABC %s %s\n"):format(
+                    tostring(n.op1_txt), tostring(n.op2_txt)))
+            end
+        end
+    end
+
     -- 1st stage. Loop unrolling on raw nodes (removes LOOP/PHI).
     local unroll_smt
     trace_record.trace, trace_record.snapshots, unroll_smt =
@@ -159,6 +176,22 @@ local function translate(trace_record, ctx_src,
     -- 2nd stage. Constructing list of `ir_nodes`
     -- from raw string data.
     local nodes, filtered_nodes = construct_nodes(trace_record)
+    if os.getenv("LJOPT_DBG_ABC") then
+        local raw_abc, has_loop = 0, false
+        for _, n in ipairs(trace_record.trace) do
+            if n.irop == 'ABC' then raw_abc = raw_abc + 1 end
+            if n.irop == 'LOOP' then has_loop = true end
+        end
+        local built_abc = 0
+        for _, n in ipairs(nodes) do
+            if n:get_opcode() == 'ABC' then built_abc = built_abc + 1 end
+        end
+        io.stderr:write(("[dbg] %s link=%s post-transform nodes=%d " ..
+            "ABC=%d loop_marker=%s built=%d builtABC=%d\n"):format(
+            tostring(smt_suffix), tostring(trace_record.linktype),
+            #trace_record.trace, raw_abc, tostring(has_loop),
+            #nodes, built_abc))
+    end
 
     if ljopt_config.is_narrowing() then
         ir_passes.mark_narrowed_refs(nodes, ctx_src)

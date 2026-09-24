@@ -70,6 +70,34 @@ local LJOPT_SMTLIB = ([[
 
 (declare-fun math_atan2 ((_ FloatingPoint 11 53) (_ FloatingPoint 11 53)) (_ FloatingPoint 11 53))
 
+; The table id of a cell that does not hold a table -- an env or
+; metatable field that is still nil, an array slot that never got
+; one. It has to be a function of the cell rather than a fresh
+; slot per load: the two passes allocate slots independently, so a
+; fresh one would have them read different tables for the same
+; cell and every such load would look like a divergence.
+(declare-fun tab_uid (MemCell) Int)
+
+; Uninterpreted functions for a table rehash. Inserting a key can
+; resize both parts of a table, and by how much is lj_tab.c's
+; business, not ours -- what the equivalence check needs is only
+; that the same insertion into the same table gives the same new
+; sizes on both sides, which is exactly what an uninterpreted
+; function says. The arguments are the sizes before the insertion
+; and the key that went in.
+(declare-fun tab_rehash_asize
+  ((_ BitVec 64) (_ BitVec 64) MemCell) (_ BitVec 64))
+(declare-fun tab_rehash_hmask
+  ((_ BitVec 64) (_ BitVec 64) MemCell) (_ BitVec 64))
+
+; Uninterpreted results for the lua_State-taking helpers (CALLS).
+; Indexed by callee, so the same helper gives the same value on
+; both sides and equivalent calls match by congruence. What the
+; helper computes is not modelled, and neither is the state it
+; advances -- two draws from math.random come out equal here.
+(declare-fun calls_num (Int) (_ FloatingPoint 11 53))
+(declare-fun calls_int (Int) (_ BitVec 64))
+
 ; Uninterpreted functions for FFI external C calls (CALLXS).
 ; Indexed by arity. Both unopt and opt traces apply the same
 ; function to congruent arguments, so equivalent FFI calls
@@ -114,9 +142,16 @@ local FIELD_TAB_PREFIX = '```'
 -- String buffer slot.
 local STRING_BUFF_SLOT = FIELD_TAB_PREFIX .. 'bufhdr'
 
+-- The vararg region of the frame the trace was entered from,
+-- modelled as one object. Far above any VM slot so it collides
+-- with none, and non-negative so the memory comparison reaches
+-- it like any other shared table.
+local VARARG_SLOT = 1000000
+
 return {
     LJOPT_SMTLIB = LJOPT_SMTLIB,
     MAXSNAP = MAXSNAP,
     FIELD_TAB_PREFIX = FIELD_TAB_PREFIX,
+    VARARG_SLOT = VARARG_SLOT,
     STRING_BUFF_SLOT = STRING_BUFF_SLOT,
 }

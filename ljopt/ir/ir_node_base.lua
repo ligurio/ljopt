@@ -231,9 +231,24 @@ local function retrieve_tab_ref(op, ctx)
     return tab_id, tab_ptr, raw_cell
 end
 
-local function get_table_uid(raw_cell, fresh_slot)
-    return ('(ite ((_ is tab-val) %s) (get-tab %s) %s)'):format(
-        raw_cell, raw_cell, fresh_slot
+-- Decode a memory cell as a table id. A cell holding no table --
+-- a metatable field still nil, an array slot that never got one
+-- -- gets an id derived from the cell itself, so both passes
+-- agree on it by congruence.
+local function get_table_uid(raw_cell)
+    return ('(ite ((_ is tab-val) %s) (get-tab %s)'
+        .. ' (tab_uid %s))'):format(
+        raw_cell, raw_cell, raw_cell
+    )
+end
+
+-- Reads the table id held in cell `key` of table `ptr`, and
+-- tells the memory stack, which keeps it apart from the tables
+-- this trace allocates.
+local function load_table_uid(ctx, ptr, key)
+    ctx.mem_stack:note_table_load(ptr, key, get_table_uid)
+    return get_table_uid(
+        ('(select %s %s)'):format(ctx.mem_stack:load(ptr), key)
     )
 end
 
@@ -293,6 +308,7 @@ return {
     retrieve_tab_ptr = retrieve_tab_ptr,
     retrieve_tab_ref = retrieve_tab_ref,
     get_table_uid = get_table_uid,
+    load_table_uid = load_table_uid,
     retrieve_num_op = retrieve_num_op,
     retrieve_str_op = retrieve_str_op,
     retrieve_int_op = retrieve_int_op,
