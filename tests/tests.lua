@@ -404,6 +404,22 @@ end
             {type = "num", name = "ADD"},
             {type = "num", name = "LT"},
         },
+    }, {
+        name = "loop PHI fed by a hoisted PHI variable",
+        code = [[
+local a, b = 1, 2
+local x, y = 0, 0
+for i = 1, 100 do
+    x = a + 3
+    y = b + 3
+    a = b
+    b = b * 2
+end
+]],
+        ins = {
+            {type = "num", name = "ADD"},
+            {type = "num", name = "MUL"},
+        },
 --[[
     }, {
 -- Fix BV <-> FP casts, now it's too slow:
@@ -1919,6 +1935,27 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XSTORE"},
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
+        },
+    }, {
+        -- The optimizer hoists the type check of `n` out of the
+        -- loop, so its snapshot is taken once before the loop on
+        -- the optimized side, while the unoptimized trace repeats
+        -- it in every unrolled copy. Strict mode requires every
+        -- snapshot to exist on both sides, which does not hold
+        -- for loops: an unmatched snapshot is legitimate there.
+        name = "loop with a guard before the carried update",
+        code = [[
+local x = 12
+local n = 0
+for i = 1, 100 do
+    if x < 1e6 then n = n + 1 end
+    x = x + 5
+end
+]],
+        ins = {
+            {type = "num", name = "LT"},
+            {type = "num", name = "ADD"},
+            {type = "num", name = "ADD"},
         },
     }}
     test:plan(2 * #srcs)

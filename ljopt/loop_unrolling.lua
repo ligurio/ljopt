@@ -97,6 +97,18 @@ end
 -- to_string() fall back to the remapped value; literals (mode
 -- flags, field names) keep theirs, since op_type.from_raw()
 -- needs the text to reconstruct them.
+local function slots_at_snapshot(snap)
+    local current = {}
+    for _, slot in ipairs(snap.last_slots or {}) do
+        current[slot[1]] = slot[2]
+    end
+    local out = {}
+    for _, slot in ipairs(snap.slots) do
+        table.insert(out, {slot[1], current[slot[1]] or slot[2]})
+    end
+    return out
+end
+
 local function clone_txt(operand, txt)
     if operand ~= nil and operand.type == 'ssa' then
         return nil
@@ -273,6 +285,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     local function nins_to_body_offset(nins)
         return body_offset_by_num[nins] or body_len
     end
+    local body_end = body_len > 0 and body_orig_num[body_len] or loop_num
 
     local result = {}
     for _, node in ipairs(prologue) do
@@ -319,11 +332,26 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
             end
         end
 
+        -- The next copy enters with the values this copy carries.
+        local next_phi_remap = {}
+        for body_ref, prologue_ref in pairs(phi_map) do
+            next_phi_remap[prologue_ref] = remap[body_ref]
+        end
+
+        -- A snapshot past the last body instruction is taken
+        -- after the back-edge: a PHI input there stands for the
+        -- value the next copy enters with, not the one this copy
+        -- entered with.
+        local after_remap = {}
+        for ref, value in pairs(remap) do after_remap[ref] = value end
+        for ref, value in pairs(next_phi_remap) do after_remap[ref] = value end
+
         if snapshots then
             for _, snap_id in ipairs(body_snap_ids) do
                 local snap = snapshots[snap_id]
 
                 local new_nins = {}
+                local snap_pos = 0
                 for _, nins in ipairs(snap.nins) do
                     if nins >= loop_num then
                         local body_offset = nins_to_body_offset(nins)
@@ -331,25 +359,19 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                             prologue_len + (iter - 1) * body_len
                                 + body_offset
                         )
+                        snap_pos = math.max(snap_pos, nins)
                     end
                 end
 
-                local snap_remap = {}
-                for k, v in pairs(remap) do snap_remap[k] = v end
-                for body_ref, prologue_ref in pairs(phi_map) do
-                    snap_remap[prologue_ref] = remap[body_ref]
-                end
                 local uid = snap_id + iter * SNAPSHOT_INC
                 new_snapshots[uid] = clone_snap(
-                    new_nins, snap.slots, snap_remap
+                    new_nins, slots_at_snapshot(snap),
+                    snap_pos > body_end and after_remap or remap
                 )
             end
         end
 
-        prev_phi_remap = {}
-        for body_ref, prologue_ref in pairs(phi_map) do
-            prev_phi_remap[prologue_ref] = remap[body_ref]
-        end
+        prev_phi_remap = next_phi_remap
     end
 
     return result, new_snapshots, smt
