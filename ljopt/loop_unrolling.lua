@@ -12,16 +12,33 @@ local dev_checks = require('ljopt.dev_checks')
 local ljopt_config = require('ljopt.config')
 local op_type = require('ljopt.ir.op_type')
 local utils = require('ljopt.utils')
+local arith_utils = require('ljopt.ir.arith_utils')
 
 -- Some huge value to distinguish snapshots from different loop
 -- iterations.
 local SNAPSHOT_INC = 1e6
 
--- Remap an operand's SSA reference if it appears in the
--- remap table.
-local function remap_operand(operand, remap)
+-- The remap table maps an SSA ref to the value that replaces it
+-- in a copy: {tab = <operand>, txt = <display text>}, the same
+-- pair a call argument is stored as. The value is a ref of the
+-- copy or a constant a PHI folded to.
+local function ssa_value(ref)
+    return {tab = {type = 'ssa', value = ref}}
+end
+
+-- Remap an operand through the remap table. Returns the new
+-- operand and its display text.
+--
+-- The display text records the operand as the *original* body
+-- node spelled it, and op_type.to_string() prefers it over the
+-- value. Once an SSA operand is remapped that text is stale, so
+-- it is replaced by the text of the new value, which is only set
+-- for a constant: that is where the SMT literal of a KNUM lives.
+-- Literals (mode flags, field names) keep their text, since
+-- op_type.from_raw() needs it to reconstruct them.
+local function remap_value(operand, txt, remap)
     if operand == nil then
-        return nil
+        return nil, txt
     end
     -- A call's argument list carries SSA refs of its own, one
     -- level down. Without recursing, a cloned CALL keeps reading
@@ -29,24 +46,19 @@ local function remap_operand(operand, remap)
     if operand.type == 'carg' then
         local args = {}
         for i, arg in ipairs(operand.value) do
-            local tab = remap_operand(arg.tab, remap)
-            -- Drop the display text for remapped refs; it still
-            -- spells the original ref and wins in to_string().
-            local txt = arg.txt
-            if arg.tab ~= nil and arg.tab.type == 'ssa' then
-                txt = nil
-            end
-            args[i] = {tab = tab, txt = txt}
+            local tab, arg_txt = remap_value(arg.tab, arg.txt, remap)
+            args[i] = {tab = tab, txt = arg_txt}
         end
-        return {type = 'carg', value = args}
+        return {type = 'carg', value = args}, txt
     end
     if operand.type ~= 'ssa' then
-        return operand
+        return operand, txt
     end
-    if remap[operand.value] then
-        return {type = 'ssa', value = remap[operand.value]}
+    local value = remap[operand.value]
+    if value == nil then
+        return operand, nil
     end
-    return operand
+    return value.tab, value.txt
 end
 
 -- Remap snapshot slot SSA refs using the iteration's remap table.
@@ -54,16 +66,20 @@ local function remap_snap_slots(slots, remap)
     local new_slots = {}
     for _, slot in ipairs(slots) do
         local info = slot[2]
-        if info.type == 'ssa' then
-            local new_ref = remap[info.value] or info.value
+        local value = (info.type == 'ssa' or info.type == 'softfp')
+            and remap[info.value]
+        if value and value.tab.type == 'number' then
+            table.insert(new_slots, {slot[1], {
+                type = 'const',
+                const_type = 'number',
+                value = arith_utils.const_num_to_smt_bv(value.tab.value),
+            }})
+        elseif value then
             table.insert(new_slots,
-                {slot[1], {type = 'ssa', value = new_ref}}
+                {slot[1], {type = info.type, value = value.tab.value}}
             )
-        elseif info.type == 'softfp' then
-            local new_ref = remap[info.value] or info.value
-            table.insert(new_slots,
-                {slot[1], {type = 'softfp', value = new_ref}}
-            )
+        elseif info.type == 'ssa' or info.type == 'softfp' then
+            table.insert(new_slots, slot)
         else
             assert(info.type == 'const',
                 ('unexpected snapshot slot type %s'):format(
@@ -76,27 +92,22 @@ local function remap_snap_slots(slots, remap)
     return new_slots
 end
 
+-- Build phi_map: prologue_ref -> the value the loop carries
+-- into the next iteration. It is the PHI's right operand: a
+-- body ref or a number the body value folded to.
 local function infer_phi_map_opt(phi_nodes)
     local phi_map = {}
     for _, phi in ipairs(phi_nodes) do
         local prologue_ref = phi.op1 and phi.op1.type == 'ssa' and phi.op1.value
-        local body_ref = phi.op2 and phi.op2.type == 'ssa' and phi.op2.value
-        if prologue_ref and body_ref then
-            phi_map[body_ref] = prologue_ref
+        local next_value = phi.op2
+        if prologue_ref and next_value ~= nil
+            and (next_value.type == 'ssa' or next_value.type == 'number') then
+            phi_map[prologue_ref] = {tab = next_value, txt = phi.op2_txt}
         end
     end
     return phi_map
 end
 
-
--- The display text records the operand as the *original* body
--- node spelled it, and op_type.to_string() prefers it over the
--- value. Once an SSA operand is remapped that text is stale, so
--- every unrolled iteration's SMT comment would claim to read
--- iteration 1's refs. Drop it for SSA operands and let
--- to_string() fall back to the remapped value; literals (mode
--- flags, field names) keep theirs, since op_type.from_raw()
--- needs the text to reconstruct them.
 local function slots_at_snapshot(snap)
     local current = {}
     for _, slot in ipairs(snap.last_slots or {}) do
@@ -109,28 +120,23 @@ local function slots_at_snapshot(snap)
     return out
 end
 
-local function clone_txt(operand, txt)
-    if operand ~= nil and operand.type == 'ssa' then
-        return nil
-    end
-    return txt
-end
-
 local function clone_node(id, bnode, remap)
+    local op1, op1_txt = remap_value(bnode.op1, bnode.op1_txt, remap)
+    local op2, op2_txt = remap_value(bnode.op2, bnode.op2_txt, remap)
     return {
         num = id,
         flags = bnode.flags,
         irtype = bnode.irtype,
         irop = bnode.irop,
-        op1 = remap_operand(bnode.op1, remap),
-        op2 = remap_operand(bnode.op2, remap),
-        op1_txt = clone_txt(bnode.op1, bnode.op1_txt),
-        op2_txt = clone_txt(bnode.op2, bnode.op2_txt),
+        op1 = op1,
+        op2 = op2,
+        op1_txt = op1_txt,
+        op2_txt = op2_txt,
     }
 end
 
-local function clone_snap(new_nins, slots, snap_remap)
-    local new_slots = remap_snap_slots(slots, snap_remap)
+local function clone_snap(new_nins, slots, remap)
+    local new_slots = remap_snap_slots(slots, remap)
 
     if #new_nins > 0 then
         return {nins = new_nins, slots = new_slots}
@@ -237,7 +243,6 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     end
     local body_len = table.getn(body)
 
-    -- Build phi_map: body_output_ref -> prologue_input_ref.
     local phi_map = infer_phi_map_opt(phi_nodes)
 
     -- Classify snapshots and split mixed ones.
@@ -303,9 +308,11 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
     local _, narrowed = sload_slot_map(raw_nodes)
     local narrowed_phi = {}
     if op_stack ~= nil and next(narrowed) ~= nil then
-        for body_ref, prologue_ref in pairs(phi_map) do
-            narrowed_phi[body_ref] = true
-            precondition(prologue_ref)
+        for prologue_ref, next_value in pairs(phi_map) do
+            if next_value.tab.type == 'ssa' then
+                narrowed_phi[next_value.tab.value] = true
+                precondition(prologue_ref)
+            end
         end
     end
 
@@ -313,11 +320,11 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
         local remap = {}
         local base_pos = prologue_len + (iter - 1) * body_len
         for j, bnode in ipairs(body) do
-            remap[bnode.num] = base_pos + j
+            remap[bnode.num] = ssa_value(base_pos + j)
         end
 
-        for prologue_ref, prev_ref in pairs(prev_phi_remap) do
-            remap[prologue_ref] = prev_ref
+        for prologue_ref, prev_value in pairs(prev_phi_remap) do
+            remap[prologue_ref] = prev_value
         end
 
         for j, bnode in ipairs(body) do
@@ -327,7 +334,7 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
 
         for body_ref in pairs(narrowed_phi) do
             if remap[body_ref] then
-                precondition(remap[body_ref])
+                precondition(remap[body_ref].tab.value)
             end
         end
 
@@ -353,9 +360,12 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
             end
         end
 
+        -- The next copy enters with the values this copy carries.
         prev_phi_remap = {}
-        for body_ref, prologue_ref in pairs(phi_map) do
-            prev_phi_remap[prologue_ref] = remap[body_ref]
+        for prologue_ref, next_value in pairs(phi_map) do
+            local tab, txt = remap_value(next_value.tab, next_value.txt,
+                remap)
+            prev_phi_remap[prologue_ref] = {tab = tab, txt = txt}
         end
     end
 
@@ -407,7 +417,7 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
     -- Build initial prev_phi_remap from iteration 1.
     local prev_phi_remap = {}
     for body_ref, sload_ref in pairs(phi_map) do
-        prev_phi_remap[sload_ref] = body_ref
+        prev_phi_remap[sload_ref] = ssa_value(body_ref)
     end
 
     -- Produce N more copies (iterations 2..N+1) to match opt's
@@ -416,12 +426,12 @@ local function unroll_without_loop_marker(raw_nodes, snapshots)
         local remap = {}
         local base_pos = (iter - 1) * body_len
         for j, bnode in ipairs(body) do
-            remap[bnode.num] = base_pos + j
+            remap[bnode.num] = ssa_value(base_pos + j)
         end
 
         -- Connect iteration inputs via inferred phi_map.
-        for prologue_ref, prev_ref in pairs(prev_phi_remap) do
-            remap[prologue_ref] = prev_ref
+        for prologue_ref, prev_value in pairs(prev_phi_remap) do
+            remap[prologue_ref] = prev_value
         end
 
         for j, bnode in ipairs(body) do
