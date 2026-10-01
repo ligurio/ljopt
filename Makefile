@@ -11,7 +11,7 @@ LUA_PATH_ROCKS=$(shell luarocks path --lr-path)
 LUA_PATH="${LUA_PATH_ROCKS};./?/init.lua;;"
 
 # Don't forget to update the commit hash in .envrc.
-LUAJIT_TAG ?= af5d38f109b6a7f714b41f92a57e2bd67d14955a
+LUAJIT_TAG ?= ab1477848bcdeaf667c34f87755a11015c81ac8a
 LUAJIT_BUGGY_TAG ?= 203a98682e925d3740291db26184b8a847857943~
 BUILD_DIR := $(PROJECT_DIR)/build
 LUA_BIN := $(BUILD_DIR)/luajit_$(LUAJIT_TAG)/src/luajit
