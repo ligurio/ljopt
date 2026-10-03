@@ -384,7 +384,7 @@ end)
 
 test:test("table-driven generator reaches everything it declares",
     function(test)
-    test:plan(18)
+    test:plan(19)
 
     local opcodes = require("ljopt.irfuzz.opcodes")
     local opcode_class = require("ljopt.irfuzz.opcode_class")
@@ -724,6 +724,30 @@ test:test("table-driven generator reaches everything it declares",
         end
     end
     test:is(reused, 0, "every SLOAD reads a slot of its own")
+
+    local jutil = require("jit.util")
+    local decode = require("ljopt.irfuzz.decode")
+    local retyped = {}
+    local function replay(seed, insns_n)
+        local insns = gen_table.gen(seed, { insns = insns_n })
+        local ok, u, o = pcall(jutil.irfuzz,
+            gen.to_spec(insns, gen_table.roots(insns)))
+        if not ok then return end
+        local tu, to = decode.decode(u), decode.decode(o)
+        for g = 1, #insns do
+            local nu, no = tu.trace[u.map[g]], to.trace[o.map[g]]
+            if nu and no and no.irop ~= "NOP" and nu.irtype ~= no.irtype then
+                retyped[#retyped + 1] = ("seed %d: %s %s became %s %s")
+                    :format(seed, nu.irtype, nu.irop, no.irtype, no.irop)
+                return
+            end
+        end
+    end
+    replay(1800866278, 100)
+    replay(1795933093, 100)
+    for seed = 1, 100 do replay(seed, 14) end
+    test:is(table.concat(retyped, "; "), "",
+        "optimization never changes the type of a generated value")
 end)
 
 require("tests.coverage").shutdown()

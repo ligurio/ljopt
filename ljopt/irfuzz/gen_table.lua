@@ -71,17 +71,24 @@ local function gen(seed, opts)
     end
 
     local cell_type = {}
+    local cell_value = {}
+    local same_table = {}
+    local function table_of(ref)
+        return same_table[ref] or ref
+    end
     local function cell_table(ref)
-        if producer[ref] == "AREF" then return insns[insns[ref].av].av end
-        return insns[ref].av
+        if producer[ref] == "AREF" then
+            return table_of(insns[insns[ref].av].av)
+        end
+        return table_of(insns[ref].av)
     end
     local function cell_of(ref)
         local ins = insns[ref]
         local op = producer[ref]
         if op == "AREF" then
-            return "A:" .. insns[ins.av].av .. ":" .. ins.bv
+            return "A:" .. table_of(insns[ins.av].av) .. ":" .. ins.bv
         elseif op == "HREF" or op == "NEWREF" then
-            return "H:" .. ins.av .. ":" .. ins.bv
+            return "H:" .. table_of(ins.av) .. ":" .. ins.bv
         end
     end
     local function typed_refs(spec, types, t)
@@ -360,7 +367,15 @@ local function gen(seed, opts)
             local idx = emit(c.name, t, ak, av, bk, bv)
             if (spec.store or spec.op1.cell_typed) and ak == K.REF
                 and cell_of(av) then
-                cell_type[cell_of(av)] = c.t
+                local cell = cell_of(av)
+                cell_type[cell] = c.t
+                if spec.store then
+                    cell_value[cell] = c.t == T.TAB and bk == K.REF
+                        and table_of(bv) or nil
+                elseif c.t == T.TAB then
+                    cell_value[cell] = cell_value[cell] or idx
+                    same_table[idx] = cell_value[cell]
+                end
             end
             -- Only a compare guard is valueless. ADDOV and its
             -- siblings compute x+y and carry the overflow check,
