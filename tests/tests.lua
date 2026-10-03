@@ -426,6 +426,21 @@ end
             {type = "str", name = "SNEW"},
             {type = "int", name = "FLOAD"},
         },    }, {
+        name = "string.sub compared through its bytes",
+        code = [[
+local sub = string.sub
+local function foo(s, n)
+    return sub(s, 1, n) == "ab"
+end
+foo("abcdef", 2)
+foo("abcdef", 2)
+foo("abcdef", 2)
+]],
+        ins = {
+            {type = "p32", name = "STRREF"},
+            {type = "str", name = "SNEW"},
+            {type = "str", name = "EQ"},
+        },    }, {
         -- Comparing two interned strings records as a str-typed
         -- guard. Without a class for that type variant the guard
         -- was dropped, and with it the branch it decides.

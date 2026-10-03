@@ -33,21 +33,35 @@ local function str_bytes(cell, nbytes)
     return ('(concat %s)'):format(table.concat(parts, ' '))
 end
 
+local function str_bytes_in_range(cell, nbytes)
+    local off = ('(get-p32-tab %s)'):format(cell)
+    local base = ('(get-str (get-p32-idx %s))'):format(cell)
+    local asserts = {}
+    for i = 0, nbytes - 1 do
+        asserts[#asserts + 1] =
+            ('(assert (< (str.to_code (str.at %s (+ %s %d))) 256))')
+                :format(base, off, i)
+    end
+    return table.concat(asserts, '\n') .. '\n'
+end
+
 local function make_xload(typ, nbytes, finalize)
     local cls = {}
     ir_node.extended(cls, ir_node.ir_node_base)
     function cls:to_smt_lib(ctx)
         local left = self:get_left_op()
         local raw
+        local prefix = ''
         if left:is_ssa() and ctx.strref_ptrs[left:get_ssa()] then
-            raw = str_bytes(
-                ctx.op_stack:load(left:get_ssa(), op_type.ANY), nbytes
-            )
+            local cell = ctx.op_stack:load(left:get_ssa(), op_type.ANY)
+            raw = str_bytes(cell, nbytes)
+            prefix = str_bytes_in_range(cell, nbytes)
         else
             local ptr = ir_node.retrieve_i64_op(left, ctx, 'p64')
             raw = arith_utils.xmem_load(ctx.xmem_cur, ptr, nbytes)
         end
-        return ctx.op_stack:store(self:get_ssa_reference(), typ, finalize(raw))
+        return prefix
+            .. ctx.op_stack:store(self:get_ssa_reference(), typ, finalize(raw))
     end
     return cls
 end
