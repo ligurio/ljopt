@@ -1,4 +1,5 @@
 local bit = require("bit")
+local ffi = require("ffi")
 local ljopt_config = require("ljopt.config")
 local op_type = require('ljopt.ir.op_type')
 
@@ -161,11 +162,22 @@ local function file_exists(path)
     return false
 end
 
+local function find_str_ptr(addr, strs)
+    for _, str in ipairs(strs) do
+        local base = tonumber(ffi.cast("uintptr_t",
+            ffi.cast("const char *", str)))
+        if addr >= base and addr <= base + #str then
+            return str, addr - base
+        end
+    end
+end
+
 return {
     debug_msg = debug_msg,
     enrich_snapshots_with_exits = enrich_snapshots_with_exits,
     fatal_msg = fatal_msg,
     file_exists = file_exists,
+    find_str_ptr = find_str_ptr,
     hash = fnv1a_hash,
     join_strings = join_strings,
     merge_tables = merge_tables,

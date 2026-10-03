@@ -18,6 +18,7 @@ local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local vmdef = require("jit.vmdef")
 local arith_utils = require("ljopt.ir.arith_utils")
+local utils = require("ljopt.utils")
 
 -- Double -> SMT bitvector literal. A self-contained copy of the
 -- same one-liner ir_dump_utils and tests/ir_tests.lua use;
@@ -99,9 +100,33 @@ end
 -- REF_BIAS-relative operand value returned by the harness; the
 -- constant lives at kval[-v] / kot[-v]. Returns (txt, tab) like
 -- ljopt_formatsmt.
+local PTR_KOPS = {}
+for op = 0, #vmdef.irnames / 6 - 1 do
+  local name = vmdef.irnames:sub(6 * op + 1, 6 * op + 6)
+  if name == "KPTR  " or name == "KKPTR " then PTR_KOPS[op] = true end
+end
+
+local function const_strs(pass)
+  if pass.kstrs == nil then
+    pass.kstrs = {}
+    for i = 1, #pass.kot do
+      local k = pass.kval[i]
+      if type(k) == "string" then pass.kstrs[#pass.kstrs + 1] = k end
+    end
+  end
+  return pass.kstrs
+end
+
 local function decode_const(pass, v)
   local idx = -v
   local k = pass.kval[idx]
+  if type(k) == "number" and PTR_KOPS[shr(pass.kot[idx], 8)] then
+    local str, ofs = utils.find_str_ptr(k, const_strs(pass))
+    if str ~= nil then
+      return ("%q+%d"):format(str, ofs),
+        { type = "strptr", value = { str = str, ofs = ofs } }
+    end
+  end
   if type(k) == "number" then
     return float_to_smt_bv(k), { type = "number", value = k }
   end

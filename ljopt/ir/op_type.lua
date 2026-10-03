@@ -39,6 +39,7 @@ OpType.NIL    = 'nil'
 OpType.NUM    = 'num'
 OpType.SSA    = 'ssa'
 OpType.STR    = 'string'
+OpType.STRPTR = 'strptr'
 OpType.TAB    = 'tab'
 
 -- Operand metatable.
@@ -56,6 +57,7 @@ function op_mt:is_lit()    return self.type == OpType.LIT  end
 function op_mt:is_num()    return self.type == OpType.NUM  end
 function op_mt:is_ssa()    return self.type == OpType.SSA  end
 function op_mt:is_str()    return self.type == OpType.STR  end
+function op_mt:is_strptr() return self.type == OpType.STRPTR end
 function op_mt:is_tab()    return self.type == OpType.TAB  end
 
 function op_mt:get_bool()  assert(self:is_bool()); return self._value end
@@ -68,6 +70,7 @@ function op_mt:get_lit()   assert(self:is_lit());  return self._value end
 function op_mt:get_num()   assert(self:is_num());  return self._value end
 function op_mt:get_ssa()   assert(self:is_ssa());  return self._value end
 function op_mt:get_str()   assert(self:is_str());  return self._value end
+function op_mt:get_strptr() assert(self:is_strptr()); return self._value end
 function op_mt:get_tab()   assert(self:is_tab());  return self._value end
 
 -- Returns a new operand object.
@@ -87,6 +90,7 @@ function OpType.new(type, value)
         number       = OpType.NUM,
         ssa          = OpType.SSA,
         string       = OpType.STR,
+        strptr       = OpType.STRPTR,
         table        = OpType.TAB,
     }
     assert(supported_types[type], 'Somehow this type is not exists: ' .. type)

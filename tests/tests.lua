@@ -426,6 +426,20 @@ end
             {type = "str", name = "SNEW"},
             {type = "int", name = "FLOAD"},
         },    }, {
+        name = "string.sub of a constant string folded to a pointer",
+        code = [[
+local sub = string.sub
+local function foo(n)
+    return sub("abcdef", 1, n) == "ab"
+end
+foo(2)
+foo(2)
+foo(2)
+]],
+        ins = {
+            {type = "str", name = "SNEW"},
+            {type = "str", name = "EQ"},
+        },    }, {
         name = "string.sub compared through its bytes",
         code = [[
 local sub = string.sub

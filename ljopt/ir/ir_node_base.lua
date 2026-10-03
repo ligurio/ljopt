@@ -202,6 +202,10 @@ local function retrieve_raw_val(op, ctx)
         return ctx.op_stack:load(op:get_ssa(), op_type.ANY)
     elseif op:is_str() then
         return arith_utils.const_str_to_memcell(op:get_str())
+    elseif op:is_strptr() then
+        local ptr = op:get_strptr()
+        return ('(p32-val %d %s)'):format(
+            ptr.ofs, arith_utils.const_str_to_memcell(ptr.str))
     elseif op:is_num() then
         return arith_utils.const_num_to_memcell(op:get_num())
     elseif op:is_bool() then

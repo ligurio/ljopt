@@ -52,8 +52,9 @@ local function make_xload(typ, nbytes, finalize)
         local left = self:get_left_op()
         local raw
         local prefix = ''
-        if left:is_ssa() and ctx.strref_ptrs[left:get_ssa()] then
-            local cell = ctx.op_stack:load(left:get_ssa(), op_type.ANY)
+        if left:is_strptr()
+            or (left:is_ssa() and ctx.strref_ptrs[left:get_ssa()]) then
+            local cell = ir_node.retrieve_raw_val(left, ctx)
             raw = str_bytes(cell, nbytes)
             prefix = str_bytes_in_range(cell, nbytes)
         else

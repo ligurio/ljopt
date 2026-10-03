@@ -17,6 +17,7 @@ local funcinfo, funcbc = jutil.funcinfo, jutil.funcbc
 local bcline = require("jit.bc").line
 local tracek = jutil.tracek
 local ljopt_config = require("ljopt.config")
+local utils = require("ljopt.utils")
 local bit = require("bit")
 local band, shr = bit.band, bit.rshift
 local sub, gsub, format = string.sub, string.gsub, string.format
@@ -265,17 +266,35 @@ local function ctlsub(c)
   end
 end
 
+local function trace_strs(tr)
+  local strs = {}
+  for idx = -jutil.traceinfo(tr).nk, -1 do
+    local k = tracek(tr, idx)
+    if type(k) == "string" then strs[#strs + 1] = k end
+  end
+  return strs
+end
+
 -- Everything same as formatk except float conversion.
 local function ljopt_formatsmt(tr, idx, sn)
   local k, t, slot = tracek(tr, idx)
   local tn = type(k)
   local s
   local const_type = nil
+  local value = k
   -- Only set for a table constant: the parts a TDUP copies.
   local tab_asize, tab_hmask
   if tn == "number" then
     const_type = "number"
-    if t < 12 then
+    local str, ofs
+    if t < 12 and k ~= 0 then
+      str, ofs = utils.find_str_ptr(k, trace_strs(tr))
+    end
+    if str ~= nil then
+      const_type = "strptr"
+      value = { str = str, ofs = ofs }
+      s = format("%q+%d", str, ofs)
+    elseif t < 12 then
       s = k == 0 and "NULL" or format("[0x%08x]", k)
     elseif band(sn or 0, 0x30000) ~= 0 then
       s = band(sn, 0x20000) ~= 0 and "contpc" or "ftsz"
@@ -329,7 +348,7 @@ local function ljopt_formatsmt(tr, idx, sn)
   -- Currently only num works.
   -- https://github.com/ligurio/ljopt/issues/36
   return s, {
-    type = const_type, value = k,
+    type = const_type, value = value,
     asize = tab_asize, hmask = tab_hmask,
   }
 end
