@@ -8,6 +8,9 @@ ir_node.extended(impls.IRNodeGENum, bin_op.BinOpGuardNum)
 impls.IRNodeGEInt = { op_str = 'bvsge' }
 ir_node.extended(impls.IRNodeGEInt, bin_op.BinOpGuardInt)
 
+impls.IRNodeGEI64 = { op_str = 'bvsge' }
+ir_node.extended(impls.IRNodeGEI64, bin_op.BinOpGuardI64)
+
 local function instance(node_str)
     return impls[node_str]
 end

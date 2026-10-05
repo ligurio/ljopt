@@ -9,6 +9,9 @@ local impls = {}
 impls.IRNodeLEInt = { op_str = 'bvsle' }
 ir_node.extended(impls.IRNodeLEInt, bin_op.BinOpGuardInt)
 
+impls.IRNodeLEI64 = { op_str = 'bvsle' }
+ir_node.extended(impls.IRNodeLEI64, bin_op.BinOpGuardI64)
+
 impls.IRNodeLENum = { op_str = 'fp.leq' }
 ir_node.extended(impls.IRNodeLENum, bin_op.BinOpGuardNum)
 

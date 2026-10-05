@@ -763,6 +763,46 @@ foo(5LL, 5LL)
             {type = "i64", name = "EQ"},
         },
     }, {
+        name = "i64 BSWAP and ordered i64 compares",
+        code = [[
+local function foo(bswap, x)
+    local s = 0
+    if bswap(x) < 0LL then s = s + 1 end
+    if x < 2LL then s = s + 2 end
+    if x <= 2LL then s = s + 4 end
+    if x <= 0LL then s = s + 8 end
+    return s
+end
+local bswap = require("bit").bswap
+foo(bswap, 1LL)
+foo(bswap, 1LL)
+foo(bswap, 1LL)
+]],
+        ins = {
+            {type = "i64", name = "BSWAP"},
+            {type = "i64", name = "GE"},
+            {type = "i64", name = "LT"},
+            {type = "i64", name = "LE"},
+            {type = "i64", name = "GT"},
+        },
+    }, {
+        name = "i64 constant above 2^53 folded by the optimizer",
+        code = [[
+local function foo(x)
+    if x + (0x4000000000000000LL + 0x3fffffffffffffffLL) < 0LL then
+        return 1
+    end
+    return 2
+end
+foo(1LL)
+foo(1LL)
+foo(1LL)
+]],
+        ins = {
+            {type = "i64", name = "ADD"},
+            {type = "i64", name = "LT"},
+        },
+    }, {
         code = [[
 local bit = require('bit');
 local function foo()

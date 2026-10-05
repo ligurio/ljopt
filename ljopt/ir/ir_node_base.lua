@@ -167,7 +167,7 @@ local function retrieve_i64_op(op, ctx, type)
     if op:is_ssa() then
         return ctx.op_stack:load(op:get_ssa(), type)
     elseif op:is_i64() then
-        return string.format('#x%016x', tonumber(op:get_i64()))
+        return arith_utils.const_i64_to_smt_bv(op:get_i64())
     elseif op:is_num() then
         return hex_double_to_i64_hex(op_type.to_string(op))
     elseif op:is_bool() then
