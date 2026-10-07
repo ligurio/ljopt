@@ -9,7 +9,7 @@ local impls = {}
 -- for the 64-bit variants too -- the i64 case said bvashr, which
 -- disagreed with the int case on any value with the top bit set.
 impls.IRNodeBSHRI64 = { op_str = 'bvlshr' }
-ir_node.extended(impls.IRNodeBSHRI64, bin_op.BinOpI64)
+ir_node.extended(impls.IRNodeBSHRI64, bin_op.BinOpShiftI64)
 
 impls.IRNodeBSHRInt = { op_str = 'bvlshr' }
 ir_node.extended(impls.IRNodeBSHRInt, bin_op.BinOpShiftInt)

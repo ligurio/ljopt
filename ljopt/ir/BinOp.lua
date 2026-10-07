@@ -105,6 +105,18 @@ function IRNodeBinOpShiftInt:to_smt_lib(ctx)
     return ctx.op_stack:store(self:get_ssa_reference(), type, data)
 end
 
+local IRNodeBinOpShiftI64 = {}
+ir_node.extended(IRNodeBinOpShiftI64, IRNodeBinOpBase)
+
+function IRNodeBinOpShiftI64:to_smt_lib(ctx)
+    local type = self:get_type()
+    local left_op = ir_node.retrieve_i64_op(self:get_left_op(), ctx, type)
+    local right_op = ir_node.retrieve_i64_op(self:get_right_op(), ctx, type)
+    local count = ('(bvand %s #x000000000000003f)'):format(right_op)
+    local data = ('(%s %s %s)'):format(self.op_str, left_op, count)
+    return ctx.op_stack:store(self:get_ssa_reference(), type, data)
+end
+
 local IRNodeBinOpGuardNum = {}
 ir_node.extended(IRNodeBinOpGuardNum, IRNodeBinOpBase)
 
@@ -164,6 +176,7 @@ return {
     BinOpNum = IRNodeBinOpNum,
     BinOpInt = IRNodeBinOpInt,
     BinOpShiftInt = IRNodeBinOpShiftInt,
+    BinOpShiftI64 = IRNodeBinOpShiftI64,
     BinOpI64 = IRNodeBinOpI64,
     BinOpU32 = IRNodeBinOpU32,
     BinOpGuardNum = IRNodeBinOpGuardNum,

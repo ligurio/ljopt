@@ -4,7 +4,7 @@ local ir_node = require('ljopt.ir.ir_node_base')
 local impls = {}
 
 impls.IRNodeBSARI64 = { op_str = 'bvashr' }
-ir_node.extended(impls.IRNodeBSARI64, bin_op.BinOpInt)
+ir_node.extended(impls.IRNodeBSARI64, bin_op.BinOpShiftI64)
 
 impls.IRNodeBSARInt = { op_str = 'bvashr' }
 ir_node.extended(impls.IRNodeBSARInt, bin_op.BinOpShiftInt)

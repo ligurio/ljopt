@@ -809,6 +809,22 @@ foo()
             {type = "cdt", name = "CNEWI"}
         }
     }, {
+        name = "i64 shift count is masked to 6 bits",
+        code = [[
+local bit = require('bit')
+local function f(x)
+    return bit.lshift(x, 65), bit.rshift(x, 65), bit.arshift(x, 65)
+end
+f(-3LL)
+f(-3LL)
+f(-3LL)
+]],
+        ins = {
+            {type = "i64", name = "BSHL"},
+            {type = "i64", name = "BSHR"},
+            {type = "i64", name = "BSAR"},
+        },
+    }, {
         code = [[
 -- CNEWI + FLOAD cdata.int64
 local ffi = require("ffi")
