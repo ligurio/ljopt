@@ -809,6 +809,88 @@ foo()
             {type = "cdt", name = "CNEWI"}
         }
     }, {
+        name = "i64 shift count is masked to 6 bits",
+        code = [[
+local bit = require('bit')
+local function f(x)
+    return bit.lshift(x, 65), bit.rshift(x, 65), bit.arshift(x, 65)
+end
+f(-3LL)
+f(-3LL)
+f(-3LL)
+]],
+        ins = {
+            {type = "i64", name = "BSHL"},
+            {type = "i64", name = "BSHR"},
+            {type = "i64", name = "BSAR"},
+        },
+    }, {
+        name = "CONV int.num of a double out of int32 range",
+        code = [[
+local ffi = require('ffi')
+local arr = ffi.new("int32_t[1]", 0)
+local function f(p, y)
+    local a = 1e300
+    p[0] = a * 10
+    return p[0] + y
+end
+f(arr, 1)
+f(arr, 1)
+f(arr, 1)
+]],
+        ins = {
+            {type = "int", name = "CONV",
+                right_op = op_type.new("lit", "int.num none")},
+            {type = "int", name = "XSTORE"},
+            {type = "int", name = "XLOAD"},
+        },
+    }, {
+        name = "CONV i64.num of a double out of int64 range",
+        code = [[
+local ffi = require('ffi')
+local function f(y)
+    local a = 1e300
+    return ffi.cast("int64_t", a * 10) + y
+end
+f(1LL)
+f(1LL)
+f(1LL)
+]],
+        ins = {
+            {type = "i64", name = "CONV",
+                right_op = op_type.new("lit", "i64.num none")},
+        },
+    }, {
+        name = "CONV u32.num of a negative double",
+        code = [[
+local ffi = require('ffi')
+local function f(y)
+    local a = -3
+    return ffi.cast("uint32_t", a * 1.5) + y
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+        },
+    }, {
+        name = "TOBIT of a double past 2^52",
+        code = [[
+local function f(y)
+    local a = 1e300
+    return bit.tobit(a * 10) + y
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "int", name = "TOBIT"},
+        },
+    }, {
         code = [[
 -- CNEWI + FLOAD cdata.int64
 local ffi = require("ffi")
@@ -1934,6 +2016,31 @@ s = s + f(arr, 1e39)
             {type = "flt", name = "XSTORE"},
             {type = "flt", name = "XLOAD"},
             {type = "num", name = "CONV"},
+        },
+    }, {
+        -- `dead` is allocated at -O0 and gone at -O3, so the two
+        -- traces allocate a different number of tables; the one
+        -- that escapes into `dst` has to be recognized as the
+        -- same table anyway. Reads sat if local tables are
+        -- matched by allocation order instead of by escape.
+        name = "local table matched across a dropped allocation",
+        code = [[
+local function fill(dst)
+    for _ = 1, 6 do
+        local dead = {}
+        dst.x = {}
+    end
+end
+
+local d = {}
+fill(d)
+fill(d)
+fill(d)
+]],
+        unroll_n = 2,
+        ins = {
+            {type = "tab", name = "TNEW"},
+            {type = "tab", name = "HSTORE"},
         },
     }}
     test:plan(2 * #srcs)

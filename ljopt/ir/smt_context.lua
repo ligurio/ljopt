@@ -426,6 +426,12 @@ function MemoryStack.init_smt(self, name, base_stack)
     self.next_free = -1
     -- base_slot -> { slot }
     self.vm_slot_map = {}
+    -- Tables this trace allocated, in allocation order, and the
+    -- ones whose id reached memory, in the order it did.
+    self.local_tabs = {}
+    self.local_by_ssa = {}
+    self.escaped_tabs = {}
+    self.escaped_set = {}
     -- [Version][Slot][Data]
     local mutable_memory = string.format(
         '(declare-fun %s () MemPtr)',
@@ -447,6 +453,57 @@ function MemoryStack.alloc_slot(self)
     local current_slot = self.next_free
     self.next_free = self.next_free - 1
     return ('(- %d)'):format(-current_slot), current_slot
+end
+
+-- Allocates a table the trace creates itself. The id is a
+-- symbolic constant, not the next counter value: which id stands
+-- for which table is settled by local_tabs2smt() in ir_smtlib.
+function MemoryStack.allocate_local(self, ssa_ref)
+    dev_checks('table', 'number')
+
+    local name = ('%s_loc%d'):format(self._name, #self.local_tabs + 1)
+    table.insert(self.local_tabs, name)
+    self.local_by_ssa[ssa_ref] = name
+    return name, ('(declare-const %s Int)\n'):format(name) ..
+        ('(assert (= (select (select %s %s) %s) zero_pointer))'):format(
+            self._name, self:get_version(), name
+        )
+end
+
+-- Records that a table the trace allocated had its id written
+-- into memory. Anything that never gets here is unreachable once
+-- the trace ends, and is left out of the comparison.
+function MemoryStack.mark_escaped(self, ssa_ref)
+    dev_checks('table', 'number')
+
+    local name = self.local_by_ssa[ssa_ref]
+    if name == nil or self.escaped_set[name] then
+        return
+    end
+    self.escaped_set[name] = true
+    table.insert(self.escaped_tabs, name)
+end
+
+-- Keeps the locally allocated tables apart from each other and
+-- from every counter-allocated slot.
+function MemoryStack.local_tabs_constraints(self)
+    if #self.local_tabs == 0 then
+        return ''
+    end
+    local out = {}
+    for _, name in ipairs(self.local_tabs) do
+        table.insert(out,
+            ('(assert (< %s %d))'):format(name, self.next_free + 1)
+        )
+    end
+    if #self.local_tabs > 1 then
+        table.insert(out,
+            ('(assert (distinct %s))'):format(
+                table.concat(self.local_tabs, ' ')
+            )
+        )
+    end
+    return table.concat(out, '\n') .. '\n'
 end
 
 -- Takes as input op num (e.g. 0001) or

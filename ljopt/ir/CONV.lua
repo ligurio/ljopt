@@ -22,14 +22,9 @@ function IRNodeCONV:to_smt_lib(ctx)
         data = arith_utils.smt_int_to_fp(data)
     elseif parsed_right_op[1] == 'int.num' then
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
-        -- TODO handle inputs that are out of range.
-        -- LuaJIT follows C semantic when converting
-        -- num -> int.
-        -- And in C it's RTZ as stated in standard 6.3.1.4:
-        -- luacheck: push no max_comment_line_length
-        -- https://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-        -- luacheck: pop
-        data = string.format('((_ fp.to_sbv 64) RTZ %s)', left_op)
+        data = ('((_ sign_extend 32) %s)'):format(
+            arith_utils.fp_trunc_to_bv(left_op, 32)
+        )
     elseif parsed_right_op[1] == 'num.i64' then
         left_op = self:get_left_op()
         data = ir_node.retrieve_i64_op(left_op, ctx, 'int')
@@ -50,8 +45,7 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = ir_node.retrieve_num_op(
             self:get_left_op(), ctx, 'num'
         )
-        -- TODO handle inputs that are out of range.
-        data = string.format('((_ fp.to_sbv 64) RNE %s)', left_op)
+        data = arith_utils.fp_trunc_to_bv(left_op, 64)
     -- Unsigned 32-bit conversions. u32 values are stored as
     -- zero-extended 64-bit BVs (canonical form); see ir/BinOp.
     elseif parsed_right_op[1] == 'u32.int' then
@@ -85,11 +79,8 @@ function IRNodeCONV:to_smt_lib(ctx)
         left_op = ir_node.retrieve_u32_op(self:get_left_op(), ctx, 'u32')
         data = arith_utils.smt_u32_to_fp(left_op)
     elseif parsed_right_op[1] == 'u32.num' then
-        -- num -> u32: C truncation toward zero (RTZ), unsigned.
         left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, 'num')
-        data = ('((_ zero_extend 32) ((_ fp.to_ubv 32) RTZ %s))'):format(
-            left_op
-        )
+        data = arith_utils.wrap_u32(arith_utils.fp_trunc_to_bv(left_op, 64))
     else
         assert(false, 'Unsupported type conversion: '..right_op)
     end
