@@ -825,6 +825,72 @@ f(-3LL)
             {type = "i64", name = "BSAR"},
         },
     }, {
+        name = "CONV int.num of a double out of int32 range",
+        code = [[
+local ffi = require('ffi')
+local arr = ffi.new("int32_t[1]", 0)
+local function f(p, y)
+    local a = 1e300
+    p[0] = a * 10
+    return p[0] + y
+end
+f(arr, 1)
+f(arr, 1)
+f(arr, 1)
+]],
+        ins = {
+            {type = "int", name = "CONV",
+                right_op = op_type.new("lit", "int.num none")},
+            {type = "int", name = "XSTORE"},
+            {type = "int", name = "XLOAD"},
+        },
+    }, {
+        name = "CONV i64.num of a double out of int64 range",
+        code = [[
+local ffi = require('ffi')
+local function f(y)
+    local a = 1e300
+    return ffi.cast("int64_t", a * 10) + y
+end
+f(1LL)
+f(1LL)
+f(1LL)
+]],
+        ins = {
+            {type = "i64", name = "CONV",
+                right_op = op_type.new("lit", "i64.num none")},
+        },
+    }, {
+        name = "CONV u32.num of a negative double",
+        code = [[
+local ffi = require('ffi')
+local function f(y)
+    local a = -3
+    return ffi.cast("uint32_t", a * 1.5) + y
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "u32", name = "CONV",
+                right_op = op_type.new("lit", "u32.num none")},
+        },
+    }, {
+        name = "TOBIT of a double past 2^52",
+        code = [[
+local function f(y)
+    local a = 1e300
+    return bit.tobit(a * 10) + y
+end
+f(1)
+f(1)
+f(1)
+]],
+        ins = {
+            {type = "int", name = "TOBIT"},
+        },
+    }, {
         code = [[
 -- CNEWI + FLOAD cdata.int64
 local ffi = require("ffi")

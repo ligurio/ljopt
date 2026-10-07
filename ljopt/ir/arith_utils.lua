@@ -217,6 +217,20 @@ local function fp_to_bits(fp, width)
         ('(assert (= %s (%s (%s %s))))'):format(fp, kind.sort, kind.fn, fp)
 end
 
+local function fp_trunc_to_bv(x, width)
+    local fmt = '(ite (fp.lt (fp.abs %s) %s) ((_ fp.to_sbv %d) RTZ %s) #x8%s)'
+    return fmt:format(x, const_num_to_smt_fp(2 ^ (width - 1)), width, x,
+        ('0'):rep(width / 4 - 1))
+end
+
+local function fp_tobit(fp_value)
+    local sum = ('(fp.add RNE %s %s)'):format(
+        fp_value, const_num_to_smt_fp(2 ^ 52 + 2 ^ 51)
+    )
+    local bits, tie = fp_to_bits(sum, 64)
+    return ('((_ sign_extend 32) ((_ extract 31 0) %s))'):format(bits), tie
+end
+
 -- Lua has a single number type, so `t[1]` and `t[1.0]` name the
 -- same slot, and -0.0 keys the same slot as +0.0.  A key reaches
 -- the IR either as a float or, once the recorder narrowed the
@@ -249,6 +263,8 @@ return {
     const_int_to_smt_bv = const_int_to_smt_bv,
     const_i64_to_smt_bv = const_i64_to_smt_bv,
     fp_to_bits = fp_to_bits,
+    fp_trunc_to_bv = fp_trunc_to_bv,
+    fp_tobit = fp_tobit,
     memcell_to_str = memcell_to_str,
     normalize_table_key = normalize_table_key,
     xmem_store = xmem_store,
