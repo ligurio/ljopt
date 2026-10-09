@@ -447,6 +447,23 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
+-- XXX: The test is kept as a skip because ljopt cannot check it
+-- yet on any available build:
+--   * a regular (non-assertions) buggy build does not fail: the
+--     miscompiled values happen to be correct, so there is no
+--     runtime error to match;
+--   * an assertions-enabled buggy build aborts with an internal
+--     LuaJIT assertion, which is exactly the reported bug (bad load
+--     forwarding after a table rehash):
+--       LuaJIT ASSERT .../src/lj_opt_mem.c:197:
+--       fwd_ahload: mismatched type in constant table
+--     but the suite is not run against such a build;
+--   * the SMT path is unusable either: on the buggy build ljopt
+--     segfaults while recording the optimized trace
+--     (gc_traverse_trace, src/lj_gc.c:253), and on the fixed build
+--     the formula is a spurious SAT.
+-- Enabling the runtime check requires running the buggy tests
+-- against LuaJIT built with -DLUA_USE_ASSERT=ON.
 -- https://github.com/LuaJIT/LuaJIT/issues/980
 -- https://github.com/tarantool/luajit/commit/46418db5fdbfc5dcf5515edea7df1c652b3a5974
 -- https://github.com/LuaJIT/LuaJIT/commit/c7db8255e1eb59f933fac7bc9322f0e4f8ddc6e6
@@ -458,6 +475,11 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
+-- XXX: Cannot be reproduced on the pinned LuaJIT pair (buggy 203a~,
+-- current af5d38f): the fix (f067cf63) is already an ancestor of the
+-- buggy build, so the bug does not exist there. Reproducing it would
+-- require an older buggy LuaJIT (before the fix); kept as a skip for
+-- now.
 -- https://github.com/LuaJIT/LuaJIT/issues/6976
 -- https://github.com/tarantool/luajit/commit/f067cf638cf8987ab3b6db372d609a5982e458b5
 -- https://github.com/LuaJIT/LuaJIT/commit/1e6e8aaa20626ac94cf907c69b0452f76e9f5fa5
@@ -499,6 +521,16 @@ function(test)
     test:skip("reproduce with SMT")
 end)
 
+-- XXX: The bug reproduces at runtime (the buggy build crashes in
+-- the generated code), but ljopt cannot check it via SMT yet:
+--   * as written, the reproducer calls jit.off() and reruns the
+--     loop, so ljopt records only the main loop trace while the
+--     side/stitch traces are skipped (parent=nil) or abort; no
+--     unoptimized/optimized pair is produced (0 formulas);
+--   * a variant without jit.off() yields one formula, but the
+--     solver does not decide it within the test timeout.
+-- The bug is an IR-level invariant-hoisting issue (IR_ABC), so SMT
+-- checking is desirable once the traces are capturable.
 -- https://github.com/LuaJIT/LuaJIT/issues/1194
 -- https://github.com/tarantool/luajit/commit/cc96994ae7cae290b22e6f3233062804ea533c8d
 -- https://github.com/LuaJIT/LuaJIT/commit/7369eff67d46d7f5fac9ee064e3fbf97a15458de
@@ -510,6 +542,13 @@ test:test("Fix IR_ABC hoisting (LuaJIT#1194)", function(test)
     test:skip("reproduce with SMT")
 end)
 
+-- XXX: The bug reproduces at runtime (SIGSEGV in the generated
+-- code), but ljopt cannot check it via SMT yet: on the buggy build
+-- the process segfaults while ljopt records the optimized trace
+-- (the miscompiled trace is executed during the recording run).
+-- The bug is an IR-level FOLD issue for IR_ABC with constants, so
+-- SMT checking is desirable once recording can be stopped before
+-- the bad trace runs.
 -- https://github.com/LuaJIT/LuaJIT/issues/794
 -- https://github.com/tarantool/luajit/commit/4018d3a8f75c5e59531d314a3bd7bd4bc911805e
 -- https://github.com/LuaJIT/LuaJIT/commit/c8bcf1e5fb8eb72c7e35604fdfd27bba512761bb
@@ -588,8 +627,14 @@ function(test)
     test:skip("const variant: reproduce with SMT")
 end)
 
+-- XXX: The bug reproduces at runtime in DUALNUM mode only. ljopt
+-- cannot check it via SMT: the guarded CONV is present in the IR
+-- on both the buggy and the fixed builds, so the -O0/-O3
+-- comparison reports equivalence (UNSAT on both). The defect
+-- shows up only as an assembly-level DCE difference (CONV is
+-- marked weak in the buggy build), which the IR-level encoding
+-- does not model.
 -- https://github.com/tarantool/luajit/commit/eac9ead5bfa699d2dfc663022fbeb2ab633285ef
--- XXX: reproduced in the DUALNUM mode only.
 test:test("Omission of the guarded CONV int.num in DUALNUM mode",
 function(test)
     test:plan(2)
