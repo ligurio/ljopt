@@ -20,7 +20,7 @@ local reproducers_path = coverage.cwd() .. "/tests/reproducers/"
 -- NOOP when environment variable LJOPT_COVERAGE is undefined.
 coverage.enable()
 
-test:plan(34)
+test:plan(36)
 
 -- The function executes the passed Lua chunk and returns
 -- a boolean value - true if the result of execution is as
@@ -552,6 +552,26 @@ test:test("Fix ABC elimination in lj_fold.c",
 function(test)
     test:plan(2)
     test:skip("reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/737
+-- https://github.com/tarantool/luajit/commit/ca0de768be31f10ccd35569f786a960a76e9fdbb
+test:test("Use-def analysis misses slots used by upvalues (LuaJIT#737)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_737.lua", "assertion is violated"),
+        "reproduce in runtime")
+    test:skip("reproduce with SMT")
+end)
+
+-- https://github.com/LuaJIT/LuaJIT/issues/1128
+-- https://github.com/tarantool/luajit/commit/005e8cea3173879bb838fe48e2eb734baca23f0a
+test:test("Restore of sunk tables with double IR_NEWREF (LuaJIT#1128)",
+function(test)
+    test:plan(2)
+    test:ok(reproduce_bug_in_popen("lj_1128.lua", "assertion is violated",
+        {"-Otryside=1"}), "reproduce in runtime")
     test:skip("reproduce with SMT")
 end)
 
