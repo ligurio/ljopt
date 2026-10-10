@@ -64,6 +64,27 @@ local function attach_snapshot(rec, pass, cmp, loop, insns, outputs)
     end
     ::continue::
   end
+  -- Snapshot 2 sits after the loop body, where a carried slot
+  -- holds what the body computed: the PHI's right operand. A
+  -- recorded snapshot reports that in `last_slots`, and the
+  -- unroller reads it from there; `slots` names the prologue ref,
+  -- as pass.map does. A carried value folded to a constant stays
+  -- on the prologue ref, the unroller substitutes it itself.
+  local carried = {}
+  for _, n in ipairs(rec.trace) do
+    if n.irop == "PHI" and n.op1 ~= nil and n.op1.type == "ssa"
+      and n.op2 ~= nil and n.op2.type == "ssa" then
+      carried[n.op1.value] = n.op2.value
+    end
+  end
+  local last_slots = {}
+  for _, s in ipairs(slots) do
+    local v = s[2]
+    if v.type == "ssa" and carried[v.value] then
+      v = { type = "ssa", value = carried[v.value] }
+    end
+    last_slots[#last_slots + 1] = { s[1], v }
+  end
   -- Two snapshots. Snapshot 1 sits before the whole stream so
   -- enrich_snapshots_with_exits (which attaches a guard to the
   -- snapshot with nins <= ir_id) assigns every guard in the
@@ -74,7 +95,7 @@ local function attach_snapshot(rec, pass, cmp, loop, insns, outputs)
   rec.snapshots = {
     [1] = { nins = { 1 }, slots = {} },
     [2] = { nins = { #rec.trace + 1 }, slots = slots,
-            last_slots = slots },
+            last_slots = last_slots },
   }
 end
 
