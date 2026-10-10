@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(11)
+test:plan(12)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -797,6 +797,40 @@ test:test("unrolling keeps a slot a carried value only reads",
     test:ok(#slot3 > 0, "the optimized trace has unrolled snapshots")
     test:is(table.concat(moved, " "), "",
         "every copy keeps slot 3 on its SLOAD")
+end)
+
+test:test("jit.util.irfuzz exports every constant it interned",
+    function(test)
+    test:plan(1)
+
+    local jutil = require("jit.util")
+    local vmdef = require("jit.vmdef")
+    local bit = require("bit")
+    local gen = require("ljopt.irfuzz.gen")
+    local function opname(ot)
+        local op = bit.rshift(ot, 8)
+        return vmdef.irnames:sub(6 * op + 1, 6 * op + 6)
+    end
+    local function replay(seed)
+        local insns = gen.gen(seed, {
+            insns = 20, ints = true, exclude_gaps = true,
+        })
+        local ok, u, o = pcall(jutil.irfuzz,
+            gen.to_spec(insns, gen.roots(insns)))
+        if ok then return u, o end
+    end
+
+    -- The payload of `KNUM 3214.0` has IR_KNUM in its opcode
+    -- byte. Read as the head of a 64-bit constant, it made the
+    -- KINT 7 above it a payload and exported it as 0.
+    local _, o = replay(1791611478)
+    local add
+    for i = 1, o.nins do
+        if opname(o.ot[i]) == "ADD   " and o.op2[i] < 0 then
+            add = o.kval[-o.op2[i]]
+        end
+    end
+    test:is(add, 7, "the int ADD of seed 1791611478 adds 7")
 end)
 
 require("tests.coverage").shutdown()

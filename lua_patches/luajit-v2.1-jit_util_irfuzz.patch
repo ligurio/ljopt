@@ -9,7 +9,7 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
  #include "lj_target.h"
  #endif
  #include "lj_trace.h"
-@@ -386,6 +387,323 @@ LJLIB_CF(jit_util_tracemc)
+@@ -386,6 +387,329 @@ LJLIB_CF(jit_util_tracemc)
    return 0;
  }
  
@@ -217,16 +217,21 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +  }
 +  lua_setfield(L, -2, "kot");
 +  lua_createtable(L, nk, 0);
-+  for (i = 1; i <= nk; i++) {
++  /* Walk the constants upwards, from the lowest ref. A 64-bit
++  ** constant keeps its payload in the slot above its head, and raw
++  ** payload bytes decode as a garbage instruction -- a KPRI of
++  ** collectable type faults the GC barrier below -- so the payload
++  ** is skipped. Walking upwards reaches every head before its
++  ** payload. Walking downwards has to guess from the slot below,
++  ** and a payload whose bytes happen to read as a 64-bit head (the
++  ** payload of KNUM 3214.0 reads as KNUM) hides the real constant
++  ** above it. */
++  for (i = nk; i >= 1; i--) {
 +    IRIns *ir = &J->cur.ir[REF_BIAS - i];
-+    /* A 64-bit constant keeps its payload in the next slot, and raw
-+    ** payload bytes decode as a garbage instruction -- a KPRI of
-+    ** collectable type faults the GC barrier below. Skip it. */
-+    if ((int32_t)(REF_BIAS - i - 1) >= (int32_t)J->cur.nk &&
-+	ir_isk64(&J->cur.ir[REF_BIAS - i - 1])) {
++    int k64 = ir_isk64(ir) && i > 1;
++    if (k64) {
 +      lua_pushinteger(L, 0);  /* benign placeholder, keeps kval aligned */
-+      lua_rawseti(L, -2, i);
-+      continue;
++      lua_rawseti(L, -2, i - 1);
 +    }
 +    if (ir->o == IR_KSLOT) {
 +      /* A KSLOT's op1 must reference another constant in the live
@@ -250,6 +255,7 @@ diff --git a/src/lib_jit.c b/src/lib_jit.c
 +    lua_pushnil(L);
 +    lj_ir_kvalue(L, L->top-1, ir);
 +    lua_rawseti(L, -2, i);
++    if (k64) i--;  /* The payload slot is filled above. */
 +  }
 +  lua_setfield(L, -2, "kval");
 +  lua_createtable(L, n, 0);
