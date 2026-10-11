@@ -122,16 +122,23 @@ end
 -- The slots of `snap` with the values the recorder saw at that
 -- snapshot (`last_slots`), not the ones the dataflow graph would
 -- suggest: a slot a carried value only feeds keeps its own value.
+-- The second result marks the slots `last_slots` moved off the
+-- ref `slots` names.
 local function slots_at_snapshot(snap)
     local current = {}
     for _, slot in ipairs(snap.last_slots or {}) do
         current[slot[1]] = slot[2]
     end
-    local out = {}
-    for _, slot in ipairs(snap.slots) do
-        table.insert(out, {slot[1], current[slot[1]] or slot[2]})
+    local out, moved = {}, {}
+    for i, slot in ipairs(snap.slots) do
+        local v = current[slot[1]]
+        if v ~= nil and (v.type ~= slot[2].type
+                         or v.value ~= slot[2].value) then
+            moved[i] = true
+        end
+        table.insert(out, {slot[1], v or slot[2]})
     end
-    return out
+    return out, moved
 end
 
 -- The display text records the operand as the *original* body
@@ -409,10 +416,18 @@ local function unroll_with_loop_marker(raw_nodes, snapshots, loop_idx,
                     end
                 end
 
+                -- A slot `last_slots` moved already names the value
+                -- the body left, and reads it in this iteration:
+                -- `PHI 0013 0037` reports 0037, which is itself
+                -- carried. snap_remap would take 0037 one more
+                -- iteration ahead, to the constant it folds to.
+                local slots, moved = slots_at_snapshot(snap)
+                for i, slot in ipairs(slots) do
+                    slots[i] = remap_snap_slots({slot},
+                        moved[i] and remap or snap_remap)[1]
+                end
                 local uid = snap_id + iter * SNAPSHOT_INC
-                new_snapshots[uid] = clone_snap(
-                    new_nins, slots_at_snapshot(snap), snap_remap
-                )
+                new_snapshots[uid] = clone_snap(new_nins, slots, {})
             end
         end
 

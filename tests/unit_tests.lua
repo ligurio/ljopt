@@ -19,7 +19,7 @@ local function expect_fail(test, name, fun, ...)
     test:is(success, false, name)
 end
 
-test:plan(13)
+test:plan(14)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -750,10 +750,10 @@ test:test("table-driven generator reaches everything it declares",
         "optimization never changes the type of a generated value")
 end)
 
--- Replay an IR fuzzer seed as a loop and collect, per Lua slot,
--- what the unrolled copies of the optimized trace's snapshot hold.
-local function unrolled_opt_slots(seed, opts)
-    local check = require("ljopt.irfuzz.check")
+-- Run `build`, which replays an IR fuzzer seed as a loop, and
+-- collect, per Lua slot, what the unrolled copies of the optimized
+-- trace's snapshot hold.
+local function unrolled_opt_slots(build)
     local orig = loop_unrolling.loop_unrooling_transform
     local by_slot = {}
     loop_unrolling.loop_unrooling_transform = function(raw, ...)
@@ -776,7 +776,7 @@ local function unrolled_opt_slots(seed, opts)
         end
         return nodes, snaps, smt
     end
-    local ok, err = pcall(check.build, seed, opts)
+    local ok, err = pcall(build)
     loop_unrolling.loop_unrooling_transform = orig
     assert(ok, err)
     return by_slot
@@ -786,10 +786,12 @@ end
 -- optimizer folds `BAND x x` to the SLOAD of slot 3 and carries
 -- `BROL(ADD(slot 3, slot 1), 28)` in slot 5. A later change to
 -- gen.lua can make this seed build something else.
-local CARRIED_SEED, CARRIED_OPTS = 1791425470, {
-    insns = 12, ints = true, exclude_gaps = true,
-    tables = true, loop = true,
-}
+local function build_carried()
+    return require("ljopt.irfuzz.check").build(1791425470, {
+        insns = 12, ints = true, exclude_gaps = true,
+        tables = true, loop = true,
+    })
+end
 
 test:test("unrolling keeps a slot a carried value only reads",
     function(test)
@@ -799,7 +801,7 @@ test:test("unrolling keeps a slot a carried value only reads",
     -- snapshot has to keep reading the SLOAD. Walking the PHI's
     -- dataflow back to the prologue rewrote it to the BROL of each
     -- copy, and the check reported a miscompile.
-    local slot3 = unrolled_opt_slots(CARRIED_SEED, CARRIED_OPTS)[3] or {}
+    local slot3 = unrolled_opt_slots(build_carried)[3] or {}
     local moved = {}
     for _, v in ipairs(slot3) do
         if v ~= "ssa:3" then moved[#moved + 1] = v end
@@ -816,7 +818,7 @@ test:test("an irfuzz loop snapshot carries the body's value",
     -- The fuzzer's snapshot sits after the loop body, so slot 5
     -- holds each copy's own BROL. Reporting the prologue ref in
     -- `last_slots` left every copy one iteration behind.
-    local slot5 = unrolled_opt_slots(CARRIED_SEED, CARRIED_OPTS)[5] or {}
+    local slot5 = unrolled_opt_slots(build_carried)[5] or {}
     local seen, dups = {}, 0
     for _, v in ipairs(slot5) do
         if seen[v] then dups = dups + 1 end
@@ -825,6 +827,30 @@ test:test("an irfuzz loop snapshot carries the body's value",
     test:is(seen["ssa:15"], nil,
         "no copy reads the prologue's BROL")
     test:is(dups, 0, "every copy reads its own BROL")
+end)
+
+test:test("a value carried through two PHIs reaches the snapshot once",
+    function(test)
+    test:plan(2)
+
+    -- IR fuzzer seed 1791658617 (--grammar --loop --insns 30).
+    -- Slot 7 holds an upvalue the body loads before it stores
+    -- `CONV(BXOR(slot 1, 0x7fffffff))` back. LuaJIT carries it as
+    -- `PHI 0013 0037` and `PHI 0037 2147483647.0`: the slot 1 the
+    -- loop sees is 0. The first copy's snapshot reads what the
+    -- prologue stored, only the later ones the folded constant.
+    -- Taking 0037 a second PHI ahead reported a miscompile.
+    local slot7 = unrolled_opt_slots(function()
+        local check = require("ljopt.irfuzz.check")
+        local gt = require("ljopt.irfuzz.gen_table")
+        local insns = gt.gen(1791658617, { insns = 30, inputs = 1 })
+        return check.build_from(insns, gt.roots(insns),
+            { loop = true }, 1791658617)
+    end)[7] or {}
+    test:is(slot7[1], "ssa:37",
+        "the first copy reads what the prologue stored")
+    test:like(slot7[2] or "", "^const:",
+        "the next copy reads the folded constant")
 end)
 
 test:test("jit.util.irfuzz exports every constant it interned",
