@@ -656,6 +656,9 @@ function SMTContext:new(vm_stack_type, op_stack_type)
     -- through the first SLOAD's chain is invisible to a later
     -- HLOAD through the second SLOAD's chain.
     self.const_tabs_by_slot = {}
+    -- math function name -> true once ir/CALLN.lua has pinned it
+    -- at its known arguments in this trace.
+    self.math_points = {}
     -- ssa_ref -> true when value is derived purely from narrowed
     -- (C-flagged) SLOAD inputs and constants. Guards on such refs
     -- are narrowing preconditions and lift to top-level asserts
@@ -671,6 +674,7 @@ function SMTContext:restart()
     self.href_keys = {}
     self.const_tabs = {}
     self.const_tabs_by_slot = {}
+    self.math_points = {}
     self.te_stack.narrowed_refs = {}
 end
 

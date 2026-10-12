@@ -23,6 +23,38 @@ local two_arg_fns = {
     ['atan2'] = true,
 }
 
+-- Arguments a call can be folded on without its operand being a
+-- constant here. LuaJIT folds a call on a literal through
+-- kfold_fpcall1, and a loop makes literals of values this trace
+-- only loads: a carried value folded to a constant, or a load
+-- forwarded from a constant store, reaches the copied call as a
+-- KNUM. The optimized side then holds the folded number, while
+-- here the uninterpreted function can answer anything for the
+-- same argument. The special points and the IR fuzzer's KNUM pool
+-- (irfuzz/gen_table.lua) are where that happens.
+local KNOWN_ARGS = {
+    0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 2.0, -2.0, 3.5, -3.5,
+    1 / 0, -1 / 0, 0 / 0,
+}
+
+-- Pin `smt_fn` to the real function at KNOWN_ARGS, once per
+-- trace. The host's math.* is the libm LuaJIT folds with, so the
+-- axioms state what the optimizer computes, not an approximation.
+local function known_points(ctx, fn_name, smt_fn, lua_fn)
+    if ctx.math_points[fn_name] then
+        return ''
+    end
+    ctx.math_points[fn_name] = true
+    local out = {}
+    for _, x in ipairs(KNOWN_ARGS) do
+        table.insert(out, ('(assert (= (%s %s) %s))'):format(
+            smt_fn, arith_utils.const_num_to_smt_fp(x),
+            arith_utils.const_num_to_smt_fp(lua_fn(x))
+        ))
+    end
+    return '\n' .. table.concat(out, '\n')
+end
+
 local impls = {}
 
 impls.IRNodeCALLNNum = {}
@@ -69,6 +101,9 @@ function impls.IRNodeCALLNNum:to_smt_lib(ctx)
             arith_utils.const_num_to_smt_fp(result_val)
         )
         ctx.const_nums[ssa_ref] = result_val
+    end
+    if lua_fn and not two_arg_fns[fn_name] then
+        axiom = axiom .. known_points(ctx, fn_name, smt_fn, lua_fn)
     end
 
     return ctx.op_stack:store(ssa_ref, 'num', result_fp) .. axiom

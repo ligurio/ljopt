@@ -1338,6 +1338,29 @@ foo(1)
                 right_op = op_type.new("lit", "tanh")},
         },
     }, {
+        -- The second iteration reads back the 0 the first
+        -- one stored, so LuaJIT folds asin(0) in the loop
+        -- body and keeps only the number. The unoptimized
+        -- copy still calls asin on a load, which the
+        -- uninterpreted function could answer with anything.
+        name = "CALLN on an argument the loop makes constant",
+        code = [[
+local function f(t, n)
+  local s = 0
+  for i = 1, n do
+    s = s + math.asin(t[1])
+    t[1] = 0
+  end
+  return s
+end
+f({0.5}, 100)
+]],
+        unroll_n = 2,
+        ins = {
+            {type = "num", name = "CALLN",
+                right_op = op_type.new("lit", "asin")},
+        },
+    }, {
         code = [[
 x = {}
 for i = 0, 100 do
