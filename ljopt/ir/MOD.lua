@@ -3,7 +3,10 @@ local ir_node = require('ljopt.ir.ir_node_base')
 
 local impls = {}
 
-impls.IRNodeMODInt = { op_str = 'bvsrem' }
+-- Lua `%` floors, so the result takes the divisor's sign -- SMT
+-- `bvsmod`, not `bvsrem`. The int MOD the recorder emits comes
+-- from Lua `%` and folds through lj_vm_modi, which floors too.
+impls.IRNodeMODInt = { op_str = 'bvsmod' }
 ir_node.extended(impls.IRNodeMODInt, bin_op.BinOpInt)
 
 impls.IRNodeMODI64 = { op_str = 'bvsrem' }

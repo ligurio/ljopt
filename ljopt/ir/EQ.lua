@@ -7,25 +7,28 @@ ir_node.extended(IRNodeEQBase, ir_node.ir_node_base)
 
 local impls = {}
 
--- At least Z3 and Bitwuzla expect `=` for floating point
--- comparison.
+-- Numeric EQ must use `fp.eq`, not `=`. SMT-LIB `=` on a
+-- FloatingPoint sort is *structural*, which disagrees with IEEE
+-- (and so with LuaJIT) in both directions:
+--   (= +0.0 -0.0)   is false, IEEE says equal
+--   (= NaN NaN)     is true,  IEEE says not equal
+-- Both were reachable: the irfuzz guard sweep found
+-- `EQ 0.0, -0.0` reported as a bug candidate, because LuaJIT
+-- correctly folds the guard away while the `=` encoding kept it.
+-- `fp.eq` gets both right, so the old syntactic `x == x`
+-- self-comparison special case is no longer needed. NE.lua has
+-- always used fp.eq -- this is what makes the pair consistent.
 impls.IRNodeEQNum = {}
 ir_node.extended(impls.IRNodeEQNum, ir_node.ir_node_base)
 
 function impls.IRNodeEQNum:to_smt_lib(ctx)
-    local type = self:get_type()
-    local left_op = ir_node.retrieve_num_op(self:get_left_op(), ctx, type)
-    local right_op = ir_node.retrieve_num_op(self:get_right_op(), ctx, type)
-    local data
-    -- `x == x` is LuaJIT's NaN guard: in IEEE it is false only
-    -- for NaN. SMT-LIB `=` is structural, so `(= x x)` is always
-    -- true. Model the self-comparison as an explicit non-NaN
-    -- check instead.
-    if left_op == right_op then
-        data = ('(not (fp.isNaN %s))'):format(left_op)
-    else
-        data = string.format('(= %s %s)', left_op, right_op)
-    end
+    local left_op = ir_node.retrieve_num_op(
+        self:get_left_op(), ctx, self:get_type()
+    )
+    local right_op = ir_node.retrieve_num_op(
+        self:get_right_op(), ctx, self:get_type()
+    )
+    local data = string.format('(fp.eq %s %s)', left_op, right_op)
     return ctx.te_stack:store(self:get_ssa_reference(), data)
 end
 

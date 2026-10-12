@@ -16,7 +16,12 @@ function impls.IRNodeBROLInt:to_smt_lib(ctx)
     local left_i32 = ('((_ extract 31 0) %s)'):format(left_op)
     local right_i32 = ('((_ extract 31 0) %s)'):format(right_op)
     local rotated = arith_utils.brol32(left_i32, right_i32)
-    local data = ('(concat #x00000000 %s)'):format(rotated)
+    -- Sign-extend, not zero-extend: int values are held in the
+    -- op stack in sign-extended 64-bit form (see BSWAP and the
+    -- int.i64 CONV), so a rotate result with the top bit set
+    -- would otherwise disagree with every other int op -- and
+    -- with BROR, which already sign-extends.
+    local data = ('((_ sign_extend 32) %s)'):format(rotated)
     return ctx.op_stack:store(self:get_ssa_reference(), self:get_type(), data)
 end
 
@@ -24,7 +29,11 @@ impls.IRNodeBROLI64 = {}
 ir_node.extended(impls.IRNodeBROLI64, ir_node.ir_node_base)
 
 function impls.IRNodeBROLI64:to_smt_lib(ctx)
-    local left_op = ir_node.retrieve_int_op(
+    -- The rotated value is 64-bit, so it has to come through
+    -- retrieve_i64_op: retrieve_int_op has no case for an i64
+    -- constant and rejects `BROL KINT64 KINT`, which is exactly
+    -- the form the 64-bit rotate fold rules are keyed on.
+    local left_op = ir_node.retrieve_i64_op(
         self:get_left_op(), ctx, self:get_type()
     )
     local right_op = ir_node.retrieve_int_op(
