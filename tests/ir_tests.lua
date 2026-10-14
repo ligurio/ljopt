@@ -155,6 +155,10 @@ test:test("IR arithmetic tests", function(test)
                         result = 7, error = 1},
         {node = create_node("i64", "CONV", num(-3.0), "i64.int sext"),
                         result = -3, error = 1},
+        {node = create_node("u64", "CONV", num(2.1), "u64.num"),
+                        result = 2, error = 3},
+        {node = create_node("u64", "CONV", num(3.5), "u64.num"),
+                        result = 3, error = 4},
         {node = create_node("num", "DIV", num(2.3), num(3.4)),
                         result = 2.3 / 3.4, error = 1.},
         {node = create_node("int", "DIV", num(23.), num(4.)),
@@ -239,7 +243,8 @@ test:test("IR arithmetic tests", function(test)
         if test_case.node.irtype == "num" then
             expected = " ((_ to_fp 11 53) " .. f2bv(test_case.result) .. ")"
             unexpected = " ((_ to_fp 11 53) " .. f2bv(test_case.error) .. ")"
-        elseif test_case.node.irtype == "i64" then
+        elseif test_case.node.irtype == "i64" or
+               test_case.node.irtype == "u64" then
             expected = string.format("#x%.16x", test_case.result)
             unexpected = string.format("#x%.16x", test_case.error)
         elseif test_case.node.irtype == "i32" or

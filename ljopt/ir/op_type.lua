@@ -83,6 +83,7 @@ function OpType.new(type, value)
         imm          = OpType.IMM,
         int          = OpType.INT,
         int64        = OpType.I64,
+        uint64       = OpType.I64,
         lit          = OpType.LIT,
         number       = OpType.NUM,
         ssa          = OpType.SSA,
