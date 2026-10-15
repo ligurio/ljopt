@@ -59,7 +59,7 @@ local function mock_solver()
     }
 end
 
-test:plan(12)
+test:plan(14)
 
 test:test("merge_tables", function(test)
     test:plan(10)
@@ -202,7 +202,7 @@ end)
 test:test("mark_narrowed_refs", function(test)
     local ir_passes = require("ljopt.ir_passes")
 
-    test:plan(3)
+    test:plan(5)
 
     local function ssa(n) return { _is_ssa = true, _v = n,
         is_ssa = function(self) return self._is_ssa end,
@@ -249,6 +249,20 @@ test:test("mark_narrowed_refs", function(test)
     }, ctx)
     test:is(ctx.te_stack.narrowed_refs[1], nil,
         "LE on stray ref not marked")
+
+    -- Overflow-guard chain SUBOV(SUBOV(0, i), 5): the first guard
+    -- takes the C-SLOAD directly, the chained one through a
+    -- derived int ref. Both must be lifted (unlike the LE chain).
+    ctx = fresh_ctx()
+    ir_passes.mark_narrowed_refs({
+        node('SLOAD', 'int', 1, lit('#2'), lit('CI')),
+        node('SUBOV', 'int', 2, lit('#0'), ssa(1)),
+        node('SUBOV', 'int', 3, ssa(2), lit('#5')),
+    }, ctx)
+    test:is(ctx.te_stack.narrowed_refs[2], true,
+        "SUBOV on SLOAD-C marked")
+    test:is(ctx.te_stack.narrowed_refs[3], true,
+        "chained SUBOV guard lifted")
 end)
 
 local LOOP_CHUNK = [[
@@ -429,7 +443,7 @@ test:test("utils select_traces", function(test)
 end)
 
 test:test("utils solver helpers", function(test)
-    test:plan(13)
+test:plan(13)
 
     local backends = utils.solver_backends()
     test:is(#backends, 2, "solver_backends count")
@@ -476,6 +490,46 @@ test:test("utils solver helpers", function(test)
     test:is(verdict, "Timeout", "check_trace UNKNOWN verdict")
 end)
 
+test:test("FLOADTab.is_implemented", function(test)
+    test:plan(5)
+    local fload = require("ljopt.ir.FLOAD")
+    local op_type = require("ljopt.ir.op_type")
+
+    local tab = fload.instance("IRNodeFLOADTab")
+    local function impl(left_op, right_op)
+        return tab.is_implemented({}, "tab", "FLOAD", left_op, right_op)
+    end
+
+    local ssa  = op_type.new(op_type.SSA, 1)
+    local fn   = op_type.new(op_type.FUN, "f")
+    local tbl  = op_type.new("table", {})
+    local env  = op_type.new(op_type.LIT, "func.env")
+    local meta = op_type.new(op_type.LIT, "tab.meta")
+    local thead_env = op_type.new(op_type.LIT, "thread.env")
+
+    test:is(impl(ssa, env), true, "func.env from a traced value accepted")
+    test:is(impl(ssa, meta), true, "tab.meta from a traced value accepted")
+    test:is(impl(fn, env), false, "func.env of a constant function dropped")
+    test:is(impl(tbl, meta), false, "tab.meta of a constant table dropped")
+    test:is(impl(ssa, thead_env), false,
+        "thread.env not supported")
+end)
+
+test:test("FREF.is_implemented", function(test)
+    test:plan(2)
+    local fref = require("ljopt.ir.FREF")
+    local op_type = require("ljopt.ir.op_type")
+
+    local fre = fref.instance("IRNodeFREFP32")
+
+    local ssa = op_type.new(op_type.SSA, 1)
+    local lit = op_type.new(op_type.LIT, "tab.meta")
+
+    test:is(fre.is_implemented({}, "p32", "FREF", ssa, lit), true,
+        "SSA table with a literal field accepted")
+    test:is(fre.is_implemented({}, "p32", "FREF", lit, lit), false,
+        "constant table dropped")
+end)
 require("tests.coverage").shutdown()
 
 os.exit(test:check() == true and 0 or 1)
