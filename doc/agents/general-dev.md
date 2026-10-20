@@ -51,6 +51,10 @@ the next lines do.
 - Prefer chunks without loops, e.g. three calls of `foo()`, because
   they are faster. If a loop is needed, it includes the minimum number
   of iterations sufficient to record the trace in LuaJIT.
+- The number of calls or loop iterations needed to record a trace
+  depends on the `hotloop` value. Tests run with `hotloop=1`, see
+  `jit.opt.start()` in `tests/tests.lua`; a higher value needs more
+  calls or iterations.
 - A fixed LuaJIT bug gets a reproducer in `tests/reproducers/`.
 
 ---

@@ -9,9 +9,6 @@ and static analysis.
 from `lua_patches/` and builds LuaJIT. The LuaJIT commit is set by
 `LUAJIT_TAG` in `Makefile`, and the same commit is used in `.envrc`.
 
-`make test` also builds a second, old LuaJIT with known bugs
-(`LUAJIT_BUGGY_TAG`), it is used by `tests/buggy_luajit_tests.lua`.
-
 `make deps` installs Lua rocks required for development: `checks`,
 `luacheck` and `luacov`.
 
@@ -21,7 +18,9 @@ used in CI.
 
 ## Tests
 
-- `make test` runs all tests.
+- `make test` runs all tests. It also builds a second, old LuaJIT
+  with known bugs (`LUAJIT_BUGGY_TAG`), it is used by
+  `tests/buggy_luajit_tests.lua`.
 - `make test-z3-smoke` checks that the Z3 backend still works.
 - `make coverage` runs tests with code coverage.
 

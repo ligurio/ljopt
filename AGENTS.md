@@ -1,7 +1,7 @@
 ## ljopt
 
 ljopt is a bounded translation validation tool for the LuaJIT
-intermediate representation (IR). It checks that LuaJIT JIT
+intermediate representation (IR). It checks that LuaJIT
 optimizations do not change the semantics of a recorded trace.
 
 The tool runs a Lua chunk twice: with JIT optimizations disabled and
