@@ -297,15 +297,6 @@ local function snapshots2smt(snapshots1, snapshots2, stack1, stack2)
     return smt_result
 end
 
--- Helper to record dump with the given optimization.
-local function record_code(lua_code, opt, chunkname)
-    local exec_records = runtime.record_sandboxed(
-        lua_code, opt, ljopt_config.is_debug_mode(), chunkname
-    )
-    assert(type(exec_records) == 'table', 'Got type: ' .. type(exec_records))
-    return exec_records
-end
-
 -- Runs Lua code twice with different level of optimizations
 -- and translates obtained JIT traces to SMT-LIB formulas.
 --
@@ -324,7 +315,10 @@ end
 -- where snap1 != snap2, which means these 2 traces
 -- are not equivalent.
 local function traces_to_smt(lua_code, chunkname)
-    local rec_unopt = record_code(lua_code, lj_unoptimized, chunkname)
+    local rec_unopt, rec_opt, unopt_locs, opt_locs = runtime.record_both(
+        lua_code, lj_unoptimized, lj_optimized,
+        ljopt_config.is_debug_mode(), chunkname
+    )
     -- ljopt keys snapshot exits by their bytecode offset, which
     -- requires the optional getpos argument of tracesnap()
     -- Without it the JIT handlers cannot record snapshots at all,
@@ -333,13 +327,8 @@ local function traces_to_smt(lua_code, chunkname)
     if not ir_dump_utils.ljopt_tracesnap_getpos_supported() then
         error('requires a LuaJIT with jit.util.tracesnap() getpos support.', 0)
     end
-    -- Both record_code() runs capture the "file:line" of every
-    -- recorded trace (see ir_dump_utils), keyed by the same
-    -- persistent uid. The next record_code() resets the module
-    -- table, so keep a reference to this run's snapshot first.
-    local unopt_locs = ir_dump_utils.ljopt_get_execution_locs()
-    utils.debug_msg(string.rep('=', 60))
-    local rec_opt = record_code(lua_code, lj_optimized, chunkname)
+    assert(type(rec_unopt) == 'table', 'Got type: ' .. type(rec_unopt))
+    assert(type(rec_opt) == 'table', 'Got type: ' .. type(rec_opt))
 
     assert(table.getn(rec_unopt) == table.getn(rec_opt),
         ('unmatched number of traces (%d vs %d)'):
@@ -351,7 +340,7 @@ local function traces_to_smt(lua_code, chunkname)
     for uid, loc in pairs(unopt_locs) do
         traces_locs[uid] = loc
     end
-    for uid, loc in pairs(ir_dump_utils.ljopt_get_execution_locs()) do
+    for uid, loc in pairs(opt_locs) do
         traces_locs[uid] = loc
     end
 
